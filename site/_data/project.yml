@@ -1,0 +1,16 @@
+# The only repo-specific texts of the website. Everything else comes from the
+# repository: the English intro from README.md, the commands from the built CLI.
+
+# How the API is accessed: open | key (env: VAR) | account (token, user, password: VARs)
+access:
+  type: open
+
+de:
+  # German version of the README's intro paragraph. Keep it in step with README.md.
+  intro: >-
+    Jedes [CKAN](https://ckan.org/)-Open-Data-Portal direkt im Terminal durchsuchen. `ckan`
+    ist ein Kommandozeilen-Tool für die CKAN Action API (`<portal>/api/3/action`), auf der
+    viele Datenkataloge der öffentlichen Hand laufen. Ohne weitere Angaben fragt es das
+    [Transparenzportal Hamburg](https://transparenz.hamburg.de/api-796358)
+    (`suche.transparenz.hamburg.de`) ab, und `--base-url` richtet es auf jedes andere CKAN:
+    suchen, ansehen, filtern und direkt an [`jq`](https://jqlang.github.io/jq/) weitergeben.

@@ -214,6 +214,29 @@ maschinenlesbar.org CLIs:
   TypeDoc runs from the lockfile-pinned `tools/docs/` toolchain; locally, run
   `npm ci --prefix tools/docs` once before `npm run docs`.
 
+## Website
+
+The project website — <https://maschinenlesbar-org.github.io/ckan-cli/> in English and
+<https://maschinenlesbar-org.github.io/ckan-cli/de/> in German — is built from `site/` with
+[Jekyll](https://jekyllrb.com/), [banira](https://sebs.github.io/banira/) web components and
+[Fylgja](https://fylgja.dev/) CSS, and deployed by `docs.yml` together with the TypeDoc API
+reference under `/api/`. Its content comes from this repository: the README intro and quick
+start, and the command tree of the built CLI (`site/scripts/cli-reference.mjs`). `Usage.md`,
+`GLOSSARY.md` (+ `GLOSSARY.de.md`), `EXAMPLE.md` (+ `EXAMPLE.de.md`) and the skills get pages
+too once they exist. The only repo-specific files are `site/_config.yml` and
+`site/_data/project.yml` (the German intro and the access requirements); the rest of `site/` is
+identical in every maschinenlesbar.org CLI, so change it in all of them together. When the
+README intro changes, update the German intro in `site/_data/project.yml`.
+
+```bash
+npm run build                        # the CLI, for the command reference
+cd site && npm ci && bundle install  # once (Node >= 22.12, Ruby 3.4, Bundler)
+npm run serve                        # http://127.0.0.1:4000/ckan-cli/
+```
+
+The command reference is read from the CLI as built, so run it without `CKAN_BASE_URL` set,
+or the `--base-url` default shown on the site is that value instead of Hamburg's.
+
 ## License
 
 Dual-licensed under **[AGPL-3.0-or-later](LICENSE)** or a commercial license — see

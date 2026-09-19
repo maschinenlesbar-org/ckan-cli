@@ -4,6 +4,8 @@
 [![Release](https://github.com/maschinenlesbar-org/ckan-cli/actions/workflows/release.yml/badge.svg)](https://github.com/maschinenlesbar-org/ckan-cli/actions/workflows/release.yml)
 [![npm](https://img.shields.io/npm/v/@maschinenlesbar.org/ckan-cli)](https://www.npmjs.com/package/@maschinenlesbar.org/ckan-cli)
 
+**Website:** [English](https://maschinenlesbar-org.github.io/ckan-cli/) · [Deutsch](https://maschinenlesbar-org.github.io/ckan-cli/de/) — command reference, guides and API docs
+
 Search any [CKAN](https://ckan.org/) open-data portal from your terminal. `ckan`
 is a command-line tool over the CKAN Action API (`<portal>/api/3/action`), which
 many public-sector catalogues run on. Out of the box it talks to the
