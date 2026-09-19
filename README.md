@@ -247,6 +247,21 @@ CKAN's error text is shown on stderr, e.g.
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (default `2`) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
+## Claude Code skills
+
+Three [Agent Skills](SKILLS.md) teach Claude Code to use `ckan` for real questions: find
+which portals have data on a topic and rank the hits (**ckan-dataset-finder**), build
+publisher/format/licence statistics (**ckan-catalogue-stats**), and search the Hamburg
+Transparenzportal's contracts, Gutachten and Senate papers
+(**ckan-hamburg-transparency**). Install them from the maschinenlesbar.org marketplace:
+
+```
+/plugin marketplace add maschinenlesbar-org/plugins
+/plugin install ckan@maschinenlesbar
+```
+
+Real runs of each skill are in [EXAMPLE.md](EXAMPLE.md).
+
 ## Data license
 
 This CLI is a **client**. It accesses data it does not own or redistribute, and

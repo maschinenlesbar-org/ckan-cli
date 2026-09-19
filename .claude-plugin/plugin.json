@@ -1,0 +1,23 @@
+{
+  "name": "ckan",
+  "version": "0.1.0",
+  "description": "Open-data skills for German CKAN portals powered by the ckan-cli: find datasets across portals, build catalogue statistics, and search the Hamburg Transparenzportal's documents.",
+  "author": {
+    "name": "Sebastian Schürmann",
+    "email": "sebs@2xs.org"
+  },
+  "license": "AGPL-3.0-or-later",
+  "repository": "https://github.com/maschinenlesbar-org/ckan-cli",
+  "homepage": "https://github.com/maschinenlesbar-org/ckan-cli#readme",
+  "keywords": [
+    "ckan",
+    "open-data",
+    "opendata",
+    "catalogue",
+    "datasets",
+    "facets",
+    "transparenzportal",
+    "hamburg",
+    "germany"
+  ]
+}
