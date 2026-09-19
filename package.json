@@ -1,6 +1,6 @@
 {
   "name": "@maschinenlesbar.org/ckan-cli",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "TypeScript API client and CLI for any CKAN open-data portal (Action API v3), e.g. the Hamburg Transparenzportal",
   "type": "module",
   "bin": {
