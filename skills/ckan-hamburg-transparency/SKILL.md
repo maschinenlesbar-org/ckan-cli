@@ -9,8 +9,12 @@ description: >
   publish this month?", "Gutachten zum Radverkehr in Hamburg", "latest
   Senatsmitteilungen about Wohnungsbau", "Hamburg Dienstanweisungen der
   Polizei", or anything about the Transparenzportal Hamburg.
-version: 1.0.0
-userInvocable: true
+compatibility: >
+  Requires the `ckan` CLI (npm package @maschinenlesbar.org/ckan-cli) on PATH,
+  installed by the user; the skill never installs it. Uses jq for JSON
+  filtering. Network access to the chosen CKAN portal (default
+  suche.transparenz.hamburg.de; --portal, --base-url or CKAN_BASE_URL). The CKAN
+  server's own `ckan` admin command must not shadow it on PATH.
 ---
 
 # Hamburg Transparenzportal Documents
@@ -23,6 +27,8 @@ publication date, publisher, licence and PDF links.
 ## Tooling
 
 This skill drives the `ckan` command. **Before anything else, validate it is available** — run `command -v ckan` (or `ckan --version`). If it is not on your PATH, STOP and inform the user that the `ckan` CLI (`@maschinenlesbar.org/ckan-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build. The CKAN server software also installs a command named `ckan` (an admin tool): if `ckan --help` does not contain the line "CLI for any CKAN open-data portal", STOP and tell the user that a different `ckan` comes first on their PATH.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 Data comes from the `ckan` CLI over the open CKAN Action API of the chosen portal. It is read-only and needs **no API key**. Always pass `--compact` so each result is one line to pipe into `jq`. Without a portal flag, `ckan` talks to the **Hamburg Transparenzportal**; `--portal <id>` picks a known portal (`ckan portals` lists them), `--base-url <url>` any other CKAN site. A search that matches nothing returns `{"count":0,…}` and exits `0` — that is an answer, not an error. Exit `4` is an id that doesn't exist; exit `1` is a real error, and its message says which (a Solr syntax error, an HTML page instead of a CKAN, a redirect loop). Add `--timeout 60000` for a slow portal.
 
