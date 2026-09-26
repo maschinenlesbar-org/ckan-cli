@@ -135,7 +135,8 @@ compared as text and returns nonsense.
 (slug); resources by id only.
 
 **`limit` / `offset`.** Paging for the `*_list` actions (`packages`, `organizations`,
-`groups`), distinct from search's `rows` / `start`.
+`groups`), distinct from search's `rows` / `start`. `--limit` is 1 or more: CKAN reads
+`limit=0` as "no limit", so the CLI refuses 0; leave `--limit` out for the whole list.
 
 **`all_fields`.** On `organizations` / `groups`, return full objects instead of names. CKAN
 caps such a list at 25 entries without saying so; the client pages past the cap.

@@ -156,7 +156,7 @@ action <name> [--param key=value …]    call any CKAN action (generic)
 
 | Command | Flags |
 | --- | --- |
-| `packages` | `--limit <n>`, `--offset <n>` |
+| `packages` | `--limit <n>` (1 or more; omit for the whole list), `--offset <n>` |
 | `organizations`, `groups` | `--all-fields` (full objects instead of names), `--limit <n>`, `--offset <n>` |
 
 > **`--all-fields` lists are complete.** CKAN caps them at 25 entries

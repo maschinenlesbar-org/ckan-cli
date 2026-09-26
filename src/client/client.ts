@@ -57,6 +57,21 @@ function prune(params: QueryParams): QueryParams {
 }
 
 /**
+ * Check a `*_list` limit. CKAN reads `limit=0` as "no limit" (a whole catalogue,
+ * 245,893 names on Hamburg), while the `all_fields` pager would read it as "no
+ * entries"; so 0, like any non-positive or fractional value, is refused. To get
+ * the whole list, leave the limit out.
+ */
+function assertLimit(limit: number | undefined): void {
+  if (limit === undefined) return;
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    throw new CkanError(
+      `Invalid limit: expected a positive integer, got ${String(limit)}. Leave it out for the whole list.`,
+    );
+  }
+}
+
+/**
  * The site root of a CKAN instance, from what a user is likely to paste: portals
  * document their API as `<site>/api/3/action`, so that suffix (or `/api/3`) is
  * dropped. A CKAN mounted under a sub-path (`https://host/ckan`) keeps it. A
@@ -154,8 +169,9 @@ export class CkanClient {
     return this.show<Resource>("resource_show", id);
   }
 
-  /** Dataset names, paged with limit/offset. */
-  packageList(params: ListParams = {}): Promise<string[]> {
+  /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
+  async packageList(params: ListParams = {}): Promise<string[]> {
+    assertLimit(params.limit);
     return this.action<string[]>("package_list", { limit: params.limit, offset: params.offset });
   }
 
@@ -195,6 +211,7 @@ export class CkanClient {
    * that ignores `offset` cannot keep it going.
    */
   private async groupOrOrgList(action: string, params: GroupListParams): Promise<JsonValue[]> {
+    assertLimit(params.limit);
     if (!params.all_fields) {
       return this.action<JsonValue[]>(action, { limit: params.limit, offset: params.offset });
     }

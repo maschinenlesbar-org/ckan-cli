@@ -248,6 +248,21 @@ function cappedOrgServer(total: number, cap: number, dropPerPage = 0) {
   });
 }
 
+test("the list methods refuse a limit that is not a positive integer, before any request", async () => {
+  const calls: [string, (c: CkanClient) => Promise<unknown>][] = [
+    ["packageList 0", (c) => c.packageList({ limit: 0 })],
+    ["organizationList 0", (c) => c.organizationList({ limit: 0 })],
+    ["organizationList all_fields 0", (c) => c.organizationList({ all_fields: true, limit: 0 })],
+    ["groupList -1", (c) => c.groupList({ limit: -1 })],
+    ["groupList 1.5", (c) => c.groupList({ limit: 1.5 })],
+  ];
+  for (const [label, call] of calls) {
+    const mt = makeMockTransport(() => jsonResponse(ckan(["a"])));
+    await assert.rejects(() => call(clientWith(mt)), /Invalid limit: expected a positive integer/, label);
+    assert.equal(mt.calls.length, 0, label);
+  }
+});
+
 test("organizationList with all_fields pages past the server's cap to return every entry", async () => {
   const mt = cappedOrgServer(60, 25);
   const res = await clientWith(mt).organizationList({ all_fields: true });

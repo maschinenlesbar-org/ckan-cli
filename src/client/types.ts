@@ -75,6 +75,11 @@ export type Resource = JsonObject;
 
 /** Paging for the `*_list` endpoints. */
 export interface ListParams {
+  /**
+   * Most entries to return, a positive integer; omit it for the whole list. `0`
+   * is refused: CKAN reads `limit=0` as "no limit", which the `all_fields` pager
+   * would read as "no entries".
+   */
   limit?: number;
   offset?: number;
 }

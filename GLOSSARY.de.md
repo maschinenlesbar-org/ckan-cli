@@ -144,7 +144,9 @@ zuletzt geändert wurde; echte Datumsfelder, Zeiträume funktionieren also:
 (Slug) ansprechbar, Ressourcen nur über die ID.
 
 **`limit` / `offset`.** Seitenweise Abfrage für die `*_list`-Aktionen (`packages`,
-`organizations`, `groups`), getrennt von `rows` / `start` der Suche.
+`organizations`, `groups`), getrennt von `rows` / `start` der Suche. `--limit` ist 1 oder
+mehr: CKAN liest `limit=0` als „keine Grenze“, daher lehnt die CLI 0 ab; für die ganze
+Liste `--limit` einfach weglassen.
 
 **`all_fields`.** Bei `organizations` / `groups` vollständige Objekte statt Namen. CKAN
 begrenzt eine solche Liste stillschweigend auf 25 Einträge; der Client blättert über diese

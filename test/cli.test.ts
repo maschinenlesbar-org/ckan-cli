@@ -142,6 +142,20 @@ test("the list commands map their options onto the *_list actions", async () => 
   }
 });
 
+test("--limit 0 is refused on every list command (CKAN reads it as no limit)", async () => {
+  for (const argv of [
+    ["packages", "--limit", "0"],
+    ["organizations", "--limit", "0"],
+    ["organizations", "--all-fields", "--limit", "0"],
+    ["groups", "--limit", "0"],
+  ]) {
+    const cli = makeCli(() => jsonResponse(ckan(["a"])));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0, argv.join(" "));
+    assert.match(cli.err.join("\n"), /Must be >= 1\./);
+  }
+});
+
 test("tags --query rejects a blank substring instead of listing every tag", async () => {
   const cli = makeCli(() => jsonResponse(ckan([])));
   assert.equal(await run(["tags", "--query", ""], cli.deps), 1);
