@@ -150,6 +150,20 @@ function assertHttpScheme(baseUrl: string): void {
   }
 }
 
+// The headers the engine sets itself, under the exact keys it uses. They are the
+// only ones that follow a cross-origin redirect.
+const ENGINE_HEADERS = new Set(["Accept", "User-Agent"]);
+
+/**
+ * A copy of `headers` with only the engine's own non-credential headers (used on
+ * cross-origin redirects). A list of known credential headers is never complete
+ * (Proxy-Authorization, X-Auth-Token, ...), so an allowlist is kept instead. A new
+ * object, so the one already handed to the transport is not changed.
+ */
+function engineHeadersOnly(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(headers).filter(([key]) => ENGINE_HEADERS.has(key)));
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -229,12 +243,14 @@ export class RequestEngine {
       const isRedirect = status >= 300 && status < 400;
       const nextUrl = isRedirect && redirects < this.maxRedirects ? resolveLocation(location, url) : undefined;
       if (nextUrl !== undefined) {
-        // Credential-strip guard: if the redirect crosses origin, drop the
-        // request headers so any future auth/cookie header is never re-sent to
-        // a different host. (Today only Accept/User-Agent are sent, but this
-        // future-proofs against header leakage across origins.)
+        // Credential-strip guard: if the redirect crosses origin (scheme + host +
+        // port, so an https->http downgrade counts), keep only the engine's own
+        // non-credential headers, so any future auth/cookie header is never
+        // re-sent to a different host. The User-Agent stays: Hamburg's own
+        // http: -> https: hop is cross-origin, and dropping it sent every request
+        // through an http:// base URL without one (and ignored --user-agent).
         if (nextUrl.origin !== new URL(url).origin) {
-          headers = { Accept: options.accept };
+          headers = engineHeadersOnly(headers);
         }
         url = nextUrl.toString();
         redirects += 1;
