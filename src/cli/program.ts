@@ -11,7 +11,7 @@ import { CkanClient } from "../client/client.js";
 import { DEFAULT_BASE_URL, MAX_RETRIES } from "../client/engine.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
 import { redactUrl } from "../client/errors.js";
-import { parseBaseUrl, parseBoundedInt, parseIntArg, parsePortal } from "./shared.js";
+import { parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg, parsePortal } from "./shared.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 import { registerPortalCommands } from "./commands/portal.js";
 
@@ -61,7 +61,7 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
         .conflicts("baseUrl"),
     )
     .option("--timeout <ms>", "per-request timeout in milliseconds", parseBoundedInt(0, MAX_TIMEOUT_MS))
-    .option("--user-agent <ua>", "User-Agent header value")
+    .option("--user-agent <ua>", "User-Agent header value", parseHeaderValue)
     .option(
       "--max-retries <n>",
       "retries for transient 429/503 responses (0..10; each waits the server's Retry-After, up to 30 s)",

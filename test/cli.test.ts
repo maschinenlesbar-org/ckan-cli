@@ -344,6 +344,25 @@ test("a password in --base-url or CKAN_BASE_URL is redacted in errors and in --h
   assert.match(text.replace(/\s+/g, " "), /default: "http:\/\/\*\*\*@127\.0\.0\.1:9\/ok"/);
 });
 
+test("--user-agent refuses a blank value, control characters and non-Latin-1 before any request", async () => {
+  const cases: [string, RegExp][] = [
+    ["", /Expected a non-empty value\./],
+    ["  ", /Expected a non-empty value\./],
+    ["a\r\nX-Injected: 1", /Value contains control characters\./],
+    ["a" + String.fromCharCode(0x7f), /Value contains control characters\./],
+    ["bot \u2603", /Value contains characters outside Latin-1/],
+  ];
+  for (const [ua, message] of cases) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(["--user-agent", ua, "status"], cli.deps), 1, JSON.stringify(ua));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), message);
+  }
+  const ok = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["--user-agent", "Mein Bot\tü/1", "status"], ok.deps), 0);
+  assert.equal(ok.mt.last().headers?.["User-Agent"], "Mein Bot\tü/1");
+});
+
 test("a bare invocation prints help to stdout and exits 0", async () => {
   const cli = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run([], cli.deps), 0);
