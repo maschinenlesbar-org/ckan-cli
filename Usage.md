@@ -123,5 +123,5 @@ ckan action help_show --param name=package_search
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`; each waits the server's `Retry-After`, up to 30 s) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
-Blank values (`search ""`, `--fq ""`, an empty id) are usage errors, never an unfiltered
+Blank values (`search ""`, `--fq ""`, an empty id, `--param q=`) are usage errors, never an unfiltered
 search. Exit codes: `0` success, `4` not found (HTTP 404), `1` anything else.

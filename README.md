@@ -149,8 +149,8 @@ action <name> [--param key=value …]    call any CKAN action (generic)
 > **Several `--fq` filters** are sent as CKAN's `fq_list`, never as a repeated
 > `fq` key, which CKAN answers with HTTP 409.
 
-> **Blank values are refused.** `ckan search ""`, `--fq ""` or `tags --query ""`
-> exit 1 before any request, instead of silently running an unfiltered search.
+> **Blank values are refused.** `ckan search ""`, `--fq ""`, `tags --query ""` or
+> `action … --param q=` exit 1 before any request, instead of silently running an unfiltered search.
 > So does a forgotten value (`--fq --rows 5`): a value of `--fq`, `--facet`,
 > `--sort` or `tags --query` cannot start with `--`.
 

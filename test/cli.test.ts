@@ -196,6 +196,18 @@ test("action --param value may contain '='", async () => {
   assert.equal(new URL(cli.mt.last().url).searchParams.get("fq"), "title:a=b");
 });
 
+test("action refuses a blank --param value and keeps a __proto__ key", async () => {
+  for (const param of ["q=", "q= "]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(["action", "package_search", "--param", param], cli.deps), 1, param);
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), /The value must not be blank\./);
+  }
+  const proto = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["action", "x", "--param", "__proto__=1", "--param", "constructor=2"], proto.deps), 0);
+  assert.equal(new URL(proto.mt.last().url).search, "?__proto__=1&constructor=2");
+});
+
 test("action rejects a bad name, a malformed --param and a duplicate key before any request", async () => {
   for (const argv of [
     ["action", "../../../etc/passwd"],
