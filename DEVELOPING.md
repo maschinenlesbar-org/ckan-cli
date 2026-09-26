@@ -116,7 +116,12 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   commander does not run value parsers on defaults, so a `preAction` hook in
   `program.ts` checks a `CKAN_BASE_URL` value the same way `--base-url` is checked.
 - **Envelope.** The client unwraps CKAN's `{ help, success, result }` and raises
-  `CkanError` when `success` is false.
+  `CkanError` when `success` is false. The typed methods also check the top-level
+  shape of `result` (never a deep schema): an object for `status` and the `*_show`
+  calls, `{ count, results[] }` for `packageSearch`, an array for the `*_list` calls
+  (every `all_fields` page too). A missing `result` or a wrong shape raises
+  `CkanParseError` `Unexpected response shape from /api/3/action/<name>: expected …`.
+  The generic `action()` passes any `result` through, `null` included.
 - **Three CKAN error shapes**, all turned into one readable line: a message
   (`{"__type": "Not Found Error", "message": "Not found"}`, HTTP 404), a validation
   field map (`{"__type": "Validation Error", "rows": ["Invalid integer"]}`, HTTP 409),
@@ -131,7 +136,10 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
 - **Readable failures.** A non-JSON answer names the URL and the content type
   (`Expected JSON from … but got text/html`); JSON that is not a CKAN envelope says so;
   a Solr syntax error is cut down to Solr's `[Reason: …]`; a redirect loop (Bonn and
-  Bielefeld redirect every API URL to itself) ends with `stopped after 5 redirects`.
+  Bielefeld redirect every API URL to itself) ends with `stopped after 5 redirects`,
+  and a 3xx with a missing or malformed `Location` with `redirect not followed (no
+  Location header)` / `redirect to <location> not followed`. A response nested too
+  deeply to pretty-print says so (`try --compact`) instead of overflowing the stack.
 - **Filters.** CKAN reads a repeated `fq=` as a Python list and pastes it into
   Solr (HTTP 409), and splits a lone `fq_list` value into characters. So one
   filter goes out as `fq`, two or more as `fq_list`. Facet fields go out as the

@@ -86,6 +86,7 @@ function problemOf(err: unknown): string {
     const got = /but got (.+)$/.exec(message);
     if (got) return `not JSON (${got[1]})`;
     if (/not a CKAN Action API response/.test(message)) return "not a CKAN Action API";
+    if (/^Unexpected response shape/.test(message)) return "unexpected response shape";
     return "invalid JSON";
   }
   if (err instanceof CkanNetworkError) {

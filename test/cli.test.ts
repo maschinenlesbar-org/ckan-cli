@@ -230,6 +230,42 @@ test("a success:false envelope exits 1", async () => {
   assert.match(cli.err.join("\n"), /status_show" failed: x/);
 });
 
+test("a result of the wrong shape exits 1 with a clear message, not an Unexpected error", async () => {
+  const cases: [string[], unknown, string][] = [
+    [["search", "elbe"], { help: "h", success: true }, "package_search: expected a result in the envelope."],
+    [["search", "elbe"], ckan({ results: [] }), "package_search: expected an object with a numeric count and a results array."],
+    [["organizations", "--all-fields"], ckan({ a: 1 }), "organization_list: expected an array."],
+    [["packages"], ckan(null), "package_list: expected an array."],
+    [["package", "x"], ckan(["x"]), "package_show: expected a JSON object."],
+    [["status"], ckan("up"), "status_show: expected a JSON object."],
+  ];
+  for (const [argv, body, expected] of cases) {
+    const cli = makeCli(() => jsonResponse(body));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.equal(cli.err.join("\n"), `Error: Unexpected response shape from ${ACTION}/${expected}`, argv.join(" "));
+  }
+  // The generic action passes any result through, null included.
+  const generic = makeCli(() => jsonResponse(ckan(null)));
+  assert.equal(await run(["action", "anything"], generic.deps), 0);
+  assert.equal(generic.out.join("\n"), "null");
+});
+
+test("a response nested too deeply to pretty-print is a clear error, not a stack overflow", async () => {
+  const depth = 200_000;
+  const deep = `{"help":"h","success":true,"result":{"a":${"[".repeat(depth)}${"]".repeat(depth)}}}`;
+  const pretty = makeCli(() => rawResponse(deep, "application/json"));
+  assert.equal(await run(["package", "x"], pretty.deps), 1);
+  assert.equal(pretty.err.join("\n"), "Error: The response is nested too deeply to pretty-print; try --compact.");
+
+  const compact = makeCli(() => rawResponse(deep, "application/json"));
+  const code = await run(["--compact", "package", "x"], compact.deps);
+  // Compact output may fit the stack; if it does not, the message says so.
+  if (code !== 0) {
+    assert.equal(code, 1);
+    assert.equal(compact.err.join("\n"), "Error: The response is nested too deeply to print.");
+  }
+});
+
 test("--compact prints JSON on a single line", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ count: 1, results: [{ id: "d1" }] })));
   await run(["--compact", "search", "elbe"], cli.deps);

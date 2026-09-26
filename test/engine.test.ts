@@ -351,3 +351,26 @@ test("parseRetryAfter reads delay-seconds and IMF-fixdate HTTP-dates", () => {
   }
   assert.equal(MAX_RETRY_AFTER_MS, 30_000);
 });
+
+test("a redirect with a malformed or missing Location is an API error naming it, not a crash", async () => {
+  const cases: [Record<string, string>, string][] = [
+    [{ location: "http://[::1" }, "redirect to http://[::1 not followed"],
+    [{ location: `http://[::1${ESC}[31m` }, "redirect to http://[::1[31m not followed"],
+    [{}, "redirect not followed (no Location header)"],
+  ];
+  for (const [headers, detail] of cases) {
+    const mt = makeMockTransport(() => ({ status: 302, headers, body: Buffer.from("") }));
+    const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
+    await assert.rejects(
+      () => e.getJson("/x"),
+      (err: unknown) => {
+        assert.ok(err instanceof CkanApiError);
+        assert.equal(err.status, 302);
+        assert.equal(err.detail, detail);
+        assert.equal(err.message, `HTTP 302 for GET https://a.example/x: ${detail}`);
+        return true;
+      },
+    );
+    assert.equal(mt.calls.length, 1);
+  }
+});

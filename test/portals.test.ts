@@ -93,6 +93,7 @@ test("checkPortal names the problem when the search fails", async () => {
     ["HTTP 404", () => jsonResponse({}, 404)],
     ["not JSON (text/html)", () => rawResponse("<!DOCTYPE html>", "text/html")],
     ["not a CKAN Action API", () => jsonResponse({ hello: "world" })],
+    ["unexpected response shape", () => jsonResponse({ help: "h", success: true, result: [] })],
     ["host not found", () => Promise.reject(new CkanNetworkError("getaddrinfo ENOTFOUND x", { cause: Object.assign(new Error("x"), { code: "ENOTFOUND" }) }))],
     ["timeout", () => Promise.reject(new CkanNetworkError("Request timed out after 15000ms"))],
     ["redirect loop", () => ({ status: 301, headers: { location: "/api/3/action/package_search" }, body: Buffer.from("") })],

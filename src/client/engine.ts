@@ -225,38 +225,39 @@ export class RequestEngine {
       }
 
       // Follow redirects, resolving the Location relative to the current URL.
-      if (status >= 300 && status < 400 && redirects < this.maxRedirects) {
-        const location = response.headers["location"];
-        if (typeof location === "string" && location.length > 0) {
-          const previous = new URL(url);
-          const next = new URL(location, url);
-          // Credential-strip guard: if the redirect crosses origin, drop the
-          // request headers so any future auth/cookie header is never re-sent to
-          // a different host. (Today only Accept/User-Agent are sent, but this
-          // future-proofs against header leakage across origins.)
-          if (next.origin !== previous.origin) {
-            headers = { Accept: options.accept };
-          }
-          url = next.toString();
-          redirects += 1;
-          continue;
+      const location = response.headers["location"];
+      const isRedirect = status >= 300 && status < 400;
+      const nextUrl = isRedirect && redirects < this.maxRedirects ? resolveLocation(location, url) : undefined;
+      if (nextUrl !== undefined) {
+        // Credential-strip guard: if the redirect crosses origin, drop the
+        // request headers so any future auth/cookie header is never re-sent to
+        // a different host. (Today only Accept/User-Agent are sent, but this
+        // future-proofs against header leakage across origins.)
+        if (nextUrl.origin !== new URL(url).origin) {
+          headers = { Accept: options.accept };
         }
+        url = nextUrl.toString();
+        redirects += 1;
+        continue;
       }
 
       const contentType = String(response.headers["content-type"] ?? "");
       if (status < 200 || status >= 300) {
-        // A 3xx that was not followed because the limit was reached: say so, or a
-        // bare "HTTP 301" reads like a redirect this client cannot follow.
-        const exhausted = status >= 300 && status < 400 && Boolean(response.headers["location"]);
-        throw exhausted
-          ? new CkanApiError({
-              status,
-              url,
-              method,
-              body: response.body.toString("utf8"),
-              detail: `stopped after ${this.maxRedirects} redirects (a redirect loop?)`,
-            })
-          : this.toApiError(method, url, status, response.body);
+        // A 3xx that was not followed: say why, or a bare "HTTP 301" reads like a
+        // redirect this client cannot follow. Past the limit it is a loop; a
+        // missing or malformed Location (which `new URL` would have thrown on as
+        // an "Unexpected error") is named as it came, sanitised.
+        if (isRedirect) {
+          const target = resolveLocation(location, url);
+          const detail =
+            target !== undefined
+              ? `stopped after ${this.maxRedirects} redirects (a redirect loop?)`
+              : location
+                ? `redirect to ${sanitizeServerText(location)} not followed`
+                : "redirect not followed (no Location header)";
+          throw new CkanApiError({ status, url, method, body: response.body.toString("utf8"), detail });
+        }
+        throw this.toApiError(method, url, status, response.body);
       }
 
       return { data: response.body, contentType, status, url };
@@ -310,5 +311,15 @@ export class RequestEngine {
     // endpoint cannot inject terminal escape sequences via the stderr error message.
     if (detail !== undefined) detail = sanitizeServerText(detail);
     return new CkanApiError({ status, url, method, body: text, detail });
+  }
+}
+
+/** Resolve a Location header against the current URL; undefined if missing or malformed. */
+function resolveLocation(location: string | undefined, base: string): URL | undefined {
+  if (location === undefined || location === "") return undefined;
+  try {
+    return new URL(location, base);
+  } catch {
+    return undefined;
   }
 }

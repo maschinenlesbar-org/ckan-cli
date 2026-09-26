@@ -56,6 +56,23 @@ function prune(params: QueryParams): QueryParams {
   return out;
 }
 
+/** A JSON object (not null, not an array). */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A `package_search` result: an object with a numeric count and a results array. */
+function isSearchResult(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  const count = value["count"];
+  return typeof count === "number" && Number.isSafeInteger(count) && count >= 0 && Array.isArray(value["results"]);
+}
+
+/** The error for a `result` that does not have the shape the caller relies on. */
+function shapeError(name: string, expected: string): CkanParseError {
+  return new CkanParseError(`Unexpected response shape from ${ACTION}/${name}: expected ${expected}.`);
+}
+
 /**
  * Check a `*_list` limit. CKAN reads `limit=0` as "no limit" (a whole catalogue,
  * 245,893 names on Hamburg), while the `all_fields` pager would read it as "no
@@ -116,12 +133,31 @@ export class CkanClient {
         `CKAN action "${name}" failed: ${sanitizeServerText(describeCkanError(env.error))}`,
       );
     }
+    // `{"success": true}` without a result would print nothing useful (and the CLI
+    // would crash rendering `undefined`); CKAN always sends one, `null` included.
+    if (env.result === undefined) throw shapeError(name, "a result in the envelope");
     return env.result as T;
+  }
+
+  /**
+   * An action whose `result` must have a known top-level shape (never a deep
+   * schema): a broken or foreign answer becomes a CkanParseError naming the
+   * action, not a TypeError further down (`page is not iterable`).
+   */
+  private async typed<T>(
+    name: string,
+    params: QueryParams,
+    ok: (value: unknown) => boolean,
+    expected: string,
+  ): Promise<T> {
+    const result = await this.action<unknown>(name, params);
+    if (!ok(result)) throw shapeError(name, expected);
+    return result as T;
   }
 
   /** Site title, CKAN version and enabled extensions of the portal. */
   status(): Promise<Status> {
-    return this.action<Status>("status_show");
+    return this.typed<Status>("status_show", {}, isObject, "a JSON object");
   }
 
   /**
@@ -137,7 +173,7 @@ export class CkanClient {
   packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     const fq = (params.fq ?? []).filter((f) => f !== "");
     const facetFields = params.facet_field ?? [];
-    return this.action<PackageSearchResult>("package_search", {
+    return this.typed<PackageSearchResult>("package_search", {
       q: params.q,
       fq: fq.length === 1 ? fq[0] : undefined,
       fq_list: fq.length > 1 ? fq : undefined,
@@ -146,7 +182,7 @@ export class CkanClient {
       sort: params.sort,
       "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
       "facet.limit": params.facet_limit,
-    });
+    }, isSearchResult, "an object with a numeric count and a results array");
   }
 
   /** A single dataset by id or name. */
@@ -172,7 +208,12 @@ export class CkanClient {
   /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
   async packageList(params: ListParams = {}): Promise<string[]> {
     assertLimit(params.limit);
-    return this.action<string[]>("package_list", { limit: params.limit, offset: params.offset });
+    return this.typed<string[]>(
+      "package_list",
+      { limit: params.limit, offset: params.offset },
+      Array.isArray,
+      "an array",
+    );
   }
 
   /**
@@ -190,12 +231,12 @@ export class CkanClient {
 
   /** Tags, optionally only those containing a substring. */
   tagList(params: TagListParams = {}): Promise<string[]> {
-    return this.action<string[]>("tag_list", { query: params.query });
+    return this.typed<string[]>("tag_list", { query: params.query }, Array.isArray, "an array");
   }
 
   /** The licences this portal offers. */
   licenseList(): Promise<License[]> {
-    return this.action<License[]>("license_list");
+    return this.typed<License[]>("license_list", {}, Array.isArray, "an array");
   }
 
   /**
@@ -213,18 +254,28 @@ export class CkanClient {
   private async groupOrOrgList(action: string, params: GroupListParams): Promise<JsonValue[]> {
     assertLimit(params.limit);
     if (!params.all_fields) {
-      return this.action<JsonValue[]>(action, { limit: params.limit, offset: params.offset });
+      return this.typed<JsonValue[]>(
+        action,
+        { limit: params.limit, offset: params.offset },
+        Array.isArray,
+        "an array",
+      );
     }
     const wanted = params.limit ?? Infinity;
     let offset = params.offset ?? 0;
     const seen = new Set<string>();
     const out: JsonValue[] = [];
     while (out.length < wanted) {
-      const page = await this.action<JsonValue[]>(action, {
-        all_fields: true,
-        limit: Math.min(ALL_FIELDS_PAGE, wanted - out.length),
-        offset: offset === 0 ? undefined : offset,
-      });
+      const page = await this.typed<JsonValue[]>(
+        action,
+        {
+          all_fields: true,
+          limit: Math.min(ALL_FIELDS_PAGE, wanted - out.length),
+          offset: offset === 0 ? undefined : offset,
+        },
+        Array.isArray,
+        "an array",
+      );
       let added = 0;
       for (const entry of page) {
         const key = entryKey(entry);
@@ -245,6 +296,6 @@ export class CkanClient {
    */
   private async show<T>(action: string, id: string): Promise<T> {
     if (id.trim() === "") throw new CkanError(`${action} needs an id or name.`);
-    return this.action<T>(action, { id });
+    return this.typed<T>(action, { id }, isObject, "a JSON object");
   }
 }
