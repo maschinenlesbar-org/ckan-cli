@@ -283,7 +283,7 @@ export class RequestEngine {
   /** Perform a GET expecting JSON and parse it into `T`. */
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
     const res = await this.request("GET", path, { query, accept: "application/json" });
-    const text = res.data.toString("utf8");
+    const text = decodeBody(res.data, res.contentType, res.url);
     try {
       return JSON.parse(text) as T;
     } catch (cause) {
@@ -328,6 +328,25 @@ export class RequestEngine {
     if (detail !== undefined) detail = sanitizeServerText(detail);
     return new CkanApiError({ status, url, method, body: text, detail });
   }
+}
+
+/**
+ * Decode a response body by the charset of its Content-Type (UTF-8 when none is
+ * given, as JSON requires). A leading byte-order mark is dropped: TextDecoder does
+ * that by default, where Buffer#toString kept it and JSON.parse then failed. CKAN
+ * sends UTF-8; this matters for proxies and mirrors that re-encode.
+ */
+function decodeBody(body: Buffer, contentType: string, url: string): string {
+  const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
+  let decoder: TextDecoder;
+  try {
+    decoder = new TextDecoder(charset);
+  } catch {
+    throw new CkanParseError(
+      `Unsupported response charset "${sanitizeServerText(charset)}" from ${redactUrl(url)}.`,
+    );
+  }
+  return decoder.decode(body);
 }
 
 /** Resolve a Location header against the current URL; undefined if missing or malformed. */

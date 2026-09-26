@@ -373,3 +373,31 @@ test("a redirect with a malformed or missing Location is an API error naming it,
     assert.equal(mt.calls.length, 1);
   }
 });
+
+test("a UTF-8 BOM is ignored and a declared charset is decoded", async () => {
+  const bom = makeMockTransport(() =>
+    rawResponse(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"city":"München"}')]), "application/json"),
+  );
+  assert.deepEqual(await new RequestEngine({ transport: bom.transport }).getJson("/x"), { city: "München" });
+
+  const latin1 = makeMockTransport(() =>
+    rawResponse(Buffer.from('{"city":"München"}', "latin1"), "application/json; charset=iso-8859-1"),
+  );
+  assert.deepEqual(await new RequestEngine({ transport: latin1.transport }).getJson("/x"), { city: "München" });
+
+  const quoted = makeMockTransport(() =>
+    rawResponse(Buffer.from('{"city":"München"}', "utf8"), 'application/json; charset="UTF-8"'),
+  );
+  assert.deepEqual(await new RequestEngine({ transport: quoted.transport }).getJson("/x"), { city: "München" });
+});
+
+test("an unknown response charset is a CkanParseError naming it", async () => {
+  const mt = makeMockTransport(() => rawResponse("{}", `application/json; charset=x-nope${ESC}`));
+  const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
+  await assert.rejects(
+    () => e.getJson("/x"),
+    (err: unknown) =>
+      err instanceof CkanParseError &&
+      err.message === 'Unsupported response charset "x-nope" from https://a.example/x.',
+  );
+});
