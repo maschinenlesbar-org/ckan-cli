@@ -152,7 +152,8 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   cannot inject path segments, a query string or a fragment.
 - **Redirects** are followed up to `maxRedirects` (default 5). Hamburg redirects
   `http:` to `https:` with a 302. If a redirect crosses origin (scheme + host +
-  port), the request headers are dropped, so nothing leaks to another host.
+  port), only the engine's own `Accept` and `User-Agent` go along (an allowlist), so no
+  other header leaks to another host.
 - **Exit codes** (`run.ts`): 0 success/help/version, 4 for HTTP 404, 1 for
   everything else.
 
