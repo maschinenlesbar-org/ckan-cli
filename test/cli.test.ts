@@ -402,6 +402,20 @@ test("--base-url and CKAN_BASE_URL with a query string are usage errors", async 
   assert.equal(flag.mt.calls.length + env.mt.calls.length, 0);
 });
 
+test("--base-url and CKAN_BASE_URL with surrounding whitespace are usage errors", async () => {
+  for (const value of ["http://127.0.0.1:9/404 ", " https://ckan.example.test", "http://127.0.0.1:9\t"]) {
+    const flag = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(["--base-url", value, "status"], flag.deps), 1, JSON.stringify(value));
+    assert.equal(flag.mt.calls.length, 0);
+    assert.match(flag.err.join("\n"), /A base URL cannot have surrounding whitespace\./);
+
+    const env = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: value });
+    assert.equal(await run(["status"], env.deps), 1, JSON.stringify(value));
+    assert.equal(env.mt.calls.length, 0);
+    assert.match(env.err.join("\n"), /CKAN_BASE_URL: A base URL cannot have surrounding whitespace\./);
+  }
+});
+
 test("--facet-limit -1 asks CKAN for every facet value; other negatives are refused", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
   assert.equal(await run(["search", "--facet", "tags", "--facet-limit", "-1"], cli.deps), 0);

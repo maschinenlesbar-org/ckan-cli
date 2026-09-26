@@ -112,6 +112,11 @@ export function parseBaseUrl(value: string): string {
   if (/[?#]/.test(value)) {
     throw new InvalidArgumentError("Expected a site URL without a query string or fragment.");
   }
+  // `new URL` trims, but the value is used as given: a trailing space would land in
+  // the request path (`/404%20/api/3/...`) or the host.
+  if (value !== value.trim()) {
+    throw new InvalidArgumentError("A base URL cannot have surrounding whitespace.");
+  }
   return value;
 }
 
