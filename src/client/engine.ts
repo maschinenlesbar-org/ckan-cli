@@ -272,7 +272,9 @@ export class RequestEngine {
     } catch (cause) {
       // Name the URL and what came back: a site that is not a CKAN (or not at this
       // path) typically answers with an HTML page and HTTP 200.
-      const mediaType = res.contentType.split(";")[0]!.trim();
+      // The Content-Type is server text (latin-1 decoded, so a 0x9B byte is the
+      // 8-bit CSI U+009B): sanitise it before it reaches stderr.
+      const mediaType = sanitizeServerText(res.contentType.split(";")[0]!);
       const message = /json/i.test(mediaType)
         ? `Invalid JSON from ${redactUrl(res.url)}`
         : `Expected JSON from ${redactUrl(res.url)} but got ${mediaType || "a body that is not JSON"}`;

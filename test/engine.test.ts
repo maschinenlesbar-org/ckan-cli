@@ -235,6 +235,19 @@ test("a non-JSON 2xx body names the full URL and the content type it got", async
   );
 });
 
+test("control characters in the Content-Type are stripped from the error message", async () => {
+  const mt = makeMockTransport(() => rawResponse("<html></html>", `text/${CSI}31m${ESC}[2Jhtml; charset=utf-8`));
+  const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
+  await assert.rejects(
+    () => e.getJson("/x"),
+    (err: unknown) => {
+      assert.ok(err instanceof CkanParseError);
+      assert.equal(err.message, "Expected JSON from https://a.example/x but got text/31m[2Jhtml");
+      return true;
+    },
+  );
+});
+
 test("broken JSON labelled as JSON is reported as invalid JSON, not as the wrong type", async () => {
   const mt = makeMockTransport(() => rawResponse('{"help": "h", "succ', "application/json;charset=utf-8"));
   const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
