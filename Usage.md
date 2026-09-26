@@ -9,6 +9,8 @@ switch to any other portal.
 CKAN wraps every response in `{ help, success, result }`. This CLI prints the
 **unwrapped `result`** and exits non-zero on an error, so the examples below pipe straight
 into [`jq`](https://jqlang.github.io/jq/).
+Numbers are re-serialised by JavaScript: an integer above 2⁵³ loses its last digits and
+one beyond the double range (`1e400`) prints as `null` (rare in CKAN metadata).
 
 ## Install
 

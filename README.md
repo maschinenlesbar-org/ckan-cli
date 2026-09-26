@@ -241,6 +241,12 @@ CKAN's error text is shown on stderr, e.g.
 `Validation Error: rows: Invalid integer` or
 `Bad request - Action name not known: …`.
 
+> **Numbers pass through JavaScript.** The output is the parsed and re-serialised
+> JSON, so an integer above 2⁵³ (9,007,199,254,740,992) loses its last digits and a
+> number beyond the double range (`1e400`) prints as `null`. CKAN metadata rarely
+> holds such numbers; for an exact copy of the raw answer, use `curl` on
+> `<site>/api/3/action/<name>`.
+
 ## Global options
 
 | Option | Description |
