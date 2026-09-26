@@ -19,6 +19,7 @@ export {
   CkanNetworkError,
   CkanParseError,
   describeCkanError,
+  redactUrl,
 } from "./errors.js";
 
 export { PORTALS } from "./portals-list.js";

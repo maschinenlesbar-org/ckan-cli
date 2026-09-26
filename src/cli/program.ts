@@ -10,6 +10,7 @@ import { defaultIO } from "./io.js";
 import { CkanClient } from "../client/client.js";
 import { DEFAULT_BASE_URL, MAX_RETRIES } from "../client/engine.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
+import { redactUrl } from "../client/errors.js";
 import { parseBaseUrl, parseBoundedInt, parseIntArg, parsePortal } from "./shared.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 import { registerPortalCommands } from "./commands/portal.js";
@@ -41,16 +42,18 @@ export const defaultDeps: CliDeps = {
 
 export function buildProgram(deps: CliDeps = defaultDeps): Command {
   const program = new Command();
+  const baseUrlDefault = deps.env["CKAN_BASE_URL"] || DEFAULT_BASE_URL;
 
   program
     .name("ckan")
     .description("CLI for any CKAN open-data portal (Action API v3)")
     .version(VERSION)
-    .option(
-      "--base-url <url>",
-      "CKAN site URL (env CKAN_BASE_URL)",
-      parseBaseUrl,
-      deps.env["CKAN_BASE_URL"] || DEFAULT_BASE_URL,
+    .addOption(
+      new Option("--base-url <url>", "CKAN site URL (env CKAN_BASE_URL)")
+        .argParser(parseBaseUrl)
+        // The help shows the default without userinfo: a password in
+        // CKAN_BASE_URL must not end up in `--help` output or CI logs.
+        .default(baseUrlDefault, JSON.stringify(redactUrl(baseUrlDefault))),
     )
     .addOption(
       new Option("--portal <id>", "a known portal by id (see `ckan portals`)")

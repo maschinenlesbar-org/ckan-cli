@@ -2,7 +2,7 @@
 // Action API (`<site>/api/3/action`).
 
 import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
-import { CkanError, CkanParseError, describeCkanError } from "./errors.js";
+import { CkanError, CkanParseError, describeCkanError, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
 import type {
   CkanEnvelope,
@@ -81,7 +81,7 @@ export function siteRoot(baseUrl: string): string {
   // The API path is appended to the base URL, so a query string or fragment in it
   // would end up in front of `/api/3/action` and break every request.
   if (/[?#]/.test(baseUrl)) {
-    throw new CkanError(`The base URL must not contain a query string or fragment: ${baseUrl}`);
+    throw new CkanError(`The base URL must not contain a query string or fragment: ${redactUrl(baseUrl)}`);
   }
   return baseUrl.replace(/\/+$/, "").replace(/\/api\/3(\/action)?$/, "");
 }
@@ -106,7 +106,7 @@ export class CkanClient {
     // envelope; say so rather than "failed: undefined".
     if (typeof env !== "object" || env === null || Array.isArray(env) || typeof env.success !== "boolean") {
       throw new CkanParseError(
-        `The answer to "${name}" is not a CKAN Action API response; is ${this.site} a CKAN site?`,
+        `The answer to "${name}" is not a CKAN Action API response; is ${redactUrl(this.site)} a CKAN site?`,
       );
     }
     if (!env.success) {

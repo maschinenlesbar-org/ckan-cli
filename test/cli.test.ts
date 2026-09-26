@@ -4,7 +4,7 @@ import { run } from "../src/cli/run.js";
 import { CkanClient } from "../src/client/client.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { makeMockTransport, jsonResponse } from "./helpers.js";
+import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 import { PORTALS } from "../src/client/portals-list.js";
 import type { Portal } from "../src/client/types.js";
 
@@ -263,6 +263,31 @@ test("--max-retries is bounded to 0..10", async () => {
       assert.equal(cli.mt.calls.length, 0);
     }
   }
+});
+
+test("a password in --base-url or CKAN_BASE_URL is redacted in errors and in --help", async () => {
+  const notFound = makeCli(() =>
+    jsonResponse({ success: false, error: { __type: "Not Found Error", message: "Not found" } }, 404),
+  );
+  assert.equal(await run(["--base-url", "http://user:s3cret@127.0.0.1:9/404", "status"], notFound.deps), 4);
+  // The request itself keeps the userinfo (Node sends it as Basic auth)...
+  assert.equal(notFound.mt.last().url, `http://user:s3cret@127.0.0.1:9/404${ACTION}/status_show`);
+  // ...but the message does not.
+  assert.equal(
+    notFound.err.join("\n"),
+    `Error: HTTP 404 for GET http://***@127.0.0.1:9/404${ACTION}/status_show: Not Found Error: Not found`,
+  );
+
+  const html = makeCli(() => rawResponse("<html></html>", "text/html"));
+  assert.equal(await run(["--base-url", "http://user:s3cret@127.0.0.1:9/x", "status"], html.deps), 1);
+  assert.match(html.err.join("\n"), /Expected JSON from http:\/\/\*\*\*@127\.0\.0\.1:9\/x\//);
+  assert.doesNotMatch(html.err.join("\n"), /s3cret/);
+
+  const help = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: "http://user:s3cret@127.0.0.1:9/ok" });
+  assert.equal(await run(["--help"], help.deps), 0);
+  const text = help.out.join("\n");
+  assert.doesNotMatch(text, /s3cret/);
+  assert.match(text.replace(/\s+/g, " "), /default: "http:\/\/\*\*\*@127\.0\.0\.1:9\/ok"/);
 });
 
 test("a bare invocation prints help to stdout and exits 0", async () => {

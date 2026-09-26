@@ -4,7 +4,7 @@
 
 import { nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { CkanApiError, CkanNetworkError, CkanParseError, describeCkanError } from "./errors.js";
+import { CkanApiError, CkanNetworkError, CkanParseError, describeCkanError, redactUrl } from "./errors.js";
 
 export const DEFAULT_BASE_URL = "https://suche.transparenz.hamburg.de";
 const DEFAULT_USER_AGENT = "ckan-cli";
@@ -141,11 +141,11 @@ function assertHttpScheme(baseUrl: string): void {
   try {
     url = new URL(baseUrl);
   } catch {
-    throw new CkanNetworkError(`Invalid base URL: ${baseUrl}`);
+    throw new CkanNetworkError(`Invalid base URL: ${redactUrl(baseUrl)}`);
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new CkanNetworkError(
-      `Unsupported protocol "${url.protocol}" in base URL: ${baseUrl}`,
+      `Unsupported protocol "${url.protocol}" in base URL: ${redactUrl(baseUrl)}`,
     );
   }
 }
@@ -274,8 +274,8 @@ export class RequestEngine {
       // path) typically answers with an HTML page and HTTP 200.
       const mediaType = res.contentType.split(";")[0]!.trim();
       const message = /json/i.test(mediaType)
-        ? `Invalid JSON from ${res.url}`
-        : `Expected JSON from ${res.url} but got ${mediaType || "a body that is not JSON"}`;
+        ? `Invalid JSON from ${redactUrl(res.url)}`
+        : `Expected JSON from ${redactUrl(res.url)} but got ${mediaType || "a body that is not JSON"}`;
       throw new CkanParseError(message, { cause });
     }
   }
