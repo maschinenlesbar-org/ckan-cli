@@ -120,7 +120,7 @@ ckan action help_show --param name=package_search
 | `--portal <id>` | a known portal by id (`ckan portals`); cannot be combined with `--base-url` |
 | `--timeout <ms>` | Per-request timeout (default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses (default `2`) |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`; each waits the server's `Retry-After`, up to 30 s) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 Blank values (`search ""`, `--fq ""`, an empty id) are usage errors, never an unfiltered
