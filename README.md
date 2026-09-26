@@ -151,6 +151,8 @@ action <name> [--param key=value …]    call any CKAN action (generic)
 
 > **Blank values are refused.** `ckan search ""`, `--fq ""` or `tags --query ""`
 > exit 1 before any request, instead of silently running an unfiltered search.
+> So does a forgotten value (`--fq --rows 5`): a value of `--fq`, `--facet`,
+> `--sort` or `tags --query` cannot start with `--`.
 
 ### Paging and list flags
 

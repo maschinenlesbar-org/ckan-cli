@@ -104,6 +104,24 @@ test("blank search values are usage errors, never a silently unfiltered search",
   }
 });
 
+test("an option whose value is forgotten does not swallow the next flag", async () => {
+  for (const argv of [
+    ["search", "--fq", "--rows", "5"],
+    ["search", "--sort", "--start", "3"],
+    ["search", "--facet", "--rows", "0"],
+    ["tags", "--query", "--x"],
+  ]) {
+    const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0, argv.join(" "));
+    assert.match(cli.err.join("\n"), /Expected a value, got another option/);
+  }
+  // A negated Solr filter (a single leading "-") is still a value.
+  const neg = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
+  assert.equal(await run(["search", "--fq", "-organization:allris"], neg.deps), 0);
+  assert.equal(new URL(neg.mt.last().url).searchParams.get("fq"), "-organization:allris");
+});
+
 test("the show commands call their *_show action with the id", async () => {
   for (const [command, action] of [
     ["package", "package_show"],

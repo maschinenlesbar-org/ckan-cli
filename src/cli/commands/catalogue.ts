@@ -9,6 +9,7 @@ import {
   parseBoundedInt,
   parseIntArg,
   parseNonEmpty,
+  parseOptionValue,
   renderJson,
 } from "../shared.js";
 
@@ -30,7 +31,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     .argument("[query]", "full-text query, e.g. elbe or title:haushalt", parseNonEmpty)
     .option("--rows <n>", "max results (servers cap this, usually at 1000)", parseIntArg)
     .option("--start <n>", "offset for paging", parseIntArg)
-    .option("--sort <expr>", 'e.g. "metadata_modified desc"', parseNonEmpty)
+    .option("--sort <expr>", 'e.g. "metadata_modified desc"', parseOptionValue)
     .option("--fq <filter>", "filter query, e.g. organization:allris (repeatable; all must match)", collectNonEmpty)
     .option("--facet <field>", "count values of a field, e.g. res_format (repeatable)", collectNonEmpty)
     .option("--facet-limit <n>", "max values per facet (default 50; -1 = all)", parseFacetLimit)
@@ -153,7 +154,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("tags")
     .description("List tags")
-    .option("--query <substring>", "only tags containing this substring", parseNonEmpty)
+    .option("--query <substring>", "only tags containing this substring", parseOptionValue)
     .action(
       action(deps, async ({ client, global, opts }) => {
         renderJson(deps, global, await client.tagList({ query: opts["query"] as string | undefined }));

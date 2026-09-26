@@ -35,9 +35,26 @@ export function parseNonEmpty(value: string): string {
   return value;
 }
 
-/** commander accumulator for a repeatable option whose values must not be blank. */
+/**
+ * commander value-parser for a text option's value: not blank, and not another
+ * long option. commander takes the next argument as the value of an option that
+ * needs one, even when it is a flag, so a forgotten value (`search --fq --rows 5`)
+ * silently shifted the rest into the query (`fq=--rows`, `q=5`) and still exited
+ * 0. No CKAN filter, sort, facet field or tag query starts with `--`; a single `-`
+ * (a negated Solr filter, `-organization:x`) stays allowed.
+ */
+export function parseOptionValue(value: string): string {
+  if (value.startsWith("--")) {
+    throw new InvalidArgumentError(
+      "Expected a value, got another option. Give the option its value first.",
+    );
+  }
+  return parseNonEmpty(value);
+}
+
+/** commander accumulator for a repeatable option whose values are checked by parseOptionValue. */
 export function collectNonEmpty(value: string, previous: string[] = []): string[] {
-  return previous.concat([parseNonEmpty(value)]);
+  return previous.concat([parseOptionValue(value)]);
 }
 
 /** Build a commander value-parser for a non-negative integer within [min, max]. */
