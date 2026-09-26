@@ -103,8 +103,9 @@ encode the non-obvious parts of these portals, for example:
   not Hamburg's documented `vertraege_oeff_interesse` (0 results) — and the example on
   Hamburg's own API page over-counts; many Hamburg records have no organization, and the
   `publishing_date` field can't be range-filtered (see **ckan-hamburg-transparency**);
-- an empty search is `{"count":0,…}` at exit `0` (a valid "nothing matched"), exit `4` is a
-  not-found id, exit `1` is a real error with a readable reason.
+- an empty search is `{"count":0,…}` at exit `0` (a valid "nothing matched"), exit `4` is an
+  HTTP 404 (a not-found id, or no CKAN at this URL), exit `1` is a real error with a
+  readable reason.
 
 Real runs of each skill are in [EXAMPLE.md](EXAMPLE.md).
 

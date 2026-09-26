@@ -126,4 +126,5 @@ ckan action help_show --param name=package_search
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 Blank values (`search ""`, `--fq ""`, an empty id, `--param q=`) are usage errors, never an unfiltered
-search. Exit codes: `0` success, `4` not found (HTTP 404), `1` anything else.
+search. Exit codes: `0` success, `4` not found (HTTP 404: an unknown id, or no CKAN at this URL), `1`
+anything else.
