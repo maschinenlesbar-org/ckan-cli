@@ -1,7 +1,7 @@
 // CkanClient — a typed client over the open (no-auth) read endpoints of any CKAN
 // Action API (`<site>/api/3/action`).
 
-import { DEFAULT_BASE_URL, RequestEngine, type EngineOptions } from "./engine.js";
+import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import { CkanError, CkanParseError, describeCkanError } from "./errors.js";
 import type { QueryParams } from "./query.js";
 import type {
@@ -95,7 +95,11 @@ export class CkanClient {
       );
     }
     if (!env.success) {
-      throw new CkanError(`CKAN action "${name}" failed: ${describeCkanError(env.error)}`);
+      // A success:false envelope can come with HTTP 200, so it never passes the
+      // engine's error-detail sanitising: strip terminal controls here too.
+      throw new CkanError(
+        `CKAN action "${name}" failed: ${sanitizeServerText(describeCkanError(env.error))}`,
+      );
     }
     return env.result as T;
   }

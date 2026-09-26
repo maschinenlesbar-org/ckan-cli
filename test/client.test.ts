@@ -34,6 +34,29 @@ test("a success:false envelope throws CkanError with CKAN's message", async () =
   );
 });
 
+test("a success:false envelope on HTTP 200 is stripped of terminal escapes, bidi and newlines", async () => {
+  // Built from char codes so the source stays free of control bytes.
+  const ESC = String.fromCharCode(0x1b);
+  const BEL = String.fromCharCode(0x07);
+  const CSI8 = String.fromCharCode(0x9b);
+  const RLO = String.fromCharCode(0x202e);
+  const errors: unknown[] = [
+    { __type: `X${ESC}]0;PWNED${BEL}${ESC}[31mRED`, message: `evil ${ESC}[2J${CSI8}31m msg` },
+    `str ${ESC}[31merr\nError: forged ${RLO}line`,
+  ];
+  const expected = [
+    'CKAN action "status_show" failed: X]0;PWNED[31mRED: evil [2J31m msg',
+    'CKAN action "status_show" failed: str [31merr Error: forged line',
+  ];
+  for (const [i, error] of errors.entries()) {
+    const mt = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
+    await assert.rejects(
+      () => clientWith(mt).action("status_show"),
+      (err: unknown) => err instanceof CkanError && err.message === expected[i],
+    );
+  }
+});
+
 test("a validation error (field map, no message) is spelled out per field", async () => {
   const mt = makeMockTransport(() =>
     jsonResponse({

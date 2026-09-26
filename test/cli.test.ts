@@ -218,6 +218,16 @@ test("DEL and C1 control characters in server data are escaped in the JSON outpu
   }
 });
 
+test("bidi formatting characters in server data are escaped in the JSON output", async () => {
+  const bidi = String.fromCharCode(0x202e, 0x2066, 0x200f, 0x061c);
+  const result = { title: `a${bidi}b` };
+  const cli = makeCli(() => jsonResponse(ckan(result)));
+  assert.equal(await run(["--compact", "package", "x"], cli.deps), 0);
+  const text = cli.out.join("\n");
+  assert.equal(text, '{"title":"a\\u202e\\u2066\\u200f\\u061cb"}');
+  assert.deepEqual(JSON.parse(text), result);
+});
+
 test("--timeout accepts up to the largest timer Node supports", async () => {
   const cli = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run(["--timeout", "2147483647", "status"], cli.deps), 0);
