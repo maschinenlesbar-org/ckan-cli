@@ -43,10 +43,12 @@ ckan search elbe --rows 5
 ```
 
 All administrative regulations (*Verwaltungsvorschriften*), using a filter
-query on one of Hamburg's own fields:
+query on one of Hamburg's own fields. The filter takes the **stemmed** value
+the search index holds: Hamburg's API page writes `verwaltungsvorschriften`,
+which also matches the *Dienstanweisungen* and returns twice as many records.
 
 ```bash
-ckan search --fq extras_registerobject_type:verwaltungsvorschriften --rows 5
+ckan search --fq extras_registerobject_type:verwaltungsvorschrift --rows 5
 ```
 
 The result is unwrapped from CKAN's `{ help, success, result }` envelope, so you
@@ -175,14 +177,18 @@ before any request is sent.
 - **Mostly documents, not datasets.** Hamburg publishes what the Hamburg
   Transparency Act (HmbTG) requires: council papers, contracts, reports,
   regulations, geodata. Most records have `type: "document"`.
-- **The *Informationsgegenstand*** is in `extras_registerobject_type`
-  (`verwaltungsvorschriften`, `vertraege_oeff_interesse`, `gutachten`,
-  `geodaten`, …). Hamburg lists the allowed values at
-  <https://suche.transparenz.hamburg.de/api/rest/enums>. That endpoint is
-  Hamburg-specific, not part of the CKAN Action API.
+- **The *Informationsgegenstand*** is in `extras_registerobject_type`. Filter
+  it with the **stemmed** value the search index holds (`verwaltungsvorschrift`,
+  `vertrageoffinteress`, `gutacht`, `geodat`, …). Hamburg's own value list at
+  <https://suche.transparenz.hamburg.de/api/rest/enums> (Hamburg-specific, not
+  part of the CKAN Action API) gives other spellings: `vertraege_oeff_interesse`
+  matches nothing, and a full word such as `verwaltungsvorschriften` over-matches.
+  List the values that work, with their counts:
+  `ckan --compact search --rows 0 --facet extras_registerobject_type --facet-limit -1`.
+  The [Glossary](GLOSSARY.md) has the details.
 - **Several filters work.** Hamburg's API page says only one filter can be
   used; with `fq_list` (repeat `--fq`) they combine:
-  `ckan search --fq extras_registerobject_type:verwaltungsvorschriften --fq organization:workflows`.
+  `ckan search --fq extras_registerobject_type:verwaltungsvorschrift --fq organization:workflows`.
 - **Tags are free text.** Many tags are whole keyword lists in a single string,
   so `tags --query` matches substrings of those strings.
 

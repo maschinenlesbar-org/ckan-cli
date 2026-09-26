@@ -36,7 +36,7 @@ const govdata = new CkanClient({ baseUrl: "https://ckan.govdata.de" });
 
 const hits = await hamburg.packageSearch({
   q: "elbe",
-  fq: ["extras_registerobject_type:verwaltungsvorschriften"],
+  fq: ["extras_registerobject_type:verwaltungsvorschrift"],
   rows: 5,
 });
 const record = await hamburg.packageShow(hits.results[0]!["name"] as string);
@@ -169,7 +169,7 @@ No test touches the network. To check a portal by hand:
 
 ```bash
 node dist/src/cli/index.js status
-node dist/src/cli/index.js search --fq extras_registerobject_type:verwaltungsvorschriften --rows 1
+node dist/src/cli/index.js search --fq extras_registerobject_type:verwaltungsvorschrift --rows 1
 ```
 
 ## The portal list
