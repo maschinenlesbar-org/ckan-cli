@@ -1,6 +1,6 @@
 {
   "name": "ckan",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Open-data skills for German CKAN portals powered by the ckan-cli: find datasets across portals, build catalogue statistics, and search the Hamburg Transparenzportal's documents.",
   "author": {
     "name": "Sebastian Schürmann",
