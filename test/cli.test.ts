@@ -297,6 +297,28 @@ test("a bare invocation prints help to stdout and exits 0", async () => {
   assert.equal(cli.mt.calls.length, 0);
 });
 
+test("help, help <command>, --help and --version exit 0; an unknown command is named", async () => {
+  for (const argv of [["help"], ["help", "search"], ["search", "--help"], ["--version"], ["--compact"]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 0, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.doesNotMatch(cli.err.join("\n"), /too many arguments/, argv.join(" "));
+  }
+  const helpSearch = makeCli(() => jsonResponse(ckan({})));
+  await run(["help", "search"], helpSearch.deps);
+  assert.match(helpSearch.out.join("\n"), /Usage: ckan search/);
+
+  for (const argv of [["foo"], ["help", "nope"]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.doesNotMatch(cli.err.join("\n"), /too many arguments/, argv.join(" "));
+  }
+  const foo = makeCli(() => jsonResponse(ckan({})));
+  await run(["foo"], foo.deps);
+  assert.match(foo.err.join("\n"), /error: unknown command 'foo'/);
+});
+
 test("--base-url and CKAN_BASE_URL with a query string are usage errors", async () => {
   const flag = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run(["--base-url", "https://ckan.govdata.de/?lang=de", "status"], flag.deps), 1);

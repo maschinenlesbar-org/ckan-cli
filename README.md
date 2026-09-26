@@ -231,7 +231,7 @@ ckan package bezirk-wandsbek-drucksache-22-3573-2 | jq '.resources[] | {format, 
 
 | Code | Meaning |
 | --- | --- |
-| `0` | success (also `--help` / `--version`) |
+| `0` | success (also `--help`, `help [command]`, `--version` and a bare `ckan`) |
 | `4` | not found (HTTP `404`), e.g. an unknown dataset id |
 | `1` | any other error — bad usage, validation error (`409`), unknown action (`400`), CKAN `success:false`, network failure |
 
