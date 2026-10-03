@@ -18,9 +18,13 @@ export {
   CkanApiError,
   CkanNetworkError,
   CkanParseError,
+  CkanValidationError,
   describeCkanError,
   redactUrl,
 } from "./errors.js";
+
+export { assertValid } from "./validate.js";
+export type { Problem } from "./validate.js";
 
 export { PORTALS } from "./portals-list.js";
 export { checkPortal, findPortal, mapLimit, portalKey, withCheck } from "./portals.js";

@@ -85,7 +85,8 @@ src/
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
     engine.ts    # URL building, retry/backoff, redirects, JSON decoding, error mapping
-    errors.ts    # CkanError / CkanApiError / CkanNetworkError / CkanParseError + describeCkanError
+    errors.ts    # CkanError / CkanApiError / CkanNetworkError / CkanParseError / CkanValidationError
+    validate.ts  # the input rules (`…Problem` functions) and assertValid
     client.ts    # CkanClient — CKAN actions over the engine (with result-unwrapping)
     portals.ts   # portalKey, findPortal, checkPortal (live check), withCheck
     portals-list.ts  # PORTALS: the built-in list, rewritten by scripts/update-portals.ts
@@ -108,6 +109,13 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
 
 **Design notes**
 
+- **Input validation.** The library owns every input rule. The rules are pure
+  `…Problem` functions in `validate.ts` (the reason a value is invalid, or
+  `undefined`); client methods enforce them with `assertValid` before any request
+  and throw (a promise-returning method rejects with) `CkanValidationError`, a
+  `CkanError`, with the message `Invalid <name>: <reason>`. The CLI's value
+  parsers call the same functions, so the CLI and the library refuse the same
+  inputs, and `run.ts` reports a `CkanValidationError` as a usage error (exit 1).
 - **Base URL.** `--base-url` or `--portal` (they conflict) > `CKAN_BASE_URL` > the
   Hamburg default. A query string or fragment is refused: the API path is
   appended, so it would land in front of it. `siteRoot()`
@@ -167,9 +175,11 @@ node --test dist/test/client.test.js   # one file, after a build
 ```
 
 - **`query.test.ts`** — query-string serialisation.
+- **`validate.test.ts`** — `assertValid`, the `…Problem` rules, and how `run.ts` reports a `CkanValidationError`.
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
 - **`engine.test.ts`** — URL building, JSON decoding, the three CKAN error shapes, 429/503 retry, redirects.
 - **`client.test.ts`** — action URL/param mapping, base-URL normalisation, result unwrapping, `fq`/`fq_list`, facets, blank ids.
+- **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `helpers.ts`), same outcome on both sides.
 - **`cli.test.ts`** — every command, `--portal`/`CKAN_BASE_URL` precedence, blank-value rejection, output escaping and exit codes.
 - **`portals.test.ts`** — `portalKey`, `findPortal`, `checkPortal` outcomes, and the invariants of the built-in list.
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.

@@ -69,6 +69,13 @@ export class CkanNetworkError extends CkanError {}
 export class CkanParseError extends CkanError {}
 
 /**
+ * An input the library refuses before sending any request: a client option or a
+ * method parameter that breaks one of the rules in `validate.ts`. The message is
+ * `Invalid <name>: <reason>`. The CLI reports it as a usage error.
+ */
+export class CkanValidationError extends CkanError {}
+
+/**
  * Turn a CKAN `error` object into one readable line. CKAN has two shapes: a
  * `message` (`{"__type": "Not Found Error", "message": "Not found"}`), and a
  * validation error that maps each offending field to its messages instead
