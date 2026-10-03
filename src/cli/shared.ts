@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import { isBidiControl, type EngineOptions } from "../client/engine.js";
 import { CkanError } from "../client/errors.js";
 import { findPortal } from "../client/portals.js";
-import { blankProblem } from "../client/validate.js";
+import { blankProblem, countProblem } from "../client/validate.js";
 import { PORTALS } from "../client/portals-list.js";
 
 /** commander value-parser: a non-negative integer. */
@@ -19,10 +19,10 @@ export function parseIntArg(value: string): number {
     throw new InvalidArgumentError("Expected a non-negative integer.");
   }
   const n = Number(value);
-  // Reject magnitudes that cannot be represented exactly (silent precision loss).
-  if (!Number.isSafeInteger(n)) {
-    throw new InvalidArgumentError("Expected a non-negative integer.");
-  }
+  // The library's count rule; it also rejects magnitudes that cannot be
+  // represented exactly (silent precision loss).
+  const reason = countProblem(n);
+  if (reason !== undefined) throw new InvalidArgumentError(reason);
   return n;
 }
 

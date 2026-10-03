@@ -436,6 +436,7 @@ test("--facet-limit -1 asks CKAN for every facet value; other negatives are refu
   const bad = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run(["search", "--facet", "tags", "--facet-limit", "-2"], bad.deps), 1);
   assert.equal(bad.mt.calls.length, 0);
+  assert.match(bad.err.join("\n"), /Expected -1 or a non-negative integer\./);
 });
 
 test("--portal selects a known portal by id and wins over CKAN_BASE_URL", async () => {

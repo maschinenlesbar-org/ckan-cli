@@ -116,15 +116,17 @@ Die CKAN-Suche läuft auf **Apache Solr**, die Parameter folgen daher der Solr-S
 CKAN beantwortet einen wiederholten `fq`-Schlüssel mit HTTP 409, deshalb wird ein Filter als
 `fq` und mehrere als `fq_list` gesendet.
 
-**`rows` / `start`.** Seitengröße und Versatz ab 0. CKAN begrenzt `rows` (standardmäßig auf
-1000), ohne es zu melden; mit `--start` weiterblättern.
+**`rows` / `start`.** Seitengröße und Versatz ab 0, jeweils eine nicht negative ganze Zahl
+(CLI und Bibliothek lehnen alles andere ab). CKAN begrenzt `rows` (standardmäßig auf 1000),
+ohne es zu melden; mit `--start` weiterblättern.
 
 **`sort`.** Ein Sortierausdruck, z. B. `metadata_modified desc`. Ein unbekanntes Sortierfeld
 wird ignoriert, nicht abgewiesen.
 
 **Facette (`facet.field`, `facet.limit`).** Wertezählungen über ein Suchergebnis, z. B. je
 Herausgeber oder Format. CLI: `--facet <Feld>` (wiederholbar) und `--facet-limit <n>`; die
-Standardgrenze ist 50 und schneidet die Liste stillschweigend ab, `-1` liefert alle Werte.
+Standardgrenze ist 50 und schneidet die Liste stillschweigend ab, `-1` liefert alle Werte;
+jeder andere negative Wert wird abgelehnt.
 Gezählt werden **Datensätze**, nicht Dateien.
 
 **`res_format`.** Das Format einer Ressource, als Filter in `fq` und als Facette nutzbar. Je
@@ -145,8 +147,8 @@ zuletzt geändert wurde; echte Datumsfelder, Zeiträume funktionieren also:
 
 **`limit` / `offset`.** Seitenweise Abfrage für die `*_list`-Aktionen (`packages`,
 `organizations`, `groups`), getrennt von `rows` / `start` der Suche. `--limit` ist 1 oder
-mehr: CKAN liest `limit=0` als „keine Grenze“, daher lehnt die CLI 0 ab; für die ganze
-Liste `--limit` einfach weglassen.
+mehr: CKAN liest `limit=0` als „keine Grenze“, daher lehnen CLI und Bibliothek 0 ab; für
+die ganze Liste `--limit` einfach weglassen. `offset` ist eine nicht negative ganze Zahl.
 
 **`all_fields`.** Bei `organizations` / `groups` vollständige Objekte statt Namen. CKAN
 begrenzt eine solche Liste stillschweigend auf 25 Einträge; der Client blättert über diese

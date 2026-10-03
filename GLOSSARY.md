@@ -108,15 +108,17 @@ CKAN search runs on **Apache Solr**, so its parameters use Solr syntax.
 e.g. `organization:allris`. CLI: `--fq`, repeatable; every filter must match. CKAN answers a
 repeated `fq` key with HTTP 409, so one filter is sent as `fq` and several as `fq_list`.
 
-**`rows` / `start`.** Page size and zero-based offset. CKAN caps `rows` (1000 by default),
-silently; page on with `--start`.
+**`rows` / `start`.** Page size and zero-based offset, each a non-negative integer (the CLI
+and the library refuse anything else). CKAN caps `rows` (1000 by default), silently; page on
+with `--start`.
 
 **`sort`.** A sort expression, e.g. `metadata_modified desc`. An unknown sort field is
 ignored, not refused.
 
 **Facet (`facet.field`, `facet.limit`).** Value counts over a search result, e.g. per
 publisher or format. CLI: `--facet <field>` (repeatable) and `--facet-limit <n>`; the default
-limit is 50 and cuts the list off silently, `-1` returns every value. Counts are
+limit is 50 and cuts the list off silently, `-1` returns every value; any other negative is
+refused. Counts are
 **datasets**, not files.
 
 **`res_format`.** A resource format, usable in `fq` and as a facet. Spelled differently per
@@ -136,7 +138,8 @@ compared as text and returns nonsense.
 
 **`limit` / `offset`.** Paging for the `*_list` actions (`packages`, `organizations`,
 `groups`), distinct from search's `rows` / `start`. `--limit` is 1 or more: CKAN reads
-`limit=0` as "no limit", so the CLI refuses 0; leave `--limit` out for the whole list.
+`limit=0` as "no limit", so the CLI and the library refuse 0; leave `--limit` out for the
+whole list. `offset` is a non-negative integer.
 
 **`all_fields`.** On `organizations` / `groups`, return full objects instead of names. CKAN
 caps such a list at 25 entries without saying so; the client pages past the cap.

@@ -2,9 +2,9 @@
 // Action API (`<site>/api/3/action`).
 
 import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
-import { CkanError, CkanParseError, describeCkanError, redactUrl } from "./errors.js";
+import { CkanError, CkanParseError, CkanValidationError, describeCkanError, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
-import { assertValid, blankProblem } from "./validate.js";
+import { assertValid, blankProblem, countProblem, facetLimitProblem } from "./validate.js";
 import type {
   CkanEnvelope,
   Group,
@@ -87,10 +87,15 @@ function shapeError(name: string, expected: string): CkanParseError {
 function assertLimit(limit: number | undefined): void {
   if (limit === undefined) return;
   if (!Number.isSafeInteger(limit) || limit < 1) {
-    throw new CkanError(
+    throw new CkanValidationError(
       `Invalid limit: expected a positive integer, got ${String(limit)}. Leave it out for the whole list.`,
     );
   }
+}
+
+/** Check an optional count or offset (`rows`, `start`, `offset`): see countProblem. */
+function assertCount(name: string, value: number | undefined): void {
+  if (value !== undefined) assertValid(name, value, countProblem);
 }
 
 /**
@@ -181,6 +186,9 @@ export class CkanClient {
     assertValid("fq", params.fq, blankProblem);
     assertValid("sort", params.sort, blankProblem);
     assertValid("facet_field", params.facet_field, blankProblem);
+    assertCount("rows", params.rows);
+    assertCount("start", params.start);
+    if (params.facet_limit !== undefined) assertValid("facet_limit", params.facet_limit, facetLimitProblem);
     const fq = params.fq ?? [];
     const facetFields = params.facet_field ?? [];
     return this.typed<PackageSearchResult>("package_search", {
@@ -215,9 +223,10 @@ export class CkanClient {
     return this.show<Resource>("resource_show", id);
   }
 
-  /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
+  /** Dataset names, paged with limit/offset (a positive limit, omit it for all; a non-negative offset). */
   async packageList(params: ListParams = {}): Promise<string[]> {
     assertLimit(params.limit);
+    assertCount("offset", params.offset);
     return this.typed<string[]>(
       "package_list",
       { limit: params.limit, offset: params.offset },
@@ -263,6 +272,8 @@ export class CkanClient {
    */
   private async groupOrOrgList(action: string, params: GroupListParams): Promise<JsonValue[]> {
     assertLimit(params.limit);
+    // Before the first request, and before the all_fields pager steps on from it.
+    assertCount("offset", params.offset);
     if (!params.all_fields) {
       return this.typed<JsonValue[]>(
         action,

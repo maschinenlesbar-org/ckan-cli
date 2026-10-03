@@ -332,3 +332,28 @@ test("JSON that is not a CKAN envelope raises CkanParseError naming the site", a
     );
   }
 });
+
+test("out-of-range rows, start, offset and facet_limit are refused before any request", async () => {
+  const cases: [string, (c: CkanClient) => Promise<unknown>][] = [
+    ["Invalid rows: Expected a non-negative integer.", (c) => c.packageSearch({ rows: -1 })],
+    ["Invalid rows: Expected a non-negative integer.", (c) => c.packageSearch({ rows: 1.5 })],
+    ["Invalid rows: Expected a non-negative integer.", (c) => c.packageSearch({ rows: NaN })],
+    ["Invalid rows: Expected a non-negative integer.", (c) => c.packageSearch({ rows: Infinity })],
+    ["Invalid start: Expected a non-negative integer.", (c) => c.packageSearch({ start: -1 })],
+    ["Invalid facet_limit: Expected -1 or a non-negative integer.", (c) => c.packageSearch({ facet_limit: -2 })],
+    ["Invalid offset: Expected a non-negative integer.", (c) => c.packageList({ offset: -1 })],
+    ["Invalid offset: Expected a non-negative integer.", (c) => c.packageList({ offset: 1.5 })],
+    ["Invalid offset: Expected a non-negative integer.", (c) => c.organizationList({ offset: -2 })],
+    ["Invalid offset: Expected a non-negative integer.", (c) => c.organizationList({ all_fields: true, offset: 1.5 })],
+    ["Invalid offset: Expected a non-negative integer.", (c) => c.groupList({ all_fields: true, offset: -3 })],
+  ];
+  for (const [message, call] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(ckan([])));
+    await assert.rejects(
+      () => call(clientWith(mt)),
+      (err: unknown) => err instanceof CkanValidationError && err.message === message,
+      message,
+    );
+    assert.equal(mt.calls.length, 0, message);
+  }
+});

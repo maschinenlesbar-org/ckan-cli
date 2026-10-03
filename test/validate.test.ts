@@ -72,3 +72,19 @@ test("blankProblem: blank strings and lists with a blank entry are invalid", asy
   assert.equal(isBlank(" "), true);
   assert.equal(isBlank("x"), false);
 });
+
+test("countProblem: a non-negative safe integer", async () => {
+  const { countProblem } = await import("../src/client/validate.js");
+  for (const n of [0, 1, Number.MAX_SAFE_INTEGER]) assert.equal(countProblem(n), undefined, String(n));
+  for (const n of [-1, 1.5, NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(countProblem(n), "Expected a non-negative integer.", String(n));
+  }
+});
+
+test("facetLimitProblem: -1 or a non-negative safe integer", async () => {
+  const { facetLimitProblem } = await import("../src/client/validate.js");
+  for (const n of [-1, 0, 50]) assert.equal(facetLimitProblem(n), undefined, String(n));
+  for (const n of [-2, 1.5, NaN, Infinity]) {
+    assert.equal(facetLimitProblem(n), "Expected -1 or a non-negative integer.", String(n));
+  }
+});

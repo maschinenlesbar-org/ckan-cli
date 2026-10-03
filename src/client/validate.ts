@@ -35,3 +35,17 @@ export function blankProblem(value: unknown): string | undefined {
   if (blank(value) || (Array.isArray(value) && value.some(blank))) return "Expected a non-empty value.";
   return undefined;
 }
+
+/**
+ * A count or offset (`rows`, `start`, `offset`): a non-negative safe integer.
+ * A negative, fractional or non-finite value would go upstream as given, and
+ * the `all_fields` pager would step on from it.
+ */
+export function countProblem(value: number): string | undefined {
+  return Number.isSafeInteger(value) && value >= 0 ? undefined : "Expected a non-negative integer.";
+}
+
+/** A `facet_limit`: -1 (every value) or a non-negative safe integer. */
+export function facetLimitProblem(value: number): string | undefined {
+  return value === -1 || countProblem(value) === undefined ? undefined : "Expected -1 or a non-negative integer.";
+}

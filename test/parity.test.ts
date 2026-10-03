@@ -54,3 +54,34 @@ test("parity: non-blank search and tag values go out the same on both sides", as
     }),
   );
 });
+
+// Finding 3 (PAT-11): rows, start, offset and facet_limit are range-checked by
+// the library, before any request and before the all_fields pager starts.
+test("parity: out-of-range rows, start, offset and facet_limit are refused", async () => {
+  const cases: [string[], (c: CkanClient) => Promise<unknown>][] = [
+    [["search", "--rows", "-5"], (c) => c.packageSearch({ rows: -5 })],
+    [["search", "--start", "-1"], (c) => c.packageSearch({ start: -1 })],
+    [["search", "--facet", "x", "--facet-limit", "-2"], (c) => c.packageSearch({ facet_field: ["x"], facet_limit: -2 })],
+    [["packages", "--offset", "1.5"], (c) => c.packageList({ offset: 1.5 })],
+    [["groups", "--all-fields", "--offset", "-3"], (c) => c.groupList({ all_fields: true, offset: -3 })],
+    [["organizations", "--offset", "-2"], (c) => c.organizationList({ offset: -2 })],
+  ];
+  for (const [argv, call] of cases) {
+    assertBothReject(await parity(argv, (transport) => call(new CkanClient({ transport })), { responder: SEARCH }));
+  }
+});
+
+test("parity: facet_limit -1 and in-range paging go out the same on both sides", async () => {
+  assertSameRequests(
+    await parity(
+      ["search", "--rows", "0", "--start", "20", "--facet", "x", "--facet-limit", "-1"],
+      (transport) => new CkanClient({ transport }).packageSearch({ rows: 0, start: 20, facet_field: ["x"], facet_limit: -1 }),
+      { responder: SEARCH },
+    ),
+  );
+  assertSameRequests(
+    await parity(["packages", "--offset", "0"], (transport) => new CkanClient({ transport }).packageList({ offset: 0 }), {
+      responder: LIST,
+    }),
+  );
+});

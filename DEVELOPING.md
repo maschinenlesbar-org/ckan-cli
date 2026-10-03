@@ -161,6 +161,12 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   value and answer with an unfiltered result. The CLI's value parsers
   (`parseNonEmpty`, `collectNonEmpty`, `--param`) apply the same rule as a usage
   error.
+- **Paging bounds.** The client refuses, before any request, a `limit` that is not a
+  positive integer, a `rows`, `start` or `offset` that is not a non-negative safe
+  integer (`countProblem`) and a `facet_limit` other than -1 or a non-negative
+  integer (`facetLimitProblem`), all with `CkanValidationError`. The `offset` check
+  runs before the `all_fields` pager steps on from it. The generic `action()` passes
+  its params through unchecked apart from blank values.
 - **Action names** are validated against `^[a-z0-9_]+$`, so the generic `action`
   cannot inject path segments, a query string or a fragment.
 - **Redirects** are followed up to `maxRedirects` (default 5). Hamburg redirects

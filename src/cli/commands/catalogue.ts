@@ -1,8 +1,9 @@
 // Commands over the catalogue: datasets, their resources, publishers, themes
 // and tags.
 
-import type { Command } from "commander";
+import { InvalidArgumentError, type Command } from "commander";
 import type { CliDeps } from "../io.js";
+import { facetLimitProblem } from "../../client/validate.js";
 import {
   action,
   collectNonEmpty,
@@ -19,9 +20,15 @@ import {
  */
 const parseLimit = parseBoundedInt(1, Number.MAX_SAFE_INTEGER);
 
-/** commander value-parser for --facet-limit: a count, or -1 for every value. */
+/**
+ * commander value-parser for --facet-limit: a count, or -1 for every value (the
+ * library's facetLimitProblem rule).
+ */
 function parseFacetLimit(value: string): number {
-  return value === "-1" ? -1 : parseIntArg(value);
+  const n = /^-\d+$/.test(value) ? Number(value) : parseIntArg(value);
+  const reason = facetLimitProblem(n);
+  if (reason !== undefined) throw new InvalidArgumentError(reason);
+  return n;
 }
 
 export function registerCatalogueCommands(program: Command, deps: CliDeps): void {
