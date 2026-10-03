@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CkanClient } from "../src/client/client.js";
-import { CkanError, CkanParseError } from "../src/client/errors.js";
+import { CkanError, CkanParseError, CkanValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse } from "./helpers.js";
 
 const ACTION = "/api/3/action";
@@ -83,7 +83,7 @@ test("action rejects a name outside [a-z0-9_] before any request", async () => {
 
 test("action sends its params as the query and drops unset ones", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan([])));
-  await clientWith(mt).action("package_list", { limit: 3, offset: undefined, q: "" });
+  await clientWith(mt).action("package_list", { limit: 3, offset: undefined });
   const url = new URL(mt.last().url);
   assert.equal(url.pathname, `${ACTION}/package_list`);
   assert.deepEqual([...url.searchParams], [["limit", "3"]]);
@@ -146,12 +146,27 @@ test("packageSearch sends several filters as fq_list, never a repeated fq (HTTP 
   assert.deepEqual(url.searchParams.getAll("fq_list"), ["type:document", "organization:allris"]);
 });
 
-test("packageSearch drops blank filters and never sends a lone fq_list", async () => {
-  const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
-  await clientWith(mt).packageSearch({ fq: ["", "organization:allris", ""] });
-  const url = new URL(mt.last().url);
-  assert.deepEqual(url.searchParams.getAll("fq"), ["organization:allris"]);
-  assert.equal(url.searchParams.has("fq_list"), false);
+test("blank search values, filters, tag queries and params are refused before any request", async () => {
+  const cases: [string, (c: CkanClient) => Promise<unknown>][] = [
+    ["Invalid q: Expected a non-empty value.", (c) => c.packageSearch({ q: " " })],
+    ["Invalid fq: Expected a non-empty value.", (c) => c.packageSearch({ fq: [""] })],
+    ["Invalid fq: Expected a non-empty value.", (c) => c.packageSearch({ fq: ["", "organization:allris", ""] })],
+    ["Invalid sort: Expected a non-empty value.", (c) => c.packageSearch({ sort: "" })],
+    ["Invalid facet_field: Expected a non-empty value.", (c) => c.packageSearch({ facet_field: ["tags", ""] })],
+    ["Invalid query: Expected a non-empty value.", (c) => c.tagList({ query: "" })],
+    ["Invalid q: Expected a non-empty value.", (c) => c.action("package_search", { q: "" })],
+    ["Invalid fq: Expected a non-empty value.", (c) => c.action("package_search", { fq: ["a", " "] })],
+    ["Invalid parameter name: Expected a non-empty value.", (c) => c.action("package_search", { "": "x" })],
+  ];
+  for (const [message, call] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+    await assert.rejects(
+      () => call(clientWith(mt)),
+      (err: unknown) => err instanceof CkanValidationError && err.message === message,
+      message,
+    );
+    assert.equal(mt.calls.length, 0, message);
+  }
 });
 
 test("packageSearch sends facet fields as the facet.field JSON list, plus facet.limit", async () => {
@@ -211,7 +226,7 @@ test("the list endpoints send only the parameters that were set", async () => {
     ["organization_list", (c) => c.organizationList({ limit: 5, offset: 10 }), { limit: "5", offset: "10" }],
     ["group_list", (c) => c.groupList({ offset: 2 }), { offset: "2" }],
     ["tag_list", (c) => c.tagList({ query: "elbe" }), { query: "elbe" }],
-    ["tag_list", (c) => c.tagList({ query: "" }), {}],
+    ["tag_list", (c) => c.tagList({ query: undefined }), {}],
     ["license_list", (c) => c.licenseList(), {}],
   ];
   for (const [action, call, expected] of cases) {

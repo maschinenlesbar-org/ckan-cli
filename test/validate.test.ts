@@ -60,3 +60,15 @@ test("parity() runs the CLI and the library on one transport and splits their re
   assert.equal(result.lib.requests.length, 1);
   assert.equal(result.cli.requests[0]!.url, result.lib.requests[0]!.url);
 });
+
+test("blankProblem: blank strings and lists with a blank entry are invalid", async () => {
+  const { blankProblem, isBlank } = await import("../src/client/validate.js");
+  for (const value of ["", " ", "\t\n", [""], ["a", " "]]) {
+    assert.equal(blankProblem(value), "Expected a non-empty value.", JSON.stringify(value));
+  }
+  for (const value of ["a", " a ", [], ["a", "b"], 0, true, undefined, null]) {
+    assert.equal(blankProblem(value), undefined, JSON.stringify(value));
+  }
+  assert.equal(isBlank(" "), true);
+  assert.equal(isBlank("x"), false);
+});

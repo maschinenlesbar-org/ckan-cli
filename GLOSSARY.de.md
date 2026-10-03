@@ -152,8 +152,10 @@ Liste `--limit` einfach weglassen.
 begrenzt eine solche Liste stillschweigend auf 25 Einträge; der Client blättert über diese
 Grenze hinweg.
 
-**Leerer Wert.** Ein leerer oder nur aus Leerzeichen bestehender Filter, Suchbegriff oder
-eine leere ID ist ein Bedienfehler, nie eine stillschweigend ungefilterte Suche.
+**Leerer Wert.** Ein leerer oder nur aus Leerzeichen bestehender Filter, Suchbegriff,
+Sortierausdruck, Facettenname, Parameter oder eine leere ID wird vor jeder Anfrage abgelehnt,
+nie eine stillschweigend ungefilterte Suche: in der CLI ein Bedienfehler, in der Bibliothek ein
+`CkanValidationError`.
 
 ---
 

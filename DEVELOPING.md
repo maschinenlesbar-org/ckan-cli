@@ -152,10 +152,15 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   Solr (HTTP 409), and splits a lone `fq_list` value into characters. So one
   filter goes out as `fq`, two or more as `fq_list`. Facet fields go out as the
   JSON list `facet.field` expects.
-- **Blank input.** A blank id is rejected by the client (`*_show`), and blank
-  search values, filters and tag queries are rejected by the CLI's value parsers
-  (`parseNonEmpty`, `collectNonEmpty`). Otherwise CKAN would drop them and answer
-  with an unfiltered result.
+- **Blank input.** The client refuses a blank (empty or whitespace-only) value
+  before any request: a blank id (`*_show`), a blank `q`, `sort`, `fq` entry or
+  `facet_field` entry (`packageSearch`), a blank tag query (`tagList`), and in
+  `action()` a blank parameter name or value (or list entry). The rule is
+  `blankProblem` (`CkanValidationError` `Invalid <name>: Expected a non-empty
+  value.`); `undefined` still means "not given". CKAN would otherwise drop the
+  value and answer with an unfiltered result. The CLI's value parsers
+  (`parseNonEmpty`, `collectNonEmpty`, `--param`) apply the same rule as a usage
+  error.
 - **Action names** are validated against `^[a-z0-9_]+$`, so the generic `action`
   cannot inject path segments, a query string or a fragment.
 - **Redirects** are followed up to `maxRedirects` (default 5). Hamburg redirects

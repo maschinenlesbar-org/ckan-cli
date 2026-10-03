@@ -4,6 +4,7 @@
 import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import { CkanError, CkanParseError, describeCkanError, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
+import { assertValid, blankProblem } from "./validate.js";
 import type {
   CkanEnvelope,
   Group,
@@ -43,17 +44,19 @@ function entryKey(entry: JsonValue): string {
 }
 
 /**
- * Drop undefined (and empty-string) values so only the parameters the caller
- * actually set are sent. An empty string filter (e.g. `tags --query ""`) is
- * treated as "no filter" rather than forwarded as `query=`.
+ * Drop undefined values so only the parameters the caller actually set are sent,
+ * and refuse a blank parameter name, a blank value or a list with a blank entry
+ * (CkanValidationError). CKAN reads an empty parameter as "not given", so a blank
+ * filter such as `tagList({ query: "" })` would silently return everything.
  */
 function prune(params: QueryParams): QueryParams {
   // A null-prototype object, so a `__proto__` key is kept as a parameter instead
   // of setting the prototype (and being lost).
   const out = Object.create(null) as QueryParams;
   for (const [k, v] of Object.entries(params)) {
-    if (v === undefined || v === "") continue;
-    out[k] = v;
+    if (v === undefined) continue;
+    assertValid("parameter name", k, blankProblem);
+    out[k] = assertValid(k, v, blankProblem);
   }
   return out;
 }
@@ -170,10 +173,15 @@ export class CkanClient {
    * several as CKAN's `fq_list` (each its own Solr filter query; all must
    * match). `fq_list` is only used for two or more, because CKAN splits a lone
    * `fq_list` value into characters. Facet fields go out as the JSON list CKAN
-   * expects in `facet.field`.
+   * expects in `facet.field`. A blank `q`, `sort`, filter or facet field is
+   * refused (CkanValidationError), never sent or dropped.
    */
-  packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
-    const fq = (params.fq ?? []).filter((f) => f !== "");
+  async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
+    assertValid("q", params.q, blankProblem);
+    assertValid("fq", params.fq, blankProblem);
+    assertValid("sort", params.sort, blankProblem);
+    assertValid("facet_field", params.facet_field, blankProblem);
+    const fq = params.fq ?? [];
     const facetFields = params.facet_field ?? [];
     return this.typed<PackageSearchResult>("package_search", {
       q: params.q,
@@ -231,7 +239,7 @@ export class CkanClient {
     return this.groupOrOrgList("group_list", params);
   }
 
-  /** Tags, optionally only those containing a substring. */
+  /** Tags, optionally only those containing a substring (a blank one is refused). */
   tagList(params: TagListParams = {}): Promise<string[]> {
     return this.typed<string[]>("tag_list", { query: params.query }, Array.isArray, "an array");
   }

@@ -141,8 +141,9 @@ compared as text and returns nonsense.
 **`all_fields`.** On `organizations` / `groups`, return full objects instead of names. CKAN
 caps such a list at 25 entries without saying so; the client pages past the cap.
 
-**Blank value.** An empty or whitespace-only filter, query or id is a usage error, never a
-silently unfiltered search.
+**Blank value.** An empty or whitespace-only filter, query, sort, facet field, parameter or id
+is refused before any request, never a silently unfiltered search: a usage error in the CLI,
+a `CkanValidationError` in the library.
 
 ---
 

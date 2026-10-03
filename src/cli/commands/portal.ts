@@ -6,6 +6,7 @@ import type { CliDeps } from "../io.js";
 import { action, renderJson, toEngineOptions, type GlobalOptions } from "../shared.js";
 import { checkPortal, mapLimit, withCheck } from "../../client/portals.js";
 import { PORTALS } from "../../client/portals-list.js";
+import { isBlank } from "../../client/validate.js";
 
 /** How many portals `portals --check` checks at once. */
 const CHECK_CONCURRENCY = 6;
@@ -19,18 +20,20 @@ function collectKeyValue(
   // Throw commander's InvalidArgumentError (not a CkanError) so the failure is
   // formatted as a usage error with `error:` prefix and help, consistent with
   // other parse-time flag validation (e.g. `--rows abc`).
-  if (eq <= 0) {
+  const key = value.slice(0, Math.max(eq, 0));
+  // A blank key (`=x`, ` =x`) names no parameter: the library refuses it too.
+  if (eq < 0 || isBlank(key)) {
     throw new InvalidArgumentError(`Invalid --param "${value}". Expected key=value.`);
   }
-  const key = value.slice(0, eq);
   // Reject a duplicated key rather than silently overwriting the earlier value.
   if (Object.prototype.hasOwnProperty.call(previous, key)) {
     throw new InvalidArgumentError(`Duplicate --param key "${key}".`);
   }
-  // A blank value would be dropped (CKAN reads an empty parameter as unset), so
-  // `--param q=` would silently run the action unfiltered.
+  // A blank value is refused by the library as well (CKAN reads an empty
+  // parameter as unset, so `--param q=` would run the action unfiltered); here it
+  // is a usage error that names the flag.
   const paramValue = value.slice(eq + 1);
-  if (paramValue.trim() === "") {
+  if (isBlank(paramValue)) {
     throw new InvalidArgumentError(`Invalid --param "${value}". The value must not be blank.`);
   }
   // A computed key in a literal is an own data property, even for `__proto__`.

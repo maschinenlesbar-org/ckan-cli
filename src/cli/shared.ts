@@ -7,6 +7,7 @@ import type { CliDeps } from "./io.js";
 import { isBidiControl, type EngineOptions } from "../client/engine.js";
 import { CkanError } from "../client/errors.js";
 import { findPortal } from "../client/portals.js";
+import { blankProblem } from "../client/validate.js";
 import { PORTALS } from "../client/portals-list.js";
 
 /** commander value-parser: a non-negative integer. */
@@ -26,13 +27,12 @@ export function parseIntArg(value: string): number {
 }
 
 /**
- * commander value-parser: a value that is not blank. A blank filter would
- * otherwise be dropped and the command would silently run unfiltered.
+ * commander value-parser: a value that is not blank (the library's blankProblem
+ * rule, reported as a usage error before the client is built).
  */
 export function parseNonEmpty(value: string): string {
-  if (value.trim() === "") {
-    throw new InvalidArgumentError("Expected a non-empty value.");
-  }
+  const reason = blankProblem(value);
+  if (reason !== undefined) throw new InvalidArgumentError(reason);
   return value;
 }
 

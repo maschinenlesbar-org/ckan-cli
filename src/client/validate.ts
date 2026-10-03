@@ -19,3 +19,19 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
   if (reason !== undefined) throw new CkanValidationError(`Invalid ${name}: ${reason}`);
   return value;
 }
+
+/** True for an empty or whitespace-only string: CKAN reads it as "not given". */
+export function isBlank(value: string): boolean {
+  return value.trim() === "";
+}
+
+/**
+ * A blank string, or a list with a blank entry. CKAN treats an empty parameter as
+ * no filter, so a blank search, filter, sort, facet field or tag query would
+ * silently return the unfiltered result. Values that are not strings pass.
+ */
+export function blankProblem(value: unknown): string | undefined {
+  const blank = (v: unknown): boolean => typeof v === "string" && isBlank(v);
+  if (blank(value) || (Array.isArray(value) && value.some(blank))) return "Expected a non-empty value.";
+  return undefined;
+}
