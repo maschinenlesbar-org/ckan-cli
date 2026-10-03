@@ -62,3 +62,21 @@ export function intRangeProblem(min: number, max: number): Problem<number> {
     return undefined;
   };
 }
+
+/**
+ * A value for an HTTP header (the User-Agent): not blank, no C0 control other
+ * than tab, no DEL, nothing above U+00FF. Node's HTTP layer refuses those at
+ * request time with an untyped "Invalid character in header content", and a
+ * custom transport might send a CR/LF on as a forged header. Checked by char code
+ * so the source stays free of control bytes.
+ */
+export function headerValueProblem(value: string): string | undefined {
+  const blank = blankProblem(value);
+  if (blank !== undefined) return blank;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if ((c < 0x20 && c !== 0x09) || c === 0x7f) return "Value contains control characters.";
+    if (c > 0xff) return "Value contains characters outside Latin-1 (above U+00FF).";
+  }
+  return undefined;
+}

@@ -5,7 +5,7 @@
 import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { CkanApiError, CkanNetworkError, CkanParseError, describeCkanError, redactUrl } from "./errors.js";
-import { assertValid, intRangeProblem } from "./validate.js";
+import { assertValid, headerValueProblem, intRangeProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://suche.transparenz.hamburg.de";
 const DEFAULT_USER_AGENT = "ckan-cli";
@@ -23,7 +23,10 @@ export interface EngineOptions {
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
   transport?: Transport;
-  /** Value of the User-Agent header. */
+  /**
+   * Value of the User-Agent header. Must be sendable (see `assertHeaderValue`):
+   * not blank, no control characters but tab, nothing above U+00FF.
+   */
   userAgent?: string;
   /** Per-request timeout in milliseconds, 0 to `MAX_TIMEOUT_MS` (2^31 - 1 ms); 0 disables. */
   timeoutMs?: number;
@@ -57,6 +60,14 @@ export const MAX_RETRIES = 10;
 
 /** Most redirects the engine follows (`maxRedirects`). */
 export const MAX_REDIRECTS = 10;
+
+/**
+ * Check a value for an HTTP header (headerValueProblem) and return it, or throw
+ * CkanValidationError `Invalid <name>: …`.
+ */
+export function assertHeaderValue(name: string, value: string): string {
+  return assertValid(name, value, headerValueProblem);
+}
 
 /** Check an optional numeric engine option against `[min, max]` (CkanValidationError). */
 function intOption(name: string, value: number | undefined, min: number, max: number): number | undefined {
@@ -198,7 +209,9 @@ export class RequestEngine {
     // gating at all, and could be steered to a non-http(s) scheme.
     assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
-    this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+    // Only undefined selects the default; a blank or unsendable value is refused.
+    this.userAgent =
+      options.userAgent === undefined ? DEFAULT_USER_AGENT : assertHeaderValue("userAgent", options.userAgent);
     this.timeoutMs = intOption("timeoutMs", options.timeoutMs, 0, MAX_TIMEOUT_MS) ?? 30_000;
     this.maxRetries = intOption("maxRetries", options.maxRetries, 0, MAX_RETRIES) ?? 2;
     this.retryDelayMs = intOption("retryDelayMs", options.retryDelayMs, 0, Number.MAX_SAFE_INTEGER) ?? 200;

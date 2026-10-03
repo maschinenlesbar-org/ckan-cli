@@ -115,3 +115,25 @@ test("parity: in-range engine limits are accepted on both sides", async () => {
     result.lib.requests.map((r) => [r.timeoutMs, r.maxResponseBytes]),
   );
 });
+
+// Finding 5 (PAT-5): the engine checks the User-Agent like the CLI's
+// --user-agent parser, at construction and before any request.
+test("parity: a blank or unsendable User-Agent is refused", async () => {
+  const DEL = String.fromCharCode(0x7f);
+  for (const ua of ["", "  ", "a\r\nX-Evil: 1", "agent€", `x${DEL}`]) {
+    assertBothReject(
+      await parity(["--user-agent", ua, "status"], (transport) => new CkanClient({ transport, userAgent: ua }).status()),
+    );
+  }
+});
+
+test("parity: a tab and Latin-1 in the User-Agent go out the same on both sides", async () => {
+  for (const ua of ["ok\tua", "café"]) {
+    const result = await parity(["--user-agent", ua, "status"], (transport) =>
+      new CkanClient({ transport, userAgent: ua }).status(),
+    );
+    assertSameRequests(result);
+    assert.equal(result.cli.requests[0]!.headers?.["User-Agent"], ua);
+    assert.equal(result.lib.requests[0]!.headers?.["User-Agent"], ua);
+  }
+});

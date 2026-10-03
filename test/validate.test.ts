@@ -97,3 +97,14 @@ test("intRangeProblem: a safe integer within [min, max], with the CLI's messages
   assert.equal(problem(11), "Must be <= 10.");
   for (const n of [1.5, NaN, Infinity]) assert.equal(problem(n), "Expected an integer from 0 to 10.", String(n));
 });
+
+test("headerValueProblem: no blank value, C0 controls but tab, DEL or code points above U+00FF", async () => {
+  const { headerValueProblem } = await import("../src/client/validate.js");
+  assert.equal(headerValueProblem(""), "Expected a non-empty value.");
+  assert.equal(headerValueProblem("  "), "Expected a non-empty value.");
+  for (const code of [0x00, 0x0a, 0x0d, 0x1f, 0x7f]) {
+    assert.equal(headerValueProblem(`a${String.fromCharCode(code)}b`), "Value contains control characters.", String(code));
+  }
+  assert.equal(headerValueProblem("agent€"), "Value contains characters outside Latin-1 (above U+00FF).");
+  for (const ok of ["ua/1", "a\tb", "café", "ÿ"]) assert.equal(headerValueProblem(ok), undefined, ok);
+});

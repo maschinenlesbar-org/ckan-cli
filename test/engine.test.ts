@@ -425,3 +425,18 @@ test("the constructor refuses out-of-range numeric limits (CkanValidationError, 
   ];
   for (const [name, value] of good) new RequestEngine({ [name]: value });
 });
+
+test("the constructor refuses a blank or unsendable userAgent, before any request", async () => {
+  const { CkanValidationError } = await import("../src/client/errors.js");
+  const { assertHeaderValue } = await import("../src/client/engine.js");
+  for (const ua of ["", " ", "a\r\nb", "€"]) {
+    const mt = makeMockTransport(() => jsonResponse({}));
+    assert.throws(
+      () => new RequestEngine({ transport: mt.transport, userAgent: ua }),
+      (err: unknown) => err instanceof CkanValidationError && err.message.startsWith("Invalid userAgent: "),
+      JSON.stringify(ua),
+    );
+    assert.equal(mt.calls.length, 0);
+  }
+  assert.equal(assertHeaderValue("User-Agent", "a\tb"), "a\tb");
+});

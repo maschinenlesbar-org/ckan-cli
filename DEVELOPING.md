@@ -60,7 +60,7 @@ new CkanClient({
   timeoutMs: 15_000,          // 0..MAX_TIMEOUT_MS (2^31 - 1); 0 disables
   maxRetries: 3,              // 0..MAX_RETRIES (10); 429 / 503 are retried (Retry-After, else linear backoff)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
-  userAgent: "my-app/1.0",
+  userAgent: "my-app/1.0",    // not blank; no control characters but tab; Latin-1 only
   transport: customTransport, // inject your own HTTP transport
 });
 ```
@@ -70,6 +70,14 @@ The numeric options (`timeoutMs`, `maxRetries`, `retryDelayMs`, `maxRedirects` u
 range. The constructor throws `CkanValidationError` otherwise: a negative or `NaN`
 timeout or size cap would silently switch that guard off. The CLI's `--timeout`,
 `--max-retries` and `--max-response-bytes` use the same bounds (`intRangeProblem`).
+
+`userAgent` goes through `assertHeaderValue` (exported; the rule is
+`headerValueProblem`, which `--user-agent` uses too): a blank value, a C0 control
+other than tab (CR/LF included), DEL or a character above U+00FF throws
+`CkanValidationError` at construction, so it never reaches a custom transport as a
+forged header. Only `undefined` selects the default `ckan-cli`. Should a transport
+call still be handed a header Node cannot send, the default transport rejects with
+`CkanNetworkError` `Invalid request: …`, never a raw `TypeError`.
 
 ### Methods
 
