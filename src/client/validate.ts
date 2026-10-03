@@ -80,3 +80,18 @@ export function headerValueProblem(value: string): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * A base URL: no surrounding or embedded whitespace and no control characters.
+ * `new URL` trims and drops tab/newline silently, but the client glues the value
+ * into every request URL as given, so a trailing space would request another
+ * path (`/ckan%20/api/3/...`) or reach a custom transport raw.
+ */
+export function baseUrlProblem(value: string): string | undefined {
+  if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
+  for (const ch of value) {
+    const c = ch.codePointAt(0) ?? 0;
+    if (c < 0x20 || c === 0x7f || /\s/u.test(ch)) return "A base URL cannot contain whitespace or control characters.";
+  }
+  return undefined;
+}

@@ -137,3 +137,35 @@ test("parity: a tab and Latin-1 in the User-Agent go out the same on both sides"
     assert.equal(result.lib.requests[0]!.headers?.["User-Agent"], ua);
   }
 });
+
+// Finding 2 (PAT-1): a base URL with whitespace is refused by the library, which
+// would otherwise glue it into every request URL as given.
+test("parity: a base URL with surrounding or embedded whitespace is refused", async () => {
+  const values = [
+    "https://x.example/ckan ",
+    " https://x.example/ckan",
+    "https://x.org/api/3/action ",
+    "https://x.org/ckan/ ",
+    "https://x.org/a b",
+    "https://x.org/a\tb",
+    "https://x.org/a\nb",
+  ];
+  for (const baseUrl of values) {
+    assertBothReject(
+      await parity(["--base-url", baseUrl, "status"], (transport) => new CkanClient({ transport, baseUrl }).status()),
+    );
+    assertBothReject(
+      await parity(["status"], (transport) => new CkanClient({ transport, baseUrl }).status(), {
+        env: { CKAN_BASE_URL: baseUrl },
+      }),
+    );
+  }
+});
+
+test("parity: a clean base URL goes out the same on both sides", async () => {
+  assertSameRequests(
+    await parity(["--base-url", "https://x.example/ckan/api/3/action", "status"], (transport) =>
+      new CkanClient({ transport, baseUrl: "https://x.example/ckan/api/3/action" }).status(),
+    ),
+  );
+});

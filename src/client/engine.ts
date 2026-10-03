@@ -5,7 +5,7 @@
 import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { CkanApiError, CkanNetworkError, CkanParseError, describeCkanError, redactUrl } from "./errors.js";
-import { assertValid, headerValueProblem, intRangeProblem } from "./validate.js";
+import { assertValid, baseUrlProblem, headerValueProblem, intRangeProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://suche.transparenz.hamburg.de";
 const DEFAULT_USER_AGENT = "ckan-cli";
@@ -203,7 +203,9 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    // The raw value, before the slash strip: the engine glues it into every URL.
+    const baseUrl = assertValid("base URL", options.baseUrl ?? DEFAULT_BASE_URL, baseUrlProblem);
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
     // Re-check the base-URL scheme here, not only in the default transport: a
     // library consumer that injects a custom transport would otherwise get no
     // gating at all, and could be steered to a non-http(s) scheme.

@@ -24,7 +24,7 @@ export function findPortal(idOrUrl: string, list: readonly Portal[]): Portal | u
   if (byId) return byId;
   let key: string;
   try {
-    key = portalKey(idOrUrl);
+    key = portalKey(idOrUrl.trim());
   } catch {
     return undefined; // not a URL either
   }

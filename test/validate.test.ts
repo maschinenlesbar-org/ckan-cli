@@ -108,3 +108,14 @@ test("headerValueProblem: no blank value, C0 controls but tab, DEL or code point
   assert.equal(headerValueProblem("agent€"), "Value contains characters outside Latin-1 (above U+00FF).");
   for (const ok of ["ua/1", "a\tb", "café", "ÿ"]) assert.equal(headerValueProblem(ok), undefined, ok);
 });
+
+test("baseUrlProblem: no surrounding or embedded whitespace or control characters", async () => {
+  const { baseUrlProblem } = await import("../src/client/validate.js");
+  for (const value of ["https://x.org ", " https://x.org", "https://x.org\n", "   "]) {
+    assert.equal(baseUrlProblem(value), "A base URL cannot have surrounding whitespace.", JSON.stringify(value));
+  }
+  for (const value of ["https://x.org/a b", "https://x.org/a\tb", `https://x.org/a${String.fromCharCode(0x7f)}`]) {
+    assert.equal(baseUrlProblem(value), "A base URL cannot contain whitespace or control characters.", JSON.stringify(value));
+  }
+  assert.equal(baseUrlProblem("https://x.org/ckan"), undefined);
+});

@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import { isBidiControl, type EngineOptions } from "../client/engine.js";
 import { CkanError } from "../client/errors.js";
 import { findPortal } from "../client/portals.js";
-import { blankProblem, countProblem, headerValueProblem, intRangeProblem } from "../client/validate.js";
+import { baseUrlProblem, blankProblem, countProblem, headerValueProblem, intRangeProblem } from "../client/validate.js";
 import { PORTALS } from "../client/portals-list.js";
 
 /** commander value-parser: a non-negative integer. */
@@ -102,11 +102,9 @@ export function parseBaseUrl(value: string): string {
   if (/[?#]/.test(value)) {
     throw new InvalidArgumentError("Expected a site URL without a query string or fragment.");
   }
-  // `new URL` trims, but the value is used as given: a trailing space would land in
-  // the request path (`/404%20/api/3/...`) or the host.
-  if (value !== value.trim()) {
-    throw new InvalidArgumentError("A base URL cannot have surrounding whitespace.");
-  }
+  // The library's whitespace rule: `new URL` trims, but the value is used as given.
+  const reason = baseUrlProblem(value);
+  if (reason !== undefined) throw new InvalidArgumentError(reason);
   return value;
 }
 

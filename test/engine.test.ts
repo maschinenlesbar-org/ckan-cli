@@ -28,7 +28,7 @@ test("the constructor rejects a non-http(s) base URL (GOV-01)", () => {
     () => new RequestEngine({ baseUrl: "file:///etc/passwd" }),
     CkanNetworkError,
   );
-  assert.throws(() => new RequestEngine({ baseUrl: "not a url" }), CkanNetworkError);
+  assert.throws(() => new RequestEngine({ baseUrl: "not-a-url" }), CkanNetworkError);
 });
 
 test("buildUrl normalises the path and appends the query", () => {

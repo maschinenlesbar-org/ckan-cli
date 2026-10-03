@@ -18,7 +18,7 @@ offers the same **Action API**, which this client wraps; each portal adds its ow
 **Portal.** One CKAN installation, addressed by its **site URL** (`--base-url`), e.g.
 `https://suche.transparenz.hamburg.de` or `https://www.daten-bw.de/ckan` (a CKAN mounted
 under a sub-path). A URL copied from a portal's API docs (`…/api/3/action`) is reduced to
-the site URL.
+the site URL. A site URL with whitespace in or around it is refused (CLI and library).
 
 **Known portal.** A German CKAN portal in the list built into the CLI, addressed by a
 short **id** with `--portal` (`hamburg`, `govdata`, `berlin`, `nrw`, …). `ckan portals`

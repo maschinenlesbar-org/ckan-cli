@@ -19,7 +19,8 @@ Portal ergänzt eigene Felder (`extras`) und Einstellungen.
 **Portal.** Eine CKAN-Installation, angesprochen über ihre **Site-URL** (`--base-url`),
 z. B. `https://suche.transparenz.hamburg.de` oder `https://www.daten-bw.de/ckan` (ein CKAN
 unter einem Unterpfad). Eine aus der API-Dokumentation eines Portals kopierte URL
-(`…/api/3/action`) wird auf die Site-URL gekürzt.
+(`…/api/3/action`) wird auf die Site-URL gekürzt. Eine Site-URL mit Leerzeichen darin oder
+drumherum wird abgelehnt (CLI und Bibliothek).
 
 **Bekanntes Portal.** Ein deutsches CKAN-Portal aus der in die CLI eingebauten Liste,
 angesprochen über eine kurze **ID** mit `--portal` (`hamburg`, `govdata`, `berlin`, `nrw` …).

@@ -132,7 +132,10 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   inputs, and `run.ts` reports a `CkanValidationError` as a usage error (exit 1).
 - **Base URL.** `--base-url` or `--portal` (they conflict) > `CKAN_BASE_URL` > the
   Hamburg default. A query string or fragment is refused: the API path is
-  appended, so it would land in front of it. `siteRoot()`
+  appended, so it would land in front of it. So is whitespace or a control
+  character anywhere in it (`baseUrlProblem`, `CkanValidationError` from the
+  constructor, `siteRoot()` and `RequestEngine`): `new URL` trims and drops tab and
+  newline, but the value is glued into every request URL as given. `siteRoot()`
   drops a trailing `/api/3/action` or `/api/3`, because portals document their API
   with that suffix, and keeps any other path (a CKAN under `https://host/ckan`).
   commander does not run value parsers on defaults, so a `preAction` hook in

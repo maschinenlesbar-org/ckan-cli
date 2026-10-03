@@ -357,3 +357,16 @@ test("out-of-range rows, start, offset and facet_limit are refused before any re
     assert.equal(mt.calls.length, 0, message);
   }
 });
+
+test("a base URL with whitespace is refused by the constructor, siteRoot and the engine", async () => {
+  const { RequestEngine } = await import("../src/client/engine.js");
+  const { siteRoot } = await import("../src/client/client.js");
+  for (const baseUrl of ["https://x.org ", " https://x.org", "https://x.org/a b", "https://x.org/api/3/action\n"]) {
+    const mt = makeMockTransport(() => jsonResponse(ckan({})));
+    const isValidation = (err: unknown) => err instanceof CkanValidationError && /^Invalid base URL: /.test((err as Error).message);
+    assert.throws(() => new CkanClient({ transport: mt.transport, baseUrl }), isValidation, JSON.stringify(baseUrl));
+    assert.throws(() => siteRoot(baseUrl), isValidation, JSON.stringify(baseUrl));
+    assert.throws(() => new RequestEngine({ transport: mt.transport, baseUrl }), isValidation, JSON.stringify(baseUrl));
+    assert.equal(mt.calls.length, 0);
+  }
+});
