@@ -81,28 +81,12 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
 }
 
 /**
- * commander value-parser for --base-url: reject a non-http(s) scheme at parse
- * time so `file:`, `ftp:`, etc. fail fast with a usage error rather than only
- * being caught later in the transport. The default transport also re-checks the
- * scheme per hop (and RequestEngine.buildUrl guards it for custom transports),
- * but this surfaces the mistake up front and independently of the transport.
+ * commander value-parser for --base-url (and CKAN_BASE_URL, via the preAction hook
+ * in program.ts): the library's baseUrlProblem rule (not blank, no whitespace, an
+ * absolute http(s) URL, no query string or fragment), reported as a usage error
+ * before the client is built.
  */
 export function parseBaseUrl(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new InvalidArgumentError("Expected an absolute http(s) URL.");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new InvalidArgumentError(
-      `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`,
-    );
-  }
-  if (/[?#]/.test(value)) {
-    throw new InvalidArgumentError("Expected a site URL without a query string or fragment.");
-  }
-  // The library's whitespace rule: `new URL` trims, but the value is used as given.
   const reason = baseUrlProblem(value);
   if (reason !== undefined) throw new InvalidArgumentError(reason);
   return value;

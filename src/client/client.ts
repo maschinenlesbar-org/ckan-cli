@@ -1,10 +1,10 @@
 // CkanClient — a typed client over the open (no-auth) read endpoints of any CKAN
 // Action API (`<site>/api/3/action`).
 
-import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
+import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, validateBaseUrl, type EngineOptions } from "./engine.js";
 import { CkanError, CkanParseError, CkanValidationError, describeCkanError, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
-import { assertValid, baseUrlProblem, blankProblem, countProblem, facetLimitProblem } from "./validate.js";
+import { assertValid, blankProblem, countProblem, facetLimitProblem } from "./validate.js";
 import type {
   CkanEnvelope,
   Group,
@@ -102,18 +102,12 @@ function assertCount(name: string, value: number | undefined): void {
  * The site root of a CKAN instance, from what a user is likely to paste: portals
  * document their API as `<site>/api/3/action`, so that suffix (or `/api/3`) is
  * dropped. A CKAN mounted under a sub-path (`https://host/ckan`) keeps it.
- * Whitespace (baseUrlProblem, CkanValidationError) and a query string or fragment
- * are refused.
+ * A base URL that breaks the rules of `validateBaseUrl` (blank, whitespace, not
+ * an http(s) URL, a query string or fragment) throws CkanValidationError.
  */
 export function siteRoot(baseUrl: string): string {
-  // Before the suffix strip: a trailing space would hide the suffix from it.
-  assertValid("base URL", baseUrl, baseUrlProblem);
-  // The API path is appended to the base URL, so a query string or fragment in it
-  // would end up in front of `/api/3/action` and break every request.
-  if (/[?#]/.test(baseUrl)) {
-    throw new CkanError(`The base URL must not contain a query string or fragment: ${redactUrl(baseUrl)}`);
-  }
-  return baseUrl.replace(/\/+$/, "").replace(/\/api\/3(\/action)?$/, "");
+  // Checked before the suffix strip: a trailing space would hide the suffix from it.
+  return validateBaseUrl(baseUrl).replace(/\/api\/3(\/action)?$/, "");
 }
 
 export class CkanClient {

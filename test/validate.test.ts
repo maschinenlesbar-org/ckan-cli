@@ -111,11 +111,26 @@ test("headerValueProblem: no blank value, C0 controls but tab, DEL or code point
 
 test("baseUrlProblem: no surrounding or embedded whitespace or control characters", async () => {
   const { baseUrlProblem } = await import("../src/client/validate.js");
-  for (const value of ["https://x.org ", " https://x.org", "https://x.org\n", "   "]) {
+  for (const value of ["https://x.org ", " https://x.org", "https://x.org\n"]) {
     assert.equal(baseUrlProblem(value), "A base URL cannot have surrounding whitespace.", JSON.stringify(value));
   }
   for (const value of ["https://x.org/a b", "https://x.org/a\tb", `https://x.org/a${String.fromCharCode(0x7f)}`]) {
     assert.equal(baseUrlProblem(value), "A base URL cannot contain whitespace or control characters.", JSON.stringify(value));
   }
   assert.equal(baseUrlProblem("https://x.org/ckan"), undefined);
+});
+
+test("baseUrlProblem: an absolute http(s) URL without a query string or fragment", async () => {
+  const { baseUrlProblem } = await import("../src/client/validate.js");
+  for (const value of ["", "   ", "not-a-url", "http://", "/relative"]) {
+    assert.equal(baseUrlProblem(value), "Expected an absolute http(s) URL.", JSON.stringify(value));
+  }
+  assert.equal(baseUrlProblem("ftp://h.example?x"), 'Unsupported scheme "ftp:". Expected an http(s) URL.');
+  assert.equal(baseUrlProblem("file:///etc/passwd"), 'Unsupported scheme "file:". Expected an http(s) URL.');
+  for (const value of ["https://h.example?x=1", "https://h.example/?", "https://h.example#f"]) {
+    assert.equal(baseUrlProblem(value), "Expected a site URL without a query string or fragment.", value);
+  }
+  for (const value of ["https://h.example", "http://127.0.0.1:9/ckan/", "http://user:pw@h.example"]) {
+    assert.equal(baseUrlProblem(value), undefined, value);
+  }
 });

@@ -23,12 +23,20 @@ function hasControlChars(s: string): boolean {
   });
 }
 
-test("the constructor rejects a non-http(s) base URL (GOV-01)", () => {
-  assert.throws(
-    () => new RequestEngine({ baseUrl: "file:///etc/passwd" }),
-    CkanNetworkError,
-  );
-  assert.throws(() => new RequestEngine({ baseUrl: "not-a-url" }), CkanNetworkError);
+test("the constructor rejects a malformed base URL as a validation error, not a network error (GOV-01)", async () => {
+  const { CkanValidationError } = await import("../src/client/errors.js");
+  const { validateBaseUrl } = await import("../src/client/engine.js");
+  for (const baseUrl of ["file:///etc/passwd", "not-a-url", "", "https://h.example?x=1", "https://h.example#f"]) {
+    for (const build of [() => new RequestEngine({ baseUrl }), () => validateBaseUrl(baseUrl)]) {
+      assert.throws(
+        build,
+        (err: unknown) =>
+          err instanceof CkanValidationError && !(err instanceof CkanNetworkError) && /^Invalid base URL: /.test(err.message),
+        JSON.stringify(baseUrl),
+      );
+    }
+  }
+  assert.equal(validateBaseUrl("https://h.example/ckan//"), "https://h.example/ckan");
 });
 
 test("buildUrl normalises the path and appends the query", () => {

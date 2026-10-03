@@ -84,7 +84,7 @@ call still be handed a header Node cannot send, the default transport rejects wi
 `status`, `packageSearch`, `packageShow`, `packageList`, `resourceShow`,
 `organizationList`, `organizationShow`, `groupList`, `groupShow`, `tagList`,
 `licenseList`, and the generic `action(name, params)`. `siteRoot(url)` exposes
-the base-URL normalisation.
+the base-URL normalisation, `validateBaseUrl(url)` the base-URL check.
 
 The known portals are exported too: `PORTALS` (the built-in list),
 `findPortal(idOrUrl, PORTALS)`, `portalKey(url)`, `checkPortal(client)` (the short
@@ -145,13 +145,19 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   parsers call the same functions, so the CLI and the library refuse the same
   inputs, and `run.ts` reports a `CkanValidationError` as a usage error (exit 1).
 - **Base URL.** `--base-url` or `--portal` (they conflict) > `CKAN_BASE_URL` > the
-  Hamburg default. A query string or fragment is refused: the API path is
-  appended, so it would land in front of it. So is whitespace or a control
-  character anywhere in it (`baseUrlProblem`, `CkanValidationError` from the
-  constructor, `siteRoot()` and `RequestEngine`): `new URL` trims and drops tab and
-  newline, but the value is glued into every request URL as given. `siteRoot()`
-  drops a trailing `/api/3/action` or `/api/3`, because portals document their API
-  with that suffix, and keeps any other path (a CKAN under `https://host/ckan`).
+  Hamburg default (an empty `CKAN_BASE_URL` counts as unset; in the library only
+  `undefined` selects the default). One rule set, `baseUrlProblem`, applied by the
+  exported `validateBaseUrl()` in the `CkanClient` and `RequestEngine` constructors
+  and in `siteRoot()`: a blank value, whitespace or a control character anywhere in
+  it (`new URL` trims and drops tab and newline, but the value is glued into every
+  request URL as given), anything but an absolute http(s) URL, and a query string or
+  fragment (the API path is appended, so it would land in front of it) all throw
+  `CkanValidationError` `Invalid base URL: …` — a configuration mistake, never a
+  `CkanNetworkError`, which stays for transport failures (the default transport
+  still re-checks the scheme on every hop and redirect). Userinfo is allowed and
+  redacted in messages. `siteRoot()` drops a trailing `/api/3/action` or `/api/3`,
+  because portals document their API with that suffix, and keeps any other path (a
+  CKAN under `https://host/ckan`). The CLI's `parseBaseUrl` calls `baseUrlProblem`;
   commander does not run value parsers on defaults, so a `preAction` hook in
   `program.ts` checks a `CKAN_BASE_URL` value the same way `--base-url` is checked.
 - **Envelope.** The client unwraps CKAN's `{ help, success, result }` and raises

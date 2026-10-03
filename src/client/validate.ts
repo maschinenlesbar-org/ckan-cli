@@ -82,16 +82,37 @@ export function headerValueProblem(value: string): string | undefined {
 }
 
 /**
- * A base URL: no surrounding or embedded whitespace and no control characters.
- * `new URL` trims and drops tab/newline silently, but the client glues the value
- * into every request URL as given, so a trailing space would request another
- * path (`/ckan%20/api/3/...`) or reach a custom transport raw.
+ * A base URL (the CKAN site URL), checked in this order:
+ *
+ * - not blank;
+ * - no surrounding or embedded whitespace and no control characters: `new URL`
+ *   trims and drops tab/newline silently, but the client glues the value into
+ *   every request URL as given, so a trailing space would request another path
+ *   (`/ckan%20/api/3/...`) or reach a custom transport raw;
+ * - an absolute URL with an http(s) scheme (`file:`, `ftp:` … never reach a
+ *   transport);
+ * - no query string or fragment: the API path is appended, so it would land in
+ *   front of `/api/3/action`.
+ *
+ * Userinfo (`https://user:pw@host`) is allowed; error messages redact it. The
+ * reasons never quote the value, so a credential in it cannot leak through them.
  */
 export function baseUrlProblem(value: string): string | undefined {
+  if (isBlank(value)) return "Expected an absolute http(s) URL.";
   if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
   for (const ch of value) {
     const c = ch.codePointAt(0) ?? 0;
     if (c < 0x20 || c === 0x7f || /\s/u.test(ch)) return "A base URL cannot contain whitespace or control characters.";
   }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "Expected an absolute http(s) URL.";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
+  }
+  if (/[?#]/.test(value)) return "Expected a site URL without a query string or fragment.";
   return undefined;
 }

@@ -194,3 +194,32 @@ test("parity: portals --check equals checkPortals over the built-in list", async
   assert.deepEqual(urls(result.cli.requests), urls(result.lib.requests));
   assert.equal(result.cli.requests.length, PORTALS.length * 2 - 1);
 });
+
+// Finding 6 (PAT-2): one set of base-URL rules, in the library; a bad base URL is
+// a CkanValidationError (a configuration mistake), never a CkanNetworkError.
+test("parity: a malformed base URL is refused with the same reason on both sides", async () => {
+  const cases: [string, RegExp][] = [
+    ["ftp://h.example", /Unsupported scheme "ftp:"\. Expected an http\(s\) URL\./],
+    ["ftp://h.example?x", /Unsupported scheme "ftp:"\. Expected an http\(s\) URL\./],
+    ["not-a-url", /Expected an absolute http\(s\) URL\./],
+    ["http://", /Expected an absolute http\(s\) URL\./],
+    ["", /Expected an absolute http\(s\) URL\./],
+    ["https://h.example?x=1", /Expected a site URL without a query string or fragment\./],
+    ["https://h.example/#top", /Expected a site URL without a query string or fragment\./],
+    ["https://h.example ", /A base URL cannot have surrounding whitespace\./],
+  ];
+  for (const [baseUrl, message] of cases) {
+    assertBothReject(
+      await parity(["--base-url", baseUrl, "status"], (transport) => new CkanClient({ transport, baseUrl }).status()),
+      message,
+    );
+    if (baseUrl !== "") {
+      assertBothReject(
+        await parity(["status"], (transport) => new CkanClient({ transport, baseUrl }).status(), {
+          env: { CKAN_BASE_URL: baseUrl },
+        }),
+        message,
+      );
+    }
+  }
+});

@@ -316,7 +316,7 @@ test("all_fields paging stops when a server ignores offset", async () => {
 
 test("a base URL with a query string or fragment is refused", () => {
   for (const baseUrl of ["https://ckan.govdata.de/?lang=de", "https://ckan.govdata.de/#top"]) {
-    assert.throws(() => new CkanClient({ baseUrl }), CkanError, baseUrl);
+    assert.throws(() => new CkanClient({ baseUrl }), CkanValidationError, baseUrl);
   }
 });
 
