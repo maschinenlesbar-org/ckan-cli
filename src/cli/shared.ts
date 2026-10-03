@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import { isBidiControl, type EngineOptions } from "../client/engine.js";
 import { CkanError } from "../client/errors.js";
 import { findPortal } from "../client/portals.js";
-import { blankProblem, countProblem } from "../client/validate.js";
+import { blankProblem, countProblem, intRangeProblem } from "../client/validate.js";
 import { PORTALS } from "../client/portals-list.js";
 
 /** commander value-parser: a non-negative integer. */
@@ -80,12 +80,13 @@ export function collectNonEmpty(value: string, previous: string[] = []): string[
   return previous.concat([parseOptionValue(value)]);
 }
 
-/** Build a commander value-parser for a non-negative integer within [min, max]. */
+/** Build a commander value-parser for a non-negative integer within [min, max] (the library's intRangeProblem). */
 export function parseBoundedInt(min: number, max: number): (value: string) => number {
+  const problem = intRangeProblem(min, max);
   return (value: string) => {
     const n = parseIntArg(value);
-    if (n < min) throw new InvalidArgumentError(`Must be >= ${min}.`);
-    if (n > max) throw new InvalidArgumentError(`Must be <= ${max}.`);
+    const reason = problem(n);
+    if (reason !== undefined) throw new InvalidArgumentError(reason);
     return n;
   };
 }

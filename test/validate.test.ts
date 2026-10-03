@@ -88,3 +88,12 @@ test("facetLimitProblem: -1 or a non-negative safe integer", async () => {
     assert.equal(facetLimitProblem(n), "Expected -1 or a non-negative integer.", String(n));
   }
 });
+
+test("intRangeProblem: a safe integer within [min, max], with the CLI's messages", async () => {
+  const { intRangeProblem } = await import("../src/client/validate.js");
+  const problem = intRangeProblem(0, 10);
+  for (const n of [0, 5, 10]) assert.equal(problem(n), undefined, String(n));
+  assert.equal(problem(-1), "Must be >= 0.");
+  assert.equal(problem(11), "Must be <= 10.");
+  for (const n of [1.5, NaN, Infinity]) assert.equal(problem(n), "Expected an integer from 0 to 10.", String(n));
+});

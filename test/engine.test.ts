@@ -401,3 +401,27 @@ test("an unknown response charset is a CkanParseError naming it", async () => {
       err.message === 'Unsupported response charset "x-nope" from https://a.example/x.',
   );
 });
+
+test("the constructor refuses out-of-range numeric limits (CkanValidationError, no request)", async () => {
+  const { CkanValidationError } = await import("../src/client/errors.js");
+  const { MAX_REDIRECTS, MAX_RETRIES } = await import("../src/client/engine.js");
+  const bad: [string, number][] = [
+    ["timeoutMs", -1], ["timeoutMs", 1.5], ["timeoutMs", NaN], ["timeoutMs", 2_147_483_648],
+    ["maxRetries", -1], ["maxRetries", 1.5], ["maxRetries", Infinity], ["maxRetries", MAX_RETRIES + 1],
+    ["maxRedirects", -1], ["maxRedirects", NaN], ["maxRedirects", MAX_REDIRECTS + 1],
+    ["maxResponseBytes", -1], ["maxResponseBytes", 1.5], ["maxResponseBytes", NaN],
+    ["retryDelayMs", -1], ["retryDelayMs", Infinity],
+  ];
+  for (const [name, value] of bad) {
+    assert.throws(
+      () => new RequestEngine({ [name]: value }),
+      (err: unknown) => err instanceof CkanValidationError && err.message.startsWith(`Invalid ${name}: `),
+      `${name}=${value}`,
+    );
+  }
+  const good: [string, number][] = [
+    ["timeoutMs", 0], ["timeoutMs", 2_147_483_647], ["maxRetries", 0], ["maxRetries", MAX_RETRIES],
+    ["maxRedirects", 0], ["maxRedirects", MAX_REDIRECTS], ["maxResponseBytes", 0], ["retryDelayMs", 0],
+  ];
+  for (const [name, value] of good) new RequestEngine({ [name]: value });
+});

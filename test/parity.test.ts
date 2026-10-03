@@ -3,6 +3,7 @@
 // report). Each test names the finding it covers.
 
 import { test } from "node:test";
+import assert from "node:assert/strict";
 import { CkanClient } from "../src/client/client.js";
 import { assertBothReject, assertSameRequests, jsonResponse, parity } from "./helpers.js";
 
@@ -83,5 +84,34 @@ test("parity: facet_limit -1 and in-range paging go out the same on both sides",
     await parity(["packages", "--offset", "0"], (transport) => new CkanClient({ transport }).packageList({ offset: 0 }), {
       responder: LIST,
     }),
+  );
+});
+
+// Finding 4 (PAT-8): the engine range-checks its numeric limits in the
+// constructor, so a bad value cannot switch off the timeout or size cap.
+test("parity: out-of-range timeout, retries and response cap are refused", async () => {
+  const cases: [string[], Record<string, number>][] = [
+    [["--timeout", "-1", "status"], { timeoutMs: -1 }],
+    [["--timeout", "NaN", "status"], { timeoutMs: NaN }],
+    [["--timeout", "2147483648", "status"], { timeoutMs: 2_147_483_648 }],
+    [["--max-retries", "50", "status"], { maxRetries: 50 }],
+    [["--max-retries", "Infinity", "status"], { maxRetries: Infinity }],
+    [["--max-response-bytes", "-1", "status"], { maxResponseBytes: -1 }],
+    [["--max-response-bytes", "NaN", "status"], { maxResponseBytes: NaN }],
+  ];
+  for (const [argv, options] of cases) {
+    assertBothReject(await parity(argv, (transport) => new CkanClient({ transport, ...options }).status()));
+  }
+});
+
+test("parity: in-range engine limits are accepted on both sides", async () => {
+  const result = await parity(
+    ["--timeout", "0", "--max-retries", "10", "--max-response-bytes", "0", "status"],
+    (transport) => new CkanClient({ transport, timeoutMs: 0, maxRetries: 10, maxResponseBytes: 0 }).status(),
+  );
+  assertSameRequests(result);
+  assert.deepEqual(
+    result.cli.requests.map((r) => [r.timeoutMs, r.maxResponseBytes]),
+    result.lib.requests.map((r) => [r.timeoutMs, r.maxResponseBytes]),
   );
 });

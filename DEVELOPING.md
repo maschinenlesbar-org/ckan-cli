@@ -57,13 +57,19 @@ try {
 ```ts
 new CkanClient({
   baseUrl: "https://ckan.govdata.de", // site URL; a trailing /api/3/action is dropped
-  timeoutMs: 15_000,
-  maxRetries: 3,              // 429 / 503 are retried (Retry-After, else linear backoff)
+  timeoutMs: 15_000,          // 0..MAX_TIMEOUT_MS (2^31 - 1); 0 disables
+  maxRetries: 3,              // 0..MAX_RETRIES (10); 429 / 503 are retried (Retry-After, else linear backoff)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",
   transport: customTransport, // inject your own HTTP transport
 });
 ```
+
+The numeric options (`timeoutMs`, `maxRetries`, `retryDelayMs`, `maxRedirects` up to
+`MAX_REDIRECTS`, `maxResponseBytes`) must be non-negative safe integers within their
+range. The constructor throws `CkanValidationError` otherwise: a negative or `NaN`
+timeout or size cap would silently switch that guard off. The CLI's `--timeout`,
+`--max-retries` and `--max-response-bytes` use the same bounds (`intRangeProblem`).
 
 ### Methods
 
