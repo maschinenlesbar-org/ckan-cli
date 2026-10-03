@@ -87,8 +87,22 @@ call still be handed a header Node cannot send, the default transport rejects wi
 the base-URL normalisation.
 
 The known portals are exported too: `PORTALS` (the built-in list),
-`findPortal(idOrUrl, PORTALS)`, `portalKey(url)` and
-`checkPortal(client)`, the short live check `ckan portals --check` runs.
+`findPortal(idOrUrl, PORTALS)`, `portalKey(url)`, `checkPortal(client)` (the short
+live check of one portal), and the whole check `ckan portals --check` runs:
+
+```ts
+import { checkPortals, PORTALS } from "@maschinenlesbar.org/ckan-cli";
+
+// Every portal checked live (6 at a time), each entry dated today.
+const list = await checkPortals(PORTALS, { engineOptions: { timeoutMs: 15_000 } });
+```
+
+`checkPortals(portals, options)` folds each result into its entry (`withCheck`);
+`checkPortalUrls(urls, options)` returns the bare `PortalCheck`s. Options:
+`engineOptions` (`baseUrl` is replaced per portal), `createClient`, `concurrency`
+(default `DEFAULT_CHECK_CONCURRENCY`, 6), `retryDelayMs` (when set, a failed check is
+repeated once after that pause; the CLI makes a single try, `update-portals` retries)
+and `date`. A URL the client refuses is a failed check, not a throw.
 
 ## Architecture
 
@@ -102,7 +116,7 @@ src/
     errors.ts    # CkanError / CkanApiError / CkanNetworkError / CkanParseError / CkanValidationError
     validate.ts  # the input rules (`…Problem` functions) and assertValid
     client.ts    # CkanClient — CKAN actions over the engine (with result-unwrapping)
-    portals.ts   # portalKey, findPortal, checkPortal (live check), withCheck
+    portals.ts   # portalKey, findPortal, checkPortal (live check), withCheck, checkPortals
     portals-list.ts  # PORTALS: the built-in list, rewritten by scripts/update-portals.ts
   cli/
     io.ts        # injectable I/O + env seam (CliDeps / CliIO)
@@ -209,7 +223,7 @@ node --test dist/test/client.test.js   # one file, after a build
 - **`client.test.ts`** — action URL/param mapping, base-URL normalisation, result unwrapping, `fq`/`fq_list`, facets, blank ids.
 - **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `helpers.ts`), same outcome on both sides.
 - **`cli.test.ts`** — every command, `--portal`/`CKAN_BASE_URL` precedence, blank-value rejection, output escaping and exit codes.
-- **`portals.test.ts`** — `portalKey`, `findPortal`, `checkPortal` outcomes, and the invariants of the built-in list.
+- **`portals.test.ts`** — `portalKey`, `findPortal`, `checkPortal` outcomes, `checkPortals` / `checkPortalUrls` (retry, concurrency), and the invariants of the built-in list.
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
@@ -234,9 +248,10 @@ npm run update-portals -- --dry-run # check and report only
 (open-data portals in Germany with their API endpoint or website), the CKAN project's
 **instance registry** (`ckan/ckan-instances`) and **GovData's harvest sources** (DCAT
 feeds; the feed's directory and origin are tried) — and checks every candidate and every
-listed portal live with `checkPortal`: a portal works when `package_search?rows=0`
-answers with a CKAN envelope. A failed check is repeated once, and a failed source is
-tried twice and otherwise skipped.
+listed portal live with `checkPortalUrls` (the library function `ckan portals --check`
+uses too): a portal works when `package_search?rows=0` answers with a CKAN envelope. A
+failed check is repeated once (`retryDelayMs`), and a failed source is tried twice and
+otherwise skipped.
 
 Merge rules (`mergePortals`): listed entries are never dropped — a failing one is marked
 `working: false` and keeps its last version and count; a new candidate is added only when

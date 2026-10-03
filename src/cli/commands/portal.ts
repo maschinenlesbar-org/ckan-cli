@@ -4,12 +4,9 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "../io.js";
 import { action, renderJson, toEngineOptions, type GlobalOptions } from "../shared.js";
-import { checkPortal, mapLimit, withCheck } from "../../client/portals.js";
+import { checkPortals } from "../../client/portals.js";
 import { PORTALS } from "../../client/portals-list.js";
 import { isBlank } from "../../client/validate.js";
-
-/** How many portals `portals --check` checks at once. */
-const CHECK_CONCURRENCY = 6;
 
 /** commander accumulator for repeatable `key=value` pairs into a record. */
 function collectKeyValue(
@@ -80,11 +77,10 @@ export function registerPortalCommands(program: Command, deps: CliDeps): void {
         renderJson(deps, global, PORTALS);
         return;
       }
-      const today = new Date().toISOString().slice(0, 10);
-      const engine = toEngineOptions(global);
-      const checked = await mapLimit(PORTALS, CHECK_CONCURRENCY, async (portal) =>
-        withCheck(portal, await checkPortal(deps.createClient({ ...engine, baseUrl: portal.url })), today),
-      );
+      const checked = await checkPortals(PORTALS, {
+        engineOptions: toEngineOptions(global),
+        createClient: deps.createClient,
+      });
       renderJson(deps, global, checked);
     });
 }

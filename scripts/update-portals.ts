@@ -15,8 +15,7 @@
 // --no-discover (only re-check the entries already in the list).
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { CkanClient, RequestEngine, checkPortal, mapLimit, portalKey } from "../src/index.js";
-import type { PortalCheck } from "../src/index.js";
+import { CkanClient, RequestEngine, checkPortalUrls, portalKey } from "../src/index.js";
 import {
   HARVEST_QUERY,
   WIKIDATA_QUERY,
@@ -85,14 +84,8 @@ async function fromSource(name: string, load: () => Promise<Candidate[]>): Promi
   }
 }
 
-/** A check, repeated once after a pause if it fails, so one timeout does not count as down. */
-async function check(url: string): Promise<PortalCheck> {
-  const client = new CkanClient({ ...engineOptions, baseUrl: url });
-  const first = await checkPortal(client);
-  if (first.working) return first;
-  await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-  return checkPortal(client);
-}
+/** The live checks: a failed one is repeated once after a pause, so one timeout does not count as down. */
+const checkOptions = { engineOptions, concurrency: options.concurrency, retryDelayMs: RETRY_DELAY_MS };
 
 const source = readFileSync(LIST_FILE, "utf8");
 const existing = readPortalsSource(source); // throws on a hand edit it cannot read: nothing is written
@@ -133,10 +126,9 @@ const toCheck = [...new Map(candidates.map((c) => [portalKey(c.url), c.url])).en
 );
 log(`checking ${existing.length} listed portals and ${toCheck.length} new candidates …`);
 
-const existingChecks = await mapLimit(existing, options.concurrency, (p) => check(p.url));
-const candidateChecks = new Map(
-  await mapLimit(toCheck, options.concurrency, async ([key, url]) => [key, await check(url)] as const),
-);
+const existingChecks = await checkPortalUrls(existing.map((p) => p.url), checkOptions);
+const candidateResults = await checkPortalUrls(toCheck.map(([, url]) => url), checkOptions);
+const candidateChecks = new Map(toCheck.map(([key], i) => [key, candidateResults[i]!] as const));
 
 const { portals, added, rejected } = mergePortals({ existing, existingChecks, candidates, candidateChecks, today });
 

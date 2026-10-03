@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkPortal, findPortal, portalKey } from "../src/client/portals.js";
-import { CkanNetworkError } from "../src/client/errors.js";
+import { checkPortal, checkPortalUrls, checkPortals, findPortal, portalKey } from "../src/client/portals.js";
+import { CkanNetworkError, CkanValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
 import type { Portal } from "../src/client/types.js";
@@ -124,4 +124,62 @@ test("the built-in list: unique short ids, one entry per portal, site-root URLs,
   }
   assert.equal(findPortal(DEFAULT_BASE_URL, PORTALS)?.id, "hamburg");
   assert.ok(Object.isFrozen(PORTALS) && Object.isFrozen(PORTALS[0]));
+});
+
+test("checkPortals checks each portal and folds the result into a dated entry", async () => {
+  const mt = makeMockTransport((req) =>
+    new URL(req.url).host === "www.daten-bw.de"
+      ? jsonResponse({}, 404)
+      : jsonResponse({ success: true, result: new URL(req.url).pathname.endsWith("status_show") ? { ckan_version: "2.11.0" } : { count: 5, results: [] } }),
+  );
+  const list = await checkPortals(LIST, { engineOptions: { transport: mt.transport, maxRetries: 0 }, date: "2026-10-03" });
+  assert.deepEqual(
+    list.map((p) => [p.id, p.working, p.checked, p.problem, p.datasets, p.ckanVersion]),
+    [
+      ["hamburg", true, "2026-10-03", null, 5, "2.11.0"],
+      ["bw", false, "2026-10-03", "HTTP 404", 1, "2.10.11"],
+    ],
+  );
+});
+
+test("checkPortalUrls repeats a failed check once after retryDelayMs, and only then", async () => {
+  let searches = 0;
+  const mt = makeMockTransport((req) => {
+    if (new URL(req.url).pathname.endsWith("status_show")) return jsonResponse({ success: true, result: {} });
+    searches += 1;
+    return searches === 1 ? jsonResponse({}, 404) : jsonResponse({ success: true, result: { count: 1, results: [] } });
+  });
+  const slept: number[] = [];
+  const sleep = async (ms: number) => void slept.push(ms);
+  const [check] = await checkPortalUrls(["https://a.example"], {
+    engineOptions: { transport: mt.transport, maxRetries: 0 },
+    retryDelayMs: 3000,
+    sleep,
+  });
+  assert.equal(check?.working, true);
+  assert.deepEqual(slept, [3000]);
+
+  searches = 0;
+  const [once] = await checkPortalUrls(["https://a.example"], { engineOptions: { transport: mt.transport, maxRetries: 0 }, sleep });
+  assert.equal(once?.working, false, "no retry without retryDelayMs");
+  assert.deepEqual(slept, [3000]);
+});
+
+test("checkPortalUrls reports a URL the client refuses as a failed check, not a throw", async () => {
+  const mt = makeMockTransport(() => jsonResponse({}));
+  const [check] = await checkPortalUrls(["https://a.example/ x"], { engineOptions: { transport: mt.transport } });
+  assert.equal(check?.working, false);
+  assert.match(check?.problem ?? "", /base URL/);
+  assert.equal(mt.calls.length, 0);
+});
+
+test("checkPortals refuses a concurrency below 1 before any request", async () => {
+  const mt = makeMockTransport(() => jsonResponse({}));
+  for (const concurrency of [0, -1, 1.5]) {
+    await assert.rejects(
+      () => checkPortals(LIST, { engineOptions: { transport: mt.transport }, concurrency }),
+      (err: unknown) => err instanceof CkanValidationError && /^Invalid concurrency: /.test(err.message),
+    );
+  }
+  assert.equal(mt.calls.length, 0);
 });

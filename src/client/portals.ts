@@ -1,9 +1,12 @@
 // Known CKAN portals: lookup and a short live check. The list itself is in
 // portals-list.ts, maintained with scripts/update-portals.ts.
 
-import { siteRoot, type CkanClient } from "./client.js";
+import { CkanClient, siteRoot } from "./client.js";
+import type { EngineOptions } from "./engine.js";
 import { CkanApiError, CkanNetworkError, CkanParseError } from "./errors.js";
+import { PORTALS } from "./portals-list.js";
 import type { Portal } from "./types.js";
+import { assertValid, intRangeProblem } from "./validate.js";
 
 /**
  * One identity per portal, whatever form its URL was written in: host (without
@@ -128,4 +131,74 @@ export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (it
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return results;
+}
+
+/** How many portals `checkPortals` / `checkPortalUrls` check at once by default. */
+export const DEFAULT_CHECK_CONCURRENCY = 6;
+
+/** Options for `checkPortalUrls` and `checkPortals`. */
+export interface CheckPortalsOptions {
+  /** Client options for every check; `baseUrl` is replaced by each portal's URL. */
+  engineOptions?: EngineOptions;
+  /** Builds the client for one portal. Defaults to `new CkanClient(options)`. */
+  createClient?: (options: EngineOptions) => CkanClient;
+  /** Checks in flight at once, 1 or more. Defaults to `DEFAULT_CHECK_CONCURRENCY` (6). */
+  concurrency?: number;
+  /**
+   * When set, a failed check is repeated once after this pause (ms), so one
+   * timeout does not count as down. Unset (the default): a single try.
+   */
+  retryDelayMs?: number;
+  /** Injectable sleep for the retry pause, for tests. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Check the CKAN portals at `urls` live (`checkPortal`), with at most
+ * `concurrency` checks in flight; results keep the input order. Never throws for
+ * one portal: a URL the client refuses becomes a failed check too. Rejects with
+ * CkanValidationError for a bad `concurrency` or `retryDelayMs`, before any request.
+ */
+export async function checkPortalUrls(urls: readonly string[], options: CheckPortalsOptions = {}): Promise<PortalCheck[]> {
+  const concurrency = assertValid(
+    "concurrency",
+    options.concurrency ?? DEFAULT_CHECK_CONCURRENCY,
+    intRangeProblem(1, Number.MAX_SAFE_INTEGER),
+  );
+  const { retryDelayMs } = options;
+  if (retryDelayMs !== undefined) assertValid("retryDelayMs", retryDelayMs, intRangeProblem(0, Number.MAX_SAFE_INTEGER));
+  const createClient = options.createClient ?? ((engine: EngineOptions) => new CkanClient(engine));
+  const sleep = options.sleep ?? realSleep;
+  return mapLimit(urls, concurrency, async (url) => {
+    let client: CkanClient;
+    try {
+      client = createClient({ ...options.engineOptions, baseUrl: url });
+    } catch (err) {
+      return { ...failedCheck(), problem: problemOf(err) };
+    }
+    const first = await checkPortal(client);
+    if (first.working || retryDelayMs === undefined) return first;
+    await sleep(retryDelayMs);
+    return checkPortal(client);
+  });
+}
+
+/**
+ * Check every portal in `portals` (the built-in list by default) live and fold
+ * each result into the entry (`withCheck`), dated `date` (default: today, UTC).
+ * What `ckan portals --check` prints.
+ */
+export async function checkPortals(
+  portals: readonly Portal[] = PORTALS,
+  options: CheckPortalsOptions & { date?: string } = {},
+): Promise<Portal[]> {
+  const date = options.date ?? new Date().toISOString().slice(0, 10);
+  const checks = await checkPortalUrls(portals.map((p) => p.url), options);
+  return portals.map((portal, i) => withCheck(portal, checks[i]!, date));
+}
+
+function failedCheck(): PortalCheck {
+  return { working: false, problem: null, datasets: null, ckanVersion: null, siteTitle: null, siteUrl: null };
 }

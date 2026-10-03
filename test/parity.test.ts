@@ -5,6 +5,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CkanClient } from "../src/client/client.js";
+import { checkPortals } from "../src/client/portals.js";
+import { PORTALS } from "../src/client/portals-list.js";
+import type { HttpRequest } from "../src/client/http.js";
 import { assertBothReject, assertSameRequests, jsonResponse, parity } from "./helpers.js";
 
 const SEARCH = () => jsonResponse({ help: "h", success: true, result: { count: 0, results: [] } });
@@ -168,4 +171,26 @@ test("parity: a clean base URL goes out the same on both sides", async () => {
       new CkanClient({ transport, baseUrl: "https://x.example/ckan/api/3/action" }).status(),
     ),
   );
+});
+
+// Finding 7 (PAT-21): `portals --check` is one library call, checkPortals.
+test("parity: portals --check equals checkPortals over the built-in list", async () => {
+  const responder = (req: HttpRequest) => {
+    const url = new URL(req.url);
+    if (url.host === "datenregister.berlin.de") return jsonResponse({}, 404);
+    return url.pathname.endsWith("/status_show")
+      ? jsonResponse({ success: true, result: { ckan_version: "2.10.4" } })
+      : jsonResponse({ success: true, result: { count: 42, results: [] } });
+  };
+  const result = await parity(
+    ["--compact", "--max-retries", "0", "--timeout", "5000", "--base-url", "https://mine.example", "portals", "--check"],
+    (transport) => checkPortals(PORTALS, { engineOptions: { transport, maxRetries: 0, timeoutMs: 5000 } }),
+    { responder },
+  );
+  assert.equal(result.cli.code, 0, result.cli.err);
+  assert.equal(result.lib.ok, true, String(result.lib.error));
+  assert.deepEqual(JSON.parse(result.cli.out), result.lib.value);
+  const urls = (rs: HttpRequest[]) => rs.map((r) => r.url).sort();
+  assert.deepEqual(urls(result.cli.requests), urls(result.lib.requests));
+  assert.equal(result.cli.requests.length, PORTALS.length * 2 - 1);
 });

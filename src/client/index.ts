@@ -29,7 +29,16 @@ export { assertValid } from "./validate.js";
 export type { Problem } from "./validate.js";
 
 export { PORTALS } from "./portals-list.js";
-export { checkPortal, findPortal, mapLimit, portalKey, withCheck } from "./portals.js";
-export type { PortalCheck } from "./portals.js";
+export {
+  DEFAULT_CHECK_CONCURRENCY,
+  checkPortal,
+  checkPortalUrls,
+  checkPortals,
+  findPortal,
+  mapLimit,
+  portalKey,
+  withCheck,
+} from "./portals.js";
+export type { CheckPortalsOptions, PortalCheck } from "./portals.js";
 
 export * from "./types.js";
