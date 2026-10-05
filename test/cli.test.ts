@@ -483,6 +483,22 @@ test("an unused, invalid CKAN_BASE_URL does not block --portal", async () => {
   assert.equal(new URL(cli.mt.last().url).host, "datenregister.berlin.de");
 });
 
+test("an invalid CKAN_BASE_URL does not block the commands that never use it (P19)", async () => {
+  for (const argv of [["portals"], [], ["help"], ["help", "status"]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: "http://x:99999" });
+    assert.equal(await run(argv, cli.deps), 0, `${argv.join(" ")}: ${cli.err.join("\n")}`);
+    assert.equal(cli.mt.calls.length, 0);
+  }
+  // portals --check uses each portal's own URL, never the variable.
+  const check = makeCli(() => jsonResponse(ckan({ count: 1, results: [] })), { CKAN_BASE_URL: "http://x:99999" });
+  assert.equal(await run(["--compact", "portals", "--check"], check.deps), 0, check.err.join("\n"));
+  assert.ok(check.mt.calls.every((c) => !c.url.startsWith("http://x:")));
+  // A command that uses it still fails.
+  const status = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: "http://x:99999" });
+  assert.equal(await run(["status"], status.deps), 1);
+  assert.match(status.err.join("\n"), /CKAN_BASE_URL/);
+});
+
 test("portals prints the built-in list without any request", async () => {
   const cli = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run(["portals"], cli.deps), 0);

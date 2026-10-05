@@ -93,8 +93,14 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
   });
 
   // commander runs value parsers on flags but not on defaults, so a base URL
-  // taken from CKAN_BASE_URL is checked here, before any command runs.
-  program.hook("preAction", () => {
+  // taken from CKAN_BASE_URL is checked here, before a command that uses it runs.
+  // The commands that never use it skip the check: help (the root action prints
+  // help or names an unknown command, `help` prints help) and `portals`, which
+  // prints the built-in list or checks each portal at its own URL — a user whose
+  // variable is broken is exactly the one looking for a working portal id.
+  const offline = new Set(["help", "portals"]);
+  program.hook("preAction", (_program, actionCommand) => {
+    if (actionCommand === program || offline.has(actionCommand.name())) return;
     if (program.getOptionValueSource("baseUrl") !== "default" || program.opts()["portal"] !== undefined) return;
     try {
       parseBaseUrl(program.opts<{ baseUrl: string }>().baseUrl);

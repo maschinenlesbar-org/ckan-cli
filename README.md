@@ -88,6 +88,7 @@ or error shows them.
 
 `ckan portals` lists the CKAN portals in Germany this version knows, with the
 result of their last check; `ckan portals --check` checks them all live now.
+Neither uses `CKAN_BASE_URL`, so both work even when the variable is broken.
 The list is built into the CLI, so it needs no outside service:
 
 | `--portal` | Portal | Datasets |

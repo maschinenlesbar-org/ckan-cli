@@ -170,7 +170,10 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   because portals document their API with that suffix, and keeps any other path (a
   CKAN under `https://host/ckan`). The CLI's `parseBaseUrl` calls `baseUrlProblem`;
   commander does not run value parsers on defaults, so a `preAction` hook in
-  `program.ts` checks a `CKAN_BASE_URL` value the same way `--base-url` is checked.
+  `program.ts` checks a `CKAN_BASE_URL` value the same way `--base-url` is checked —
+  for the commands that use it: help, a bare `ckan` and `portals` (which prints the
+  built-in list, or checks each portal at its own URL) work whatever the variable
+  holds.
 - **Envelope.** The client unwraps CKAN's `{ help, success, result }` and raises
   `CkanError` when `success` is false. The typed methods also check the top-level
   shape of `result` (never a deep schema): an object for `status` and the `*_show`
