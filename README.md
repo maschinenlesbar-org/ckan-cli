@@ -243,6 +243,9 @@ ckan package bezirk-wandsbek-drucksache-22-3573-2 | jq '.resources[] | {format, 
 | `4` | not found (HTTP `404`): an unknown id on `package`/`resource`/`organization`/`group`, or, on any command, no CKAN at this URL (a wrong `--base-url`, a portal that left CKAN) |
 | `1` | any other error — bad usage, validation error (`409`), unknown action (`400`), CKAN `success:false`, network failure |
 
+A reader that stops early (`| head`) ends `ckan` quietly with exit 0; a failed
+run keeps its exit code even when nothing reads stderr.
+
 CKAN's error text is shown on stderr, e.g.
 `Validation Error: rows: Invalid integer` or
 `Bad request - Action name not known: …`.

@@ -271,6 +271,10 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   `GET <url, redacted> failed: <reason>`, with the original as `cause`.
 - **Exit codes** (`run.ts`): 0 success/help/version, 4 for HTTP 404, 1 for
   everything else.
+- **Closed pipes** (`io.ts`, `handleOutputErrors`, installed by the bin before
+  `run()`): an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly; an
+  EPIPE on stderr is ignored, so a failed run keeps its exit code (`2>&1 | true` no
+  longer turns a usage error into 0).
 
 ## Testing
 
@@ -295,7 +299,8 @@ node --test dist/test/client.test.js   # one file, after a build
   origin only; from dwd-cli), P4/P19 (an unusable base URL is a usage error; help
   works whatever `CKAN_BASE_URL` holds), P5 (the limits hold for every transport;
   from destatis-genesis-cli, resets not retried), P6 (retries never burst; a Retry-After
-  above 30 s fails at once naming the wait; from fim-portal-cli).
+  above 30 s fails at once naming the wait; from fim-portal-cli), P7 (closed pipes:
+  no stack trace, the exit code kept; runs the built bin; from dwd-cli).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
