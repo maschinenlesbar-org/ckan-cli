@@ -2,9 +2,18 @@
 // requests via a Transport, applies retry/backoff for transient statuses
 // (429, 503), and decodes responses.
 
-import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
+import { MAX_TIMEOUT_MS, nodeHttpTransport, type HttpResponse, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { CkanApiError, CkanParseError, describeCkanError, redactUrl } from "./errors.js";
+import {
+  CkanApiError,
+  CkanError,
+  CkanNetworkError,
+  CkanParseError,
+  credentialsIn,
+  describeCkanError,
+  redactCredentials,
+  redactUrl,
+} from "./errors.js";
 import { assertValid, baseUrlProblem, headerValueProblem, intRangeProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://suche.transparenz.hamburg.de";
@@ -184,7 +193,12 @@ const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 export class RequestEngine {
-  private readonly baseUrl: string;
+  // A real private field (not TypeScript's `private`): util.inspect, console.log and
+  // JSON.stringify of a client never show it, so a password in the base URL can't be
+  // logged by accident. Messages use redactUrl.
+  readonly #baseUrl: string;
+  /** The base URL's userinfo, raw and percent-decoded, for scrubbing server and transport text. */
+  readonly #credentials: string[];
   private readonly transport: Transport;
   private readonly userAgent: string;
   private readonly timeoutMs: number;
@@ -200,7 +214,14 @@ export class RequestEngine {
     // consumer that injects a custom transport would otherwise get no gating at
     // all, and could be steered to a non-http(s) scheme. Only undefined selects
     // the default.
-    this.baseUrl = validateBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+    this.#baseUrl = validateBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+    this.#credentials = credentialsIn(this.#baseUrl).flatMap((raw) => {
+      try {
+        return [raw, decodeURIComponent(raw)];
+      } catch {
+        return [raw];
+      }
+    });
     this.transport = options.transport ?? nodeHttpTransport;
     // Only undefined selects the default; a blank or unsendable value is refused.
     this.userAgent =
@@ -214,11 +235,43 @@ export class RequestEngine {
     this.sleep = options.sleep ?? realSleep;
   }
 
+  /**
+   * `text` without the base URL's credentials (raw and percent-decoded): server text
+   * (an error body or a CKAN error that echoes the request URL) and transport text
+   * (fetch's "Failed to fetch <url>") can carry them. The client uses it for its own
+   * messages built from server text.
+   */
+  scrub(text: string): string {
+    return this.#credentials.length === 0 ? text : redactCredentials(text, this.#credentials);
+  }
+
+  /**
+   * A failure as the `cause` of the error the engine raises: the original when its
+   * text carries no credentials, otherwise a copy with them scrubbed (message, `code`
+   * and the cause chain kept), so logging the error with its causes can't reveal the
+   * base URL's password.
+   */
+  private scrubCause(cause: unknown, depth = 0): unknown {
+    if (this.#credentials.length === 0 || depth > 5) return cause;
+    if (typeof cause === "string") return this.scrub(cause);
+    if (!(cause instanceof Error)) return cause;
+    const inner = this.scrubCause(cause.cause, depth + 1);
+    const message = this.scrub(cause.message);
+    if (message === cause.message && inner === cause.cause && this.scrub(cause.stack ?? "") === (cause.stack ?? "")) {
+      return cause;
+    }
+    const copy = new Error(message, inner === undefined ? undefined : { cause: inner });
+    copy.name = cause.name;
+    const code = (cause as { code?: unknown }).code;
+    if (code !== undefined) Object.assign(copy, { code });
+    return copy;
+  }
+
   /** Build a fully-qualified URL from a path and optional query parameters. */
   buildUrl(path: string, query?: QueryParams): string {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const qs = query ? buildQueryString(query) : "";
-    return `${this.baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
+    return `${this.#baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }
 
   /** Perform a request with Accept negotiation and transient-error retries. */
@@ -237,13 +290,27 @@ export class RequestEngine {
     let redirects = 0;
     // attempts = initial try + maxRetries (redirects are counted separately)
     for (;;) {
-      const response = await this.transport({
-        method,
-        url,
-        headers,
-        timeoutMs: this.timeoutMs,
-        ...(this.maxResponseBytes > 0 ? { maxResponseBytes: this.maxResponseBytes } : {}),
-      });
+      let response: HttpResponse;
+      try {
+        response = await this.transport({
+          method,
+          url,
+          headers,
+          timeoutMs: this.timeoutMs,
+          ...(this.maxResponseBytes > 0 ? { maxResponseBytes: this.maxResponseBytes } : {}),
+        });
+      } catch (cause) {
+        // The default transport rejects with CkanNetworkError only; an injected one may
+        // throw anything, and its text may quote the URL with its userinfo. Every
+        // failure becomes a CkanNetworkError naming the request (redacted), with the
+        // credentials scrubbed from its text and its cause chain; any other CkanError
+        // passes through.
+        if (cause instanceof CkanError && !(cause instanceof CkanNetworkError)) throw cause;
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        throw new CkanNetworkError(`${method} ${redactUrl(url)} failed: ${sanitizeServerText(this.scrub(reason))}`, {
+          cause: this.scrubCause(cause),
+        });
+      }
 
       const status = response.status;
       const retryable = status === 429 || status === 503;
@@ -291,7 +358,7 @@ export class RequestEngine {
               : location
                 ? `redirect to ${sanitizeServerText(location)} not followed`
                 : "redirect not followed (no Location header)";
-          throw new CkanApiError({ status, url, method, body: response.body.toString("utf8"), detail });
+          throw new CkanApiError({ status, url, method, body: this.scrub(response.body.toString("utf8")), detail });
         }
         throw this.toApiError(method, url, status, response.body);
       }
@@ -315,12 +382,12 @@ export class RequestEngine {
       const message = /json/i.test(mediaType)
         ? `Invalid JSON from ${redactUrl(res.url)}`
         : `Expected JSON from ${redactUrl(res.url)} but got ${mediaType || "a body that is not JSON"}`;
-      throw new CkanParseError(message, { cause });
+      throw new CkanParseError(message, { cause: this.scrubCause(cause) });
     }
   }
 
   private toApiError(method: string, url: string, status: number, body: Buffer): CkanApiError {
-    const text = body.toString("utf8");
+    const text = this.scrub(body.toString("utf8"));
     let detail: string | undefined;
     try {
       const parsed: unknown = JSON.parse(text);

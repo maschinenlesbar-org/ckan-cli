@@ -219,6 +219,14 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   `http:` to `https:` with a 302. If a redirect crosses origin (scheme + host +
   port), only the engine's own `Accept` and `User-Agent` go along (an allowlist), so no
   other header leaks to another host.
+- **Credentials in logged objects.** The client and the engine keep the base URL in
+  real `#private` fields, so `console.log(client)`, `util.inspect` and
+  `JSON.stringify` never show its password. The engine scrubs the base URL's
+  userinfo (raw and percent-decoded) from error bodies and details, a CKAN
+  `success:false` message, transport error text and the `cause` chain it attaches.
+  A transport failure of any kind (the default transport's `CkanNetworkError`, or
+  anything a custom transport throws) becomes a `CkanNetworkError`
+  `GET <url, redacted> failed: <reason>`, with the original as `cause`.
 - **Exit codes** (`run.ts`): 0 success/help/version, 4 for HTTP 404, 1 for
   everything else.
 
@@ -239,6 +247,9 @@ node --test dist/test/client.test.js   # one file, after a build
 - **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `helpers.ts`), same outcome on both sides.
 - **`cli.test.ts`** — every command, `--portal`/`CKAN_BASE_URL` precedence, blank-value rejection, output escaping and exit codes.
 - **`portals.test.ts`** — `portalKey`, `findPortal`, `checkPortal` outcomes, `checkPortals` / `checkPortalUrls` (retry, concurrency), and the invariants of the built-in list.
+- **`conformance-p*.test.ts`** — the shared checks of the 2026-10-05 fix plan, copied
+  from autobahn-cli with only their adapter block changed: P1 (no credential in any CLI
+  output), P2 (none in a logged client or error).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:

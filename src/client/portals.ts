@@ -79,6 +79,17 @@ export async function checkPortal(client: CkanClient): Promise<PortalCheck> {
   return result;
 }
 
+/**
+ * The first error `code` (`ENOTFOUND`, `ECONNREFUSED`, …) along a cause chain: the
+ * engine wraps a transport failure in a CkanNetworkError that names the request, so
+ * Node's code sits one or more levels down.
+ */
+function errorCode(cause: unknown, depth = 0): unknown {
+  if (typeof cause !== "object" || cause === null || depth > 5) return undefined;
+  const code = (cause as { code?: unknown }).code;
+  return code !== undefined ? code : errorCode((cause as { cause?: unknown }).cause, depth + 1);
+}
+
 /** A short, stable reason for a failed check. */
 function problemOf(err: unknown): string {
   if (err instanceof CkanApiError) {
@@ -93,12 +104,15 @@ function problemOf(err: unknown): string {
     return "invalid JSON";
   }
   if (err instanceof CkanNetworkError) {
-    const code = (err.cause as { code?: unknown } | undefined)?.code;
+    const code = errorCode(err.cause);
     if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "host not found";
     if (code === "ECONNREFUSED") return "connection refused";
     if (code === "ECONNRESET") return "connection reset";
     if (/certificate|CERT|SELF_SIGNED/i.test(`${String(code)} ${message}`)) return "TLS certificate not verifiable";
     if (/timed out|deadline/.test(message)) return "timeout";
+    // The engine's "GET <url> failed: <reason>": the reason is what tells portals apart.
+    const reason = /^[A-Z]+ \S+ failed: (.+)$/.exec(message)?.[1];
+    if (reason !== undefined) return reason.slice(0, 80);
   }
   return message.slice(0, 80);
 }

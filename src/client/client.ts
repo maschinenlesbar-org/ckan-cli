@@ -111,13 +111,16 @@ export function siteRoot(baseUrl: string): string {
 }
 
 export class CkanClient {
-  private readonly engine: RequestEngine;
-  /** The site this client talks to, for error messages. */
-  private readonly site: string;
+  // Real private fields (not TypeScript's `private`): console.log, util.inspect and
+  // JSON.stringify of a client never show them, so a password in the base URL can't
+  // be logged by accident.
+  readonly #engine: RequestEngine;
+  /** The site this client talks to, for error messages (always through redactUrl). */
+  readonly #site: string;
 
   constructor(options: EngineOptions = {}) {
-    this.site = siteRoot(options.baseUrl ?? DEFAULT_BASE_URL);
-    this.engine = new RequestEngine({ ...options, baseUrl: this.site });
+    this.#site = siteRoot(options.baseUrl ?? DEFAULT_BASE_URL);
+    this.#engine = new RequestEngine({ ...options, baseUrl: this.#site });
   }
 
   /** Call any CKAN action by name and return its unwrapped `result`. */
@@ -125,19 +128,19 @@ export class CkanClient {
     if (!ACTION_NAME.test(name)) {
       throw new CkanError(`Invalid CKAN action name: "${name}"`);
     }
-    const env = await this.engine.getJson<CkanEnvelope<T> | null>(`${ACTION}/${name}`, prune(params));
+    const env = await this.#engine.getJson<CkanEnvelope<T> | null>(`${ACTION}/${name}`, prune(params));
     // Another JSON API at the same path (or a proxy's JSON error page) is not an
     // envelope; say so rather than "failed: undefined".
     if (typeof env !== "object" || env === null || Array.isArray(env) || typeof env.success !== "boolean") {
       throw new CkanParseError(
-        `The answer to "${name}" is not a CKAN Action API response; is ${redactUrl(this.site)} a CKAN site?`,
+        `The answer to "${name}" is not a CKAN Action API response; is ${redactUrl(this.#site)} a CKAN site?`,
       );
     }
     if (!env.success) {
       // A success:false envelope can come with HTTP 200, so it never passes the
       // engine's error-detail sanitising: strip terminal controls here too.
       throw new CkanError(
-        `CKAN action "${name}" failed: ${sanitizeServerText(describeCkanError(env.error))}`,
+        `CKAN action "${name}" failed: ${sanitizeServerText(this.#engine.scrub(describeCkanError(env.error)))}`,
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
