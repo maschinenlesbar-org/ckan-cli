@@ -44,12 +44,17 @@ export interface EngineOptions {
    */
   timeoutMs?: number;
   /**
-   * Number of automatic retries for transient (429/503) responses. Each waits the
-   * response's `Retry-After` (up to `MAX_RETRY_AFTER_MS`; a longer one is not
-   * retried), or else `retryDelayMs * attempt`. 0 to `MAX_RETRIES`; defaults to 2.
+   * Number of automatic retries for transient (429/503) responses; a reset or other
+   * network error is not retried. Each waits `retryDelayMs * attempt`, or the
+   * response's `Retry-After` when that is longer (up to `MAX_RETRY_AFTER_MS`; a longer
+   * one is not retried, and the CkanApiError says so). 0 to `MAX_RETRIES`; defaults to 2.
    */
   maxRetries?: number;
-  /** Base backoff between retries in milliseconds (grows linearly); used without a Retry-After. */
+  /**
+   * Base backoff between retries in milliseconds (grows linearly), 0 to
+   * `MAX_RETRY_AFTER_MS` (30 000); defaults to 200. It is also the floor under a
+   * `Retry-After`: the header can lengthen a wait, never shorten it.
+   */
   retryDelayMs?: number;
   /** Number of HTTP redirects (301/302/303/307/308) to follow, 0 to `MAX_REDIRECTS`. Defaults to 5. */
   maxRedirects?: number;
@@ -92,8 +97,8 @@ function intOption(name: string, value: number | undefined, min: number, max: nu
 /**
  * Longest `Retry-After` the engine waits out before retrying a 429/503. When the
  * server asks for longer, the engine does not retry at all and surfaces the error at
- * once: retrying early would only land inside the window the server asked us to wait
- * out, and a hostile value must not stall the CLI.
+ * once, naming the requested wait: retrying early would only land inside the window
+ * the server asked us to wait out, and a hostile value must not stall the CLI.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
 
@@ -288,7 +293,9 @@ export class RequestEngine {
       options.userAgent === undefined ? DEFAULT_USER_AGENT : assertHeaderValue("userAgent", options.userAgent);
     this.timeoutMs = intOption("timeoutMs", options.timeoutMs, 0, MAX_TIMEOUT_MS) ?? 30_000;
     this.maxRetries = intOption("maxRetries", options.maxRetries, 0, MAX_RETRIES) ?? 2;
-    this.retryDelayMs = intOption("retryDelayMs", options.retryDelayMs, 0, Number.MAX_SAFE_INTEGER) ?? 200;
+    // Bounded like a Retry-After wait: a larger value overflowed Node's timer and fired
+    // after 1 ms, a burst rather than a backoff.
+    this.retryDelayMs = intOption("retryDelayMs", options.retryDelayMs, 0, MAX_RETRY_AFTER_MS) ?? 200;
     this.maxRedirects = intOption("maxRedirects", options.maxRedirects, 0, MAX_REDIRECTS) ?? 5;
     this.maxResponseBytes =
       intOption("maxResponseBytes", options.maxResponseBytes, 0, Number.MAX_SAFE_INTEGER) ?? DEFAULT_MAX_RESPONSE_BYTES;
@@ -448,15 +455,18 @@ export class RequestEngine {
         throw new CkanNetworkError(`${method} ${redactUrl(url)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
       }
       const retryable = status === 429 || status === 503;
-      if (retryable && attempt < this.maxRetries) {
-        // Honour Retry-After; without a usable one, back off linearly. A Retry-After
-        // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once.
-        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
-        if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
-          attempt += 1;
-          await this.sleep(retryAfter ?? this.retryDelayMs * attempt);
-          continue;
-        }
+      // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: the error below
+      // surfaces at once and names the wait the server asked for.
+      const retryAfter = retryable ? parseRetryAfter(headerValue(responseHeaders["retry-after"])) : undefined;
+      const tooLong = retryAfter !== undefined && retryAfter > MAX_RETRY_AFTER_MS;
+      if (retryable && !tooLong && attempt < this.maxRetries) {
+        attempt += 1;
+        // Back off linearly from retryDelayMs. A Retry-After can ask for longer, never
+        // for less: `Retry-After: 0` or a date in the past turned the retries into a
+        // zero-delay burst against a server that had just asked for less load.
+        const backoff = this.retryDelayMs * attempt;
+        await this.sleep(retryAfter === undefined ? backoff : Math.max(retryAfter, backoff));
+        continue;
       }
 
       // Follow redirects, resolving the Location relative to the current URL.
@@ -515,7 +525,10 @@ export class RequestEngine {
                 : "redirect not followed (no Location header)";
           throw new CkanApiError({ status, url, method, body: this.scrub(body.toString("utf8")), detail });
         }
-        throw this.toApiError(method, url, status, body, status === 401 || status === 403 ? dropped : undefined);
+        throw this.toApiError(method, url, status, body, status === 401 || status === 403 ? dropped : undefined, {
+          retries: attempt,
+          ...(tooLong ? { retryAfterMs: retryAfter } : {}),
+        });
       }
 
       return { data: body, contentType, status, url };
@@ -541,7 +554,14 @@ export class RequestEngine {
     }
   }
 
-  private toApiError(method: string, url: string, status: number, body: Buffer, hint?: string): CkanApiError {
+  private toApiError(
+    method: string,
+    url: string,
+    status: number,
+    body: Buffer,
+    hint: string | undefined,
+    retry: { retries: number; retryAfterMs?: number },
+  ): CkanApiError {
     const text = this.scrub(body.toString("utf8"));
     let detail: string | undefined;
     try {
@@ -569,7 +589,15 @@ export class RequestEngine {
     // endpoint cannot inject terminal escape sequences via the stderr error message.
     if (detail !== undefined) detail = sanitizeServerText(detail);
     if (hint !== undefined) detail = detail === undefined ? hint : `${detail}; ${hint}`;
-    return new CkanApiError({ status, url, method, body: text, detail });
+    return new CkanApiError({
+      status,
+      url,
+      method,
+      body: text,
+      detail,
+      retries: retry.retries,
+      ...(retry.retryAfterMs === undefined ? {} : { retryAfterMs: retry.retryAfterMs, maxRetryAfterMs: MAX_RETRY_AFTER_MS }),
+    });
   }
 }
 

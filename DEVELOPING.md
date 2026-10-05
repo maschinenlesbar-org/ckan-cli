@@ -58,18 +58,25 @@ try {
 new CkanClient({
   baseUrl: "https://ckan.govdata.de", // site URL; a trailing /api/3/action is dropped
   timeoutMs: 15_000,          // 0..MAX_TIMEOUT_MS (2^31 - 1); 0 disables
-  maxRetries: 3,              // 0..MAX_RETRIES (10); 429 / 503 are retried (Retry-After, else linear backoff)
+  maxRetries: 3,              // 0..MAX_RETRIES (10); 429 / 503 are retried (linear backoff; a longer Retry-After up to 30 s)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",    // not blank; no control characters but tab; Latin-1 only
   transport: customTransport, // inject your own HTTP transport
 });
 ```
 
-The numeric options (`timeoutMs`, `maxRetries`, `retryDelayMs`, `maxRedirects` up to
-`MAX_REDIRECTS`, `maxResponseBytes`) must be non-negative safe integers within their
+The numeric options (`timeoutMs`, `maxRetries`, `retryDelayMs` up to
+`MAX_RETRY_AFTER_MS`, `maxRedirects` up to `MAX_REDIRECTS`, `maxResponseBytes`) must be non-negative safe integers within their
 range. The constructor throws `CkanValidationError` otherwise: a negative or `NaN`
 timeout or size cap would silently switch that guard off. The CLI's `--timeout`,
 `--max-retries` and `--max-response-bytes` use the same bounds (`intRangeProblem`).
+
+Retries never burst: a 429/503 waits `retryDelayMs * attempt` (linear), and a
+`Retry-After` can only lengthen that wait (`Retry-After: 0` or a past date waits the
+backoff). A `Retry-After` above `MAX_RETRY_AFTER_MS` (30 s) is not retried; the
+`CkanApiError` says so (`the server asked to retry after 3600 s, longer than the 30 s
+the client waits; not retried — try again after that`) and carries `retryAfterMs`.
+After spent retries the message ends `(after N retries)` and `retries` holds the count.
 
 `timeoutMs` and `maxResponseBytes` hold for every transport, not only the built-in
 one: the engine runs each transport call under the `timeoutMs` deadline (passing an
@@ -287,7 +294,8 @@ node --test dist/test/client.test.js   # one file, after a build
   output), P2 (none in a logged client or error), P3 (credentials go to their own
   origin only; from dwd-cli), P4/P19 (an unusable base URL is a usage error; help
   works whatever `CKAN_BASE_URL` holds), P5 (the limits hold for every transport;
-  from destatis-genesis-cli, resets not retried).
+  from destatis-genesis-cli, resets not retried), P6 (retries never burst; a Retry-After
+  above 30 s fails at once naming the wait; from fim-portal-cli).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
