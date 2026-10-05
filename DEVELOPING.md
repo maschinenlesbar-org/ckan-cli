@@ -228,6 +228,11 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   until an empty page, stepping by the number of entries returned (safe with a lower
   cap), dedupes by `id`, and stops when a page adds nothing (a server that ignores
   `offset`). A page can be short without being the last: Berlin hides entries.
+  Berlin counts the hidden entries in its `limit`/`offset` window but leaves them out
+  of the answer, so the small last window before a `limit` is reached (`limit=1`)
+  could hold only a hidden entry and come back empty, one short of the limit. A
+  window smaller than a full page that comes back empty (or with nothing new) is
+  therefore asked again at the same offset as a full page before it ends the list.
   The pager is bounded: pages are `ALL_FIELDS_PAGE_DELAY_MS` (100 ms) apart, and after
   `MAX_ALL_FIELDS_PAGES` (400 pages, 10,000 entries at 25) without an end it throws
   `CkanParseError` `<action> with all_fields: stopped after 400 pages

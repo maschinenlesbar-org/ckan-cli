@@ -308,6 +308,28 @@ test("all_fields paging honours an explicit limit and offset", async () => {
   );
 });
 
+test("all_fields paging with a limit does not stop early on a portal that hides entries (result 01 Bug 1)", async () => {
+  // Like Berlin: hidden entries count in the limit/offset window but are left out of
+  // the answer. A small last window (limit=1 at offset 50) holding only a hidden entry
+  // came back empty and ended the list one short.
+  const hidden = new Set([10, 43, 50]);
+  const all = Array.from({ length: 55 }, (_, i) => ({ id: `id${i}`, name: `org${i}` }));
+  const mt = makeMockTransport((req) => {
+    const params = new URL(req.url).searchParams;
+    const offset = Number(params.get("offset") ?? 0);
+    const limit = Math.min(Number(params.get("limit") ?? 25), 25);
+    const window = all.slice(offset, offset + limit).filter((_, i) => !hidden.has(offset + i));
+    return jsonResponse(ckan(window));
+  });
+  const res = await clientWith(mt).organizationList({ all_fields: true, limit: 30, offset: 20 });
+  const visibleFrom20 = all.filter((_, i) => i >= 20 && !hidden.has(i)).slice(0, 30);
+  assert.deepEqual(res, visibleFrom20);
+  assert.equal(res.length, 30);
+  // Without a limit the whole visible list comes back, as before.
+  const whole = await clientWith(mt).groupList({ all_fields: true });
+  assert.equal(whole.length, 55 - hidden.size);
+});
+
 test("all_fields paging stops when a server ignores offset", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan([{ id: "a", name: "a" }, { id: "b", name: "b" }])));
   const res = await clientWith(mt).organizationList({ all_fields: true });

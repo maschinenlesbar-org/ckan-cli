@@ -347,6 +347,11 @@ export class CkanClient {
    * (by `id`), and a page that adds nothing new ends the loop too, so a server
    * that ignores `offset` cannot keep it going.
    *
+   * Berlin counts hidden entries in its `limit`/`offset` window but leaves them
+   * out of the answer, so a window smaller than a full page (the last one before
+   * `limit` is reached) can come back empty although more entries follow. Such a
+   * miss is asked again at the same offset with a full page before it ends the list.
+   *
    * Bounds: pages are `ALL_FIELDS_PAGE_DELAY_MS` apart, and after
    * `MAX_ALL_FIELDS_PAGES` pages without reaching the end (a server whose pages
    * keep returning new entries) the call fails with a CkanParseError.
@@ -373,6 +378,9 @@ export class CkanClient {
     const seen = new Set<string>();
     const out: JsonValue[] = [];
     let pages = 0;
+    // Set after a short window came back empty (or with nothing new): from then on
+    // every page is a full one.
+    let fullPages = false;
     while (out.length < wanted) {
       if (pages >= MAX_ALL_FIELDS_PAGES) {
         throw new CkanParseError(
@@ -382,7 +390,7 @@ export class CkanClient {
         );
       }
       if (pages > 0) await this.#sleep(ALL_FIELDS_PAGE_DELAY_MS);
-      const limit = Math.min(ALL_FIELDS_PAGE, wanted - out.length);
+      const limit = fullPages ? ALL_FIELDS_PAGE : Math.min(ALL_FIELDS_PAGE, wanted - out.length);
       const page = await this.typed<JsonValue[]>(
         action,
         {
@@ -402,7 +410,15 @@ export class CkanClient {
         out.push(entry);
         added += 1;
       }
-      if (page.length === 0 || added === 0) break;
+      if (page.length === 0 || added === 0) {
+        // A short window may have held only hidden entries: ask once more, same
+        // offset, for a full page before taking it as the end.
+        if (limit < ALL_FIELDS_PAGE) {
+          fullPages = true;
+          continue;
+        }
+        break;
+      }
       offset += page.length;
     }
     return out.slice(0, wanted);
