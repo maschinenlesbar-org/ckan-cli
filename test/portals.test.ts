@@ -183,3 +183,12 @@ test("checkPortals refuses a concurrency below 1 before any request", async () =
   }
   assert.equal(mt.calls.length, 0);
 });
+
+test("checkPortalUrls settles at timeoutMs with a transport that never answers (result 04 Bug 1)", async () => {
+  const transport = () => new Promise<HttpResponse>(() => {});
+  const started = Date.now();
+  const [check] = await checkPortalUrls(["https://a.example"], { engineOptions: { transport, timeoutMs: 200, maxRetries: 0 } });
+  assert.equal(check?.working, false);
+  assert.equal(check?.problem, "timeout");
+  assert.ok(Date.now() - started < 2000);
+});

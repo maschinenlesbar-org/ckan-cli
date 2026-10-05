@@ -22,6 +22,13 @@ export interface HttpRequest {
   /** Hard cap on the response body size in bytes; the request aborts if exceeded. */
   maxResponseBytes?: number;
   /**
+   * Aborted when the engine's overall deadline (`timeoutMs`) passes. A transport should
+   * stop the request then (`fetch(url, { signal })`); the engine rejects at the deadline
+   * either way, and enforces `maxResponseBytes` on the body it gets back, so neither
+   * limit depends on the transport.
+   */
+  signal?: AbortSignal;
+  /**
    * Always `"manual"` from the engine: a transport must not follow redirects. The
    * engine follows them itself and decides per hop whether the `Authorization`
    * header (the base URL's userinfo) goes along (same origin only). A fetch-based
@@ -44,6 +51,11 @@ export interface HttpResponse {
 }
 
 export type Transport = (request: HttpRequest) => Promise<HttpResponse>;
+
+/** The message for a body over the size cap, naming the option on both sides. */
+export function sizeLimitMessage(maxBytes: number): string {
+  return `Response exceeded the size limit of ${maxBytes} bytes (maxResponseBytes; --max-response-bytes on the CLI)`;
+}
 
 /**
  * The longest delay Node's timers support (2^31 - 1 ms, about 24.8 days). A longer one
@@ -111,7 +123,7 @@ export const nodeHttpTransport: Transport = (request) =>
             if (maxBytes !== undefined && received > maxBytes) {
               aborted = true;
               res.destroy();
-              settleReject(new CkanNetworkError(`Response exceeded maxResponseBytes (${maxBytes})`));
+              settleReject(new CkanNetworkError(sizeLimitMessage(maxBytes)));
               return;
             }
             chunks.push(chunk);
@@ -152,6 +164,14 @@ export const nodeHttpTransport: Transport = (request) =>
       }, delay);
       // Don't let a pending deadline timer keep the event loop alive on its own.
       deadline.unref?.();
+    }
+
+    if (request.signal !== undefined) {
+      const abort = (): void => {
+        req.destroy(new CkanNetworkError(`Request exceeded the ${request.timeoutMs ?? 0}ms deadline`));
+      };
+      if (request.signal.aborted) abort();
+      else request.signal.addEventListener("abort", abort, { once: true });
     }
 
     req.on("error", (err) => {

@@ -71,6 +71,26 @@ range. The constructor throws `CkanValidationError` otherwise: a negative or `Na
 timeout or size cap would silently switch that guard off. The CLI's `--timeout`,
 `--max-retries` and `--max-response-bytes` use the same bounds (`intRangeProblem`).
 
+`timeoutMs` and `maxResponseBytes` hold for every transport, not only the built-in
+one: the engine runs each transport call under the `timeoutMs` deadline (passing an
+`AbortSignal` in `HttpRequest.signal`, which the built-in transport honours; the call
+rejects at the deadline either way) and checks the size of the body it gets back
+(`Response exceeded the size limit of N bytes (maxResponseBytes; --max-response-bytes
+on the CLI)`). A custom transport may return its headers as a plain object in any
+case, a fetch `Headers` object or a `Map`, and its body as a `Buffer`, any
+`ArrayBuffer` view (fetch's `Uint8Array`) or an `ArrayBuffer`. Anything it throws, and
+a response without a valid status, headers object or body, becomes a
+`CkanNetworkError`. A reset connection is not retried (only 429/503 are), and a
+redirect to a scheme other than http(s) is refused before the transport sees it.
+A minimal fetch transport:
+
+```ts
+const transport: Transport = async (req) => {
+  const r = await fetch(req.url, { method: req.method, headers: req.headers, redirect: req.redirect, signal: req.signal });
+  return { status: r.status, headers: r.headers as never, body: new Uint8Array(await r.arrayBuffer()) as Buffer, url: r.url };
+};
+```
+
 `userAgent` goes through `assertHeaderValue` (exported; the rule is
 `headerValueProblem`, which `--user-agent` uses too): a blank value, a C0 control
 other than tab (CR/LF included), DEL or a character above U+00FF throws
@@ -266,7 +286,8 @@ node --test dist/test/client.test.js   # one file, after a build
   from autobahn-cli with only their adapter block changed: P1 (no credential in any CLI
   output), P2 (none in a logged client or error), P3 (credentials go to their own
   origin only; from dwd-cli), P4/P19 (an unusable base URL is a usage error; help
-  works whatever `CKAN_BASE_URL` holds).
+  works whatever `CKAN_BASE_URL` holds), P5 (the limits hold for every transport;
+  from destatis-genesis-cli, resets not retried).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:

@@ -2,7 +2,7 @@
 // requests via a Transport, applies retry/backoff for transient statuses
 // (429, 503), and decodes responses.
 
-import { MAX_TIMEOUT_MS, nodeHttpTransport, type HttpResponse, type Transport } from "./http.js";
+import { MAX_TIMEOUT_MS, nodeHttpTransport, sizeLimitMessage, type HttpRequest, type HttpResponse, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import {
   CkanApiError,
@@ -37,7 +37,11 @@ export interface EngineOptions {
    * not blank, no control characters but tab, nothing above U+00FF.
    */
   userAgent?: string;
-  /** Per-request timeout in milliseconds, 0 to `MAX_TIMEOUT_MS` (2^31 - 1 ms); 0 disables. */
+  /**
+   * Per-request timeout in milliseconds, 0 to `MAX_TIMEOUT_MS` (2^31 - 1 ms); 0 disables.
+   * It covers the whole response, body included, and the engine enforces it for every
+   * transport (the request also gets an AbortSignal that fires at the deadline).
+   */
   timeoutMs?: number;
   /**
    * Number of automatic retries for transient (429/503) responses. Each waits the
@@ -52,6 +56,8 @@ export interface EngineOptions {
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
    * from a hostile/buggy endpoint). Defaults to 100 MiB; set to 0 for no limit.
+   * Enforced by the engine for every transport: the built-in one aborts early, a
+   * custom one's body is checked when it arrives.
    *
    * Every numeric option must be a non-negative safe integer within its range;
    * the constructor throws CkanValidationError otherwise (a negative or NaN
@@ -189,6 +195,60 @@ function engineHeadersOnly(headers: Record<string, string>): Record<string, stri
   return Object.fromEntries(Object.entries(headers).filter(([key]) => ENGINE_HEADERS.has(key)));
 }
 
+/** Why `value` is not a usable HttpResponse, or undefined when it is. */
+function responseProblem(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null) return "not an object";
+  const r = value as Partial<Record<"status" | "headers" | "body", unknown>>;
+  if (typeof r.status !== "number" || !Number.isInteger(r.status) || r.status < 100 || r.status > 599) {
+    return "status is not an HTTP status code";
+  }
+  if (typeof r.headers !== "object" || r.headers === null || Array.isArray(r.headers)) return "headers is not an object";
+  if (bodyBytes(r.body) === undefined) return "body is not a Buffer, Uint8Array, other ArrayBuffer view or ArrayBuffer";
+  return undefined;
+}
+
+/**
+ * The response body as a Buffer (a view, no copy): a Buffer, any ArrayBuffer view (a
+ * Uint8Array from fetch, a DataView) or an ArrayBuffer/SharedArrayBuffer — checked by
+ * internal slot, not `instanceof`, so a value from another realm (a vm context, a
+ * Jest test) counts. Undefined for anything else.
+ */
+function bodyBytes(value: unknown): Buffer | undefined {
+  if (Buffer.isBuffer(value)) return value;
+  if (ArrayBuffer.isView(value)) return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  const tag = Object.prototype.toString.call(value);
+  if (tag === "[object ArrayBuffer]" || tag === "[object SharedArrayBuffer]") return Buffer.from(value as ArrayBuffer);
+  return undefined;
+}
+
+/**
+ * The response headers as a plain record with lower-case names. Node's transport
+ * lower-cases them; a custom one may not (`Retry-After`, `Location`, `Content-Type`),
+ * and a fetch transport naturally returns its `Headers` object, which has no plain
+ * properties. Such an object (anything with `get` and `forEach`: `Headers`, a `Map`)
+ * is copied.
+ */
+function plainHeaders(headers: object): Record<string, string | string[] | undefined> {
+  const h = headers as { get?: unknown; forEach?: unknown };
+  if (typeof h.get === "function" && typeof h.forEach === "function") {
+    const record: Record<string, string> = {};
+    (h.forEach as (cb: (value: string, name: string) => void) => void).call(headers, (value, name) => {
+      record[String(name).toLowerCase()] = value;
+    });
+    return record;
+  }
+  const record: Record<string, string | string[] | undefined> = {};
+  for (const [name, value] of Object.entries(headers as Record<string, string | string[] | undefined>)) {
+    record[name.toLowerCase()] = value;
+  }
+  return record;
+}
+
+/** The first value of a header (a repeated one arrives as an array). */
+function headerValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -284,6 +344,33 @@ export class RequestEngine {
     return `${base}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }
 
+  /**
+   * Call the transport under the overall deadline (`timeoutMs`): the request gets an
+   * AbortSignal that fires at the deadline, and the call rejects then whether the
+   * transport stops or not — a custom transport (fetch, a node:http wrapper) that
+   * ignores `timeoutMs` can't hang the caller (or `checkPortals`). A synchronous throw
+   * becomes a rejection.
+   */
+  private async callTransport(request: HttpRequest): Promise<HttpResponse> {
+    const call = (signal?: AbortSignal): Promise<HttpResponse> =>
+      Promise.resolve().then(() => this.transport(signal === undefined ? request : { ...request, signal }));
+    if (this.timeoutMs === 0) return call();
+    const controller = new AbortController();
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const err = new CkanNetworkError(`Request exceeded the ${this.timeoutMs}ms deadline`);
+        controller.abort(err);
+        reject(err);
+      }, Math.min(this.timeoutMs, MAX_TIMEOUT_MS));
+    });
+    try {
+      return await Promise.race([call(controller.signal), deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Perform a request with Accept negotiation and transient-error retries. */
   async request(
     method: string,
@@ -310,7 +397,7 @@ export class RequestEngine {
     for (;;) {
       let response: HttpResponse;
       try {
-        response = await this.transport({
+        response = await this.callTransport({
           method,
           url,
           headers,
@@ -331,6 +418,14 @@ export class RequestEngine {
         });
       }
 
+      // An injected transport may resolve with anything; a malformed HttpResponse
+      // would otherwise surface below as a raw TypeError, outside the CkanError contract.
+      const invalid = responseProblem(response);
+      if (invalid !== undefined) {
+        throw new CkanNetworkError(
+          `${method} ${redactUrl(url)} failed: the transport returned an invalid response (${invalid}).`,
+        );
+      }
       // A transport must not follow redirects itself (`redirect: "manual"`): one that
       // did (fetch's default) may have carried the Authorization header to another
       // host, and the answer is not the one asked for. Reject it when it says so (`url`).
@@ -344,11 +439,19 @@ export class RequestEngine {
       }
 
       const status = response.status;
+      const responseHeaders = plainHeaders(response.headers);
+      // fetch gives a Uint8Array; view it as a Buffer (no copy), which the decoders expect.
+      const body = bodyBytes(response.body) as Buffer;
+      // The size cap holds whatever the transport did: the default one aborts early, a
+      // custom one may have read everything.
+      if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
+        throw new CkanNetworkError(`${method} ${redactUrl(url)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
+      }
       const retryable = status === 429 || status === 503;
       if (retryable && attempt < this.maxRetries) {
         // Honour Retry-After; without a usable one, back off linearly. A Retry-After
         // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once.
-        const retryAfter = parseRetryAfter(response.headers["retry-after"]);
+        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
         if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
           attempt += 1;
           await this.sleep(retryAfter ?? this.retryDelayMs * attempt);
@@ -357,7 +460,7 @@ export class RequestEngine {
       }
 
       // Follow redirects, resolving the Location relative to the current URL.
-      const location = response.headers["location"];
+      const location = headerValue(responseHeaders["location"]);
       const isRedirect = status >= 300 && status < 400;
       const nextUrl = isRedirect && redirects < this.maxRedirects ? resolveLocation(location, url) : undefined;
       if (nextUrl !== undefined) {
@@ -365,6 +468,14 @@ export class RequestEngine {
         // only, as the Authorization header, never from a server.
         nextUrl.username = "";
         nextUrl.password = "";
+        // Only http(s) is followed: a `file:`, `ftp:`, `data:` or `javascript:` target
+        // never reaches a transport (a custom one may not check the scheme).
+        if (nextUrl.protocol !== "http:" && nextUrl.protocol !== "https:") {
+          throw new CkanNetworkError(
+            `Refusing to follow redirect to unsupported protocol "${sanitizeServerText(nextUrl.protocol)}" ` +
+              `for ${method} ${redactUrl(url)}`,
+          );
+        }
         // Credential-strip guard: if the redirect crosses origin (scheme + host +
         // port, so an https->http downgrade counts), keep only the engine's own
         // non-credential headers, so the base URL's Authorization (and any future
@@ -388,7 +499,7 @@ export class RequestEngine {
         continue;
       }
 
-      const contentType = String(response.headers["content-type"] ?? "");
+      const contentType = String(headerValue(responseHeaders["content-type"]) ?? "");
       if (status < 200 || status >= 300) {
         // A 3xx that was not followed: say why, or a bare "HTTP 301" reads like a
         // redirect this client cannot follow. Past the limit it is a loop; a
@@ -402,12 +513,12 @@ export class RequestEngine {
               : location
                 ? `redirect to ${sanitizeServerText(location)} not followed`
                 : "redirect not followed (no Location header)";
-          throw new CkanApiError({ status, url, method, body: this.scrub(response.body.toString("utf8")), detail });
+          throw new CkanApiError({ status, url, method, body: this.scrub(body.toString("utf8")), detail });
         }
-        throw this.toApiError(method, url, status, response.body, status === 401 || status === 403 ? dropped : undefined);
+        throw this.toApiError(method, url, status, body, status === 401 || status === 403 ? dropped : undefined);
       }
 
-      return { data: response.body, contentType, status, url };
+      return { data: body, contentType, status, url };
     }
   }
 

@@ -448,3 +448,32 @@ test("the constructor refuses a blank or unsendable userAgent, before any reques
   }
   assert.equal(assertHeaderValue("User-Agent", "a\tb"), "a\tb");
 });
+
+test("a fetch-style transport's headers are read in any case: Location, charset (result 04 Bug 2)", async () => {
+  // A 302 whose Location sits in a Headers object is followed.
+  let n = 0;
+  const redirect = makeMockTransport(() =>
+    n++ === 0
+      ? ({ status: 302, headers: new Headers({ Location: "/moved" }), body: Buffer.alloc(0) } as unknown as HttpResponse)
+      : jsonResponse({ ok: true }),
+  );
+  const e = new RequestEngine({ baseUrl: "https://example.test", transport: redirect.transport });
+  assert.deepEqual(await e.getJson("/x"), { ok: true });
+  assert.equal(redirect.calls[1]?.url, "https://example.test/moved");
+  // A canonical-case Content-Type with a Latin-1 charset is decoded, not read as UTF-8.
+  const latin1 = makeMockTransport(() => ({
+    status: 200,
+    headers: { "Content-Type": "application/json; charset=iso-8859-1" } as unknown as HttpResponse["headers"],
+    body: Buffer.from([0x22, 0xe4, 0x22]),
+  }));
+  assert.equal(await new RequestEngine({ baseUrl: "https://example.test", transport: latin1.transport }).getJson("/x"), "ä");
+});
+
+test("a redirect to a non-http(s) scheme is refused before the transport sees it", async () => {
+  const mt = makeMockTransport(() => ({ status: 302, headers: { location: "ftp://files.example/x" }, body: Buffer.alloc(0) }));
+  await assert.rejects(
+    new RequestEngine({ baseUrl: "https://example.test", transport: mt.transport }).getJson("/x"),
+    (err: unknown) => err instanceof CkanNetworkError && /unsupported protocol "ftp:"/.test(err.message),
+  );
+  assert.equal(mt.calls.length, 1);
+});
