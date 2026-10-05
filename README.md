@@ -32,7 +32,7 @@ search, inspect, filter and pipe straight into [`jq`](https://jqlang.github.io/j
 npm i -g @maschinenlesbar.org/ckan-cli
 ```
 
-This installs the **`ckan`** command. Requires **Node.js 20+**.
+This installs the **`ckan`** command. Requires **Node.js 22.12+**.
 
 ## Quickstart
 

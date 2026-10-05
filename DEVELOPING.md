@@ -367,7 +367,7 @@ shows what changed.
 GitHub Actions workflows under `.github/workflows/`, identical to the other
 maschinenlesbar.org CLIs:
 
-- **ci.yml** — type-check, build and test on Node 20/22/24 for every push and PR.
+- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR.
 - **release.yml** — on a `v*` tag: verify the tag matches `package.json`, test, `npm pack`, SBOMs, and a GitHub Release.
 - **publish.yml** — manual dispatch: publish to npm via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
 - **docs.yml** — the project website and TypeDoc API docs to GitHub Pages on each `v*` tag.
