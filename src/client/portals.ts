@@ -2,7 +2,7 @@
 // portals-list.ts, maintained with scripts/update-portals.ts.
 
 import { CkanClient, siteRoot } from "./client.js";
-import type { EngineOptions } from "./engine.js";
+import { validateBaseUrl, type EngineOptions } from "./engine.js";
 import { CkanApiError, CkanNetworkError, CkanParseError, CkanValidationError } from "./errors.js";
 import { PORTALS } from "./portals-list.js";
 import type { Portal } from "./types.js";
@@ -197,6 +197,10 @@ export async function checkPortalUrls(urls: readonly string[], options: CheckPor
   return mapLimit(urls, concurrency, async (url) => {
     let client: CkanClient;
     try {
+      // Checked here, not left to the client: `baseUrl: undefined` selects the
+      // Hamburg default, so an entry without a url was checked against Hamburg and
+      // reported as working, with Hamburg's dataset count.
+      validateBaseUrl(url);
       client = createClient({ ...options.engineOptions, baseUrl: url });
     } catch (err) {
       return { ...failedCheck(), problem: problemOf(err) };

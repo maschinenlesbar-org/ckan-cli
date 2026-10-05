@@ -192,3 +192,20 @@ test("checkPortalUrls settles at timeoutMs with a transport that never answers (
   assert.equal(check?.problem, "timeout");
   assert.ok(Date.now() - started < 2000);
 });
+
+test("a portal entry without a url is a failed check, never Hamburg's (result 04 Bug 3)", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ help: "h", success: true, result: { count: 245000, results: [] } }));
+  const [entry] = await checkPortals([{ id: "mine", title: "My portal" } as unknown as Portal], {
+    engineOptions: { transport: mt.transport },
+    date: "2026-10-06",
+  });
+  assert.equal(entry?.working, false);
+  assert.match(entry?.problem ?? "", /^Invalid base URL/);
+  assert.notEqual(entry?.datasets, 245000, "not Hamburg's count");
+  for (const url of [undefined, null, 5]) {
+    const [check] = await checkPortalUrls([url as unknown as string], { engineOptions: { transport: mt.transport } });
+    assert.equal(check?.working, false, String(url));
+    assert.match(check?.problem ?? "", /^Invalid base URL/);
+  }
+  assert.equal(mt.calls.length, 0, "no request, to Hamburg or anywhere");
+});

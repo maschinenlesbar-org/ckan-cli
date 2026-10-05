@@ -129,7 +129,8 @@ const list = await checkPortals(PORTALS, { engineOptions: { timeoutMs: 15_000 } 
 `engineOptions` (`baseUrl` is replaced per portal), `createClient`, `concurrency`
 (default `DEFAULT_CHECK_CONCURRENCY`, 6), `retryDelayMs` (when set, a failed check is
 repeated once after that pause; the CLI makes a single try, `update-portals` retries)
-and `date`. A URL the client refuses is a failed check, not a throw.
+and `date`. A URL the client refuses is a failed check, not a throw — a missing one
+(`undefined`, an entry without `url`) too: it is never checked as the Hamburg default.
 
 ## Architecture
 
