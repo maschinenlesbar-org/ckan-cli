@@ -92,7 +92,9 @@ export function headerValueProblem(value: string): string | undefined {
  * - an absolute URL with an http(s) scheme (`file:`, `ftp:` … never reach a
  *   transport);
  * - no query string or fragment: the API path is appended, so it would land in
- *   front of `/api/3/action`.
+ *   front of `/api/3/action`;
+ * - a `%` in the user name or password must start a valid escape (`%25` for a
+ *   literal one): the engine decodes the userinfo for the Authorization header.
  *
  * Userinfo (`https://user:pw@host`) is allowed; error messages redact it. The
  * reasons never quote the value, so a credential in it cannot leak through them.
@@ -114,5 +116,14 @@ export function baseUrlProblem(value: string): string | undefined {
     return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "Expected a site URL without a query string or fragment.";
+  // The engine decodes the userinfo into the Authorization header; a "%" that isn't an
+  // escape would fail there ("URI malformed") at request time. Reject it here.
+  for (const part of [url.username, url.password]) {
+    try {
+      decodeURIComponent(part);
+    } catch {
+      return 'The user name or password has a "%" that is not followed by two hex digits; write a literal "%" as %25.';
+    }
+  }
   return undefined;
 }

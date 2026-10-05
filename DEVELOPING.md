@@ -151,7 +151,9 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   and in `siteRoot()`: a blank value, whitespace or a control character anywhere in
   it (`new URL` trims and drops tab and newline, but the value is glued into every
   request URL as given), anything but an absolute http(s) URL, and a query string or
-  fragment (the API path is appended, so it would land in front of it) all throw
+  fragment (the API path is appended, so it would land in front of it), and a `%`
+  in the user name or password that does not start an escape (write `%25`; the
+  engine decodes the userinfo for the Authorization header) all throw
   `CkanValidationError` `Invalid base URL: …` — a configuration mistake, never a
   `CkanNetworkError`, which stays for transport failures (the default transport
   still re-checks the scheme on every hop and redirect). Userinfo is allowed and
@@ -260,7 +262,8 @@ node --test dist/test/client.test.js   # one file, after a build
 - **`conformance-p*.test.ts`** — the shared checks of the 2026-10-05 fix plan, copied
   from autobahn-cli with only their adapter block changed: P1 (no credential in any CLI
   output), P2 (none in a logged client or error), P3 (credentials go to their own
-  origin only; from dwd-cli).
+  origin only; from dwd-cli), P4/P19 (an unusable base URL is a usage error; help
+  works whatever `CKAN_BASE_URL` holds).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
