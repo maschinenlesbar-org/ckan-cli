@@ -336,17 +336,18 @@ test("a password in --base-url or CKAN_BASE_URL is redacted in errors and in --h
     jsonResponse({ success: false, error: { __type: "Not Found Error", message: "Not found" } }, 404),
   );
   assert.equal(await run(["--base-url", "http://user:s3cret@127.0.0.1:9/404", "status"], notFound.deps), 4);
-  // The request itself keeps the userinfo (Node sends it as Basic auth)...
-  assert.equal(notFound.mt.last().url, `http://user:s3cret@127.0.0.1:9/404${ACTION}/status_show`);
-  // ...but the message does not.
+  // The userinfo goes out as Basic auth in an Authorization header, never in the URL...
+  assert.equal(notFound.mt.last().url, `http://127.0.0.1:9/404${ACTION}/status_show`);
+  assert.equal(notFound.mt.last().headers?.["Authorization"], `Basic ${Buffer.from("user:s3cret").toString("base64")}`);
+  // ...and no message shows it.
   assert.equal(
     notFound.err.join("\n"),
-    `Error: HTTP 404 for GET http://***@127.0.0.1:9/404${ACTION}/status_show: Not Found Error: Not found`,
+    `Error: HTTP 404 for GET http://127.0.0.1:9/404${ACTION}/status_show: Not Found Error: Not found`,
   );
 
   const html = makeCli(() => rawResponse("<html></html>", "text/html"));
   assert.equal(await run(["--base-url", "http://user:s3cret@127.0.0.1:9/x", "status"], html.deps), 1);
-  assert.match(html.err.join("\n"), /Expected JSON from http:\/\/\*\*\*@127\.0\.0\.1:9\/x\//);
+  assert.match(html.err.join("\n"), /Expected JSON from http:\/\/127\.0\.0\.1:9\/x\//);
   assert.doesNotMatch(html.err.join("\n"), /s3cret/);
 
   const help = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: "http://user:s3cret@127.0.0.1:9/ok" });

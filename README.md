@@ -79,6 +79,11 @@ sub-path keeps it (`https://open.canada.ca/data`). `ckan status` is a good first
 call on an unfamiliar portal: it shows the CKAN version and the installed
 extensions.
 
+A portal behind a login takes its user name and password in the URL
+(`https://user:password@host`). They go out as HTTP Basic auth to that site only:
+a redirect to another host, port or scheme drops them, and no message, help text
+or error shows them.
+
 ### Known portals
 
 `ckan portals` lists the CKAN portals in Germany this version knows, with the

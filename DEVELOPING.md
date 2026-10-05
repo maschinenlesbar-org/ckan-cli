@@ -219,6 +219,16 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   `http:` to `https:` with a 302. If a redirect crosses origin (scheme + host +
   port), only the engine's own `Accept` and `User-Agent` go along (an allowlist), so no
   other header leaks to another host.
+- **Credentials per hop.** A base URL's userinfo (`https://user:pw@host`) never reaches
+  the transport inside the URL: the engine sends it as an `Authorization: Basic …`
+  header that it manages per hop. A redirect on the same origin keeps it, relative or
+  absolute `Location`; one to another origin drops it (the allowlist above), and a
+  401/403 after such a drop says so (`the server redirected http→https, which dropped
+  the base URL's credentials; use an https base URL`). A userinfo inside a `Location`
+  is never used. `HttpRequest.redirect` is always `"manual"`: a transport must not
+  follow redirects itself, and a response whose `HttpResponse.url` lies on another
+  origin is rejected as a `CkanNetworkError`. Messages show the request URL without
+  the userinfo.
 - **Credentials in logged objects.** The client and the engine keep the base URL in
   real `#private` fields, so `console.log(client)`, `util.inspect` and
   `JSON.stringify` never show its password. The engine scrubs the base URL's
@@ -249,7 +259,8 @@ node --test dist/test/client.test.js   # one file, after a build
 - **`portals.test.ts`** — `portalKey`, `findPortal`, `checkPortal` outcomes, `checkPortals` / `checkPortalUrls` (retry, concurrency), and the invariants of the built-in list.
 - **`conformance-p*.test.ts`** — the shared checks of the 2026-10-05 fix plan, copied
   from autobahn-cli with only their adapter block changed: P1 (no credential in any CLI
-  output), P2 (none in a logged client or error).
+  output), P2 (none in a logged client or error), P3 (credentials go to their own
+  origin only; from dwd-cli).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
