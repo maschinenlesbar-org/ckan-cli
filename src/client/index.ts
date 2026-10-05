@@ -24,6 +24,8 @@ export {
   CkanValidationError,
   describeCkanError,
   redactUrl,
+  credentialsIn,
+  redactCredentials,
 } from "./errors.js";
 
 export { assertValid } from "./validate.js";

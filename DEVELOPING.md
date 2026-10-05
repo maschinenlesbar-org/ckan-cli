@@ -155,7 +155,16 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   `CkanValidationError` `Invalid base URL: …` — a configuration mistake, never a
   `CkanNetworkError`, which stays for transport failures (the default transport
   still re-checks the scheme on every hop and redirect). Userinfo is allowed and
-  redacted in messages. `siteRoot()` drops a trailing `/api/3/action` or `/api/3`,
+  redacted in messages; the reasons never repeat the value. The CLI also redacts on
+  output: `run.ts` (`withRedactedOutput`) takes the exact userinfo of every
+  argument and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it with
+  `***` in everything it prints — commander's usage errors, which echo a rejected
+  `--base-url` or `--portal` value or a URL typed where the command goes, the
+  client's own messages and the help's defaults — so a password with spaces,
+  quotes, `#`, `?` or `/` is caught as well as an ordinary one. `redactUrl` falls
+  back to the same text-based cut (`redactCredentials`) for a value that doesn't
+  parse as a URL, so an unparseable `CKAN_BASE_URL` shows as `https://***@…` in
+  `--help` too. `siteRoot()` drops a trailing `/api/3/action` or `/api/3`,
   because portals document their API with that suffix, and keeps any other path (a
   CKAN under `https://host/ckan`). The CLI's `parseBaseUrl` calls `baseUrlProblem`;
   commander does not run value parsers on defaults, so a `preAction` hook in

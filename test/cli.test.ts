@@ -356,6 +356,26 @@ test("a password in --base-url or CKAN_BASE_URL is redacted in errors and in --h
   assert.match(text.replace(/\s+/g, " "), /default: "http:\/\/\*\*\*@127\.0\.0\.1:9\/ok"/);
 });
 
+test("a password in --portal, an unparseable CKAN_BASE_URL or an id is never printed (P1)", async () => {
+  const pw = "hunter2";
+  // An unknown --portal URL: commander repeats the value twice.
+  const portal = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["--portal", `https://bob:${pw}@ckan.example.org`, "status"], portal.deps), 1);
+  assert.doesNotMatch(portal.err.join("\n"), /hunter2/);
+  assert.match(portal.err.join("\n"), /https:\/\/\*\*\*@ckan\.example\.org/);
+  // An unparseable CKAN_BASE_URL (port out of range): its error and the help after it.
+  for (const argv of [["--help"], ["search", "x"], []]) {
+    const env = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: `https://bob:${pw}@ckan.example.org:70000` });
+    await run(argv, env.deps);
+    const text = [...env.out, ...env.err].join("\n");
+    assert.doesNotMatch(text, /hunter2/, `argv ${JSON.stringify(argv)}: ${text}`);
+  }
+  // A URL given as an id goes out percent-encoded; a 404 message echoes that form.
+  const id = makeCli(() => jsonResponse({ success: false, error: { message: "Not found" } }, 404));
+  assert.equal(await run(["package", `https://bob:${pw}@ckan.example.org`], id.deps), 4);
+  assert.doesNotMatch(id.err.join("\n"), /hunter2/);
+});
+
 test("--user-agent refuses a blank value, control characters and non-Latin-1 before any request", async () => {
   const cases: [string, RegExp][] = [
     ["", /Expected a non-empty value\./],
