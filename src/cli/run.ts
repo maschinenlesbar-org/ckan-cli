@@ -76,10 +76,40 @@ export function withRedactedOutput(deps: CliDeps, argv: readonly string[]): CliD
   return { ...deps, io: { out: (text) => deps.io.out(redact(text)), err: (text) => deps.io.err(redact(text)) } };
 }
 
+/**
+ * The index of a `help` command whose topic names no command (`ckan help nonexistent`),
+ * or undefined. Commander answers that with the root help on stderr and exit 1, but
+ * no line saying what was wrong. Global options before `help` are skipped with their
+ * values; scanning stops at `--`.
+ */
+export function unknownHelpTopic(program: Command, argv: readonly string[]): number | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i]!;
+    if (token === "--") return undefined;
+    if (token.startsWith("-")) {
+      if (token.includes("=")) continue;
+      const option = program.options.find((o) => o.long === token || o.short === token);
+      if (option?.required) i++;
+      continue;
+    }
+    if (token !== "help") return undefined;
+    const topic = argv[i + 1];
+    if (topic === undefined || topic.startsWith("-")) return undefined;
+    const known = program.commands.some((c) => c.name() === topic || c.aliases().includes(topic));
+    return known ? undefined : i;
+  }
+  return undefined;
+}
+
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {
   deps = withRedactedOutput(deps, argv);
   const program = buildProgram(deps);
   configureTree(program, deps);
+
+  // `help <unknown>` is answered like `<unknown>`: "error: unknown command '<unknown>'",
+  // the help after it, exit 1 — not the help alone with a failure code.
+  const helpAt = unknownHelpTopic(program, argv);
+  if (helpAt !== undefined) argv = argv.filter((_, i) => i !== helpAt);
 
   try {
     await program.parseAsync(argv, { from: "user" });

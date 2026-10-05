@@ -499,6 +499,19 @@ test("an invalid CKAN_BASE_URL does not block the commands that never use it (P1
   assert.match(status.err.join("\n"), /CKAN_BASE_URL/);
 });
 
+test("help <unknown> names the unknown command, like <unknown> does (result 06 Bug 1)", async () => {
+  for (const argv of [["help", "nonexistent"], ["--compact", "help", "nonexistent"], ["--base-url", "https://h.example", "help", "nonexistent"]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.match(cli.err.join("\n"), /^error: unknown command 'nonexistent'/, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0);
+  }
+  // A known topic still prints that command's help, exit 0.
+  const known = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["help", "status"], known.deps), 0);
+  assert.match(known.out.join("\n"), /Usage: ckan status/);
+});
+
 test("a single-value option given twice is a usage error, before any request (P10)", async () => {
   for (const argv of [
     ["--base-url", "https://a.example", "--base-url", "https://b.example", "status"],

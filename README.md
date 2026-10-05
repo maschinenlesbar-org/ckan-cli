@@ -245,7 +245,7 @@ ckan package bezirk-wandsbek-drucksache-22-3573-2 | jq '.resources[] | {format, 
 | --- | --- |
 | `0` | success (also `--help`, `help [command]`, `--version` and a bare `ckan`) |
 | `4` | not found (HTTP `404`): an unknown id on `package`/`resource`/`organization`/`group`, or, on any command, no CKAN at this URL (a wrong `--base-url`, a portal that left CKAN) |
-| `1` | any other error — bad usage, validation error (`409`), unknown action (`400`), CKAN `success:false`, network failure |
+| `1` | any other error — bad usage (an unknown command, also after `help`), validation error (`409`), unknown action (`400`), CKAN `success:false`, network failure |
 
 A reader that stops early (`| head`) ends `ckan` quietly with exit 0; a failed
 run keeps its exit code even when nothing reads stderr.
