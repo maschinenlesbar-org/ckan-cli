@@ -499,6 +499,21 @@ test("an invalid CKAN_BASE_URL does not block the commands that never use it (P1
   assert.match(status.err.join("\n"), /CKAN_BASE_URL/);
 });
 
+test("a single-value option given twice is a usage error, before any request (P10)", async () => {
+  for (const argv of [
+    ["--base-url", "https://a.example", "--base-url", "https://b.example", "status"],
+    ["--portal", "berlin", "--portal", "hamburg", "status"],
+    ["--timeout", "5", "status", "--timeout", "6"],
+    ["organizations", "--limit", "2", "--limit", "3"],
+    ["tags", "--query", "a", "--query", "b"],
+  ]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), /more than once/);
+  }
+});
+
 test("portals prints the built-in list without any request", async () => {
   const cli = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run(["portals"], cli.deps), 0);

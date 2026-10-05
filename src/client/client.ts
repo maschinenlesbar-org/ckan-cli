@@ -83,6 +83,28 @@ function assertParams(params: unknown): void {
   }
 }
 
+/**
+ * Throw CkanValidationError unless every own key of `params` is in `known`. CKAN
+ * ignores a parameter it doesn't know, so a misspelled `fqs` or a JSON `__proto__`
+ * key would run the search unfiltered over the whole catalogue. Any other CKAN
+ * parameter goes through `action(name, params)`, which sends every key.
+ */
+function assertKeys(method: string, action: string, params: object, known: readonly string[]): void {
+  for (const key of Object.keys(params)) {
+    if (!known.includes(key)) {
+      throw new CkanValidationError(
+        `Invalid ${method} parameter ${JSON.stringify(cutForMessage(key))}: not a parameter of ${method}. ` +
+          `Known: ${known.join(", ")}. Use action("${action}", params) to send another CKAN parameter.`,
+      );
+    }
+  }
+}
+
+const SEARCH_KEYS = ["q", "fq", "rows", "start", "sort", "facet_field", "facet_limit"] as const;
+const PACKAGE_LIST_KEYS = ["limit", "offset"] as const;
+const GROUP_LIST_KEYS = ["limit", "offset", "all_fields"] as const;
+const TAG_LIST_KEYS = ["query"] as const;
+
 /** Check an optional text parameter (`q`, `sort`, a tag query): a non-blank string. */
 function assertText(name: string, value: unknown): void {
   if (value !== undefined) assertValid(name, value, textProblem);
@@ -210,6 +232,7 @@ export class CkanClient {
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     assertParams(params);
+    assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
     assertText("q", params.q);
     if (params.fq !== undefined) assertValid("fq", params.fq, textListProblem);
     assertText("sort", params.sort);
@@ -254,6 +277,7 @@ export class CkanClient {
   /** Dataset names, paged with limit/offset (a positive limit, omit it for all; a non-negative offset). */
   async packageList(params: ListParams = {}): Promise<string[]> {
     assertParams(params);
+    assertKeys("packageList", "package_list", params, PACKAGE_LIST_KEYS);
     assertLimit(params.limit);
     assertCount("offset", params.offset);
     return this.typed<string[]>(
@@ -280,6 +304,7 @@ export class CkanClient {
   /** Tags, optionally only those containing a substring (a blank one is refused). */
   async tagList(params: TagListParams = {}): Promise<string[]> {
     assertParams(params);
+    assertKeys("tagList", "tag_list", params, TAG_LIST_KEYS);
     assertText("query", params.query);
     return this.typed<string[]>("tag_list", { query: params.query }, Array.isArray, "an array");
   }
@@ -303,6 +328,7 @@ export class CkanClient {
    */
   private async groupOrOrgList(action: string, params: GroupListParams): Promise<JsonValue[]> {
     assertParams(params);
+    assertKeys(action === "group_list" ? "groupList" : "organizationList", action, params, GROUP_LIST_KEYS);
     if (params.all_fields !== undefined && typeof params.all_fields !== "boolean") {
       throw new CkanValidationError("Invalid all_fields: Expected a boolean.");
     }

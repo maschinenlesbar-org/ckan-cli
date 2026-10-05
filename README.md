@@ -158,7 +158,9 @@ action <name> [--param key=value …]    call any CKAN action (generic)
 > **Blank values are refused.** `ckan search ""`, `--fq ""`, `tags --query ""` or
 > `action … --param q=` exit 1 before any request, instead of silently running an unfiltered search.
 > So does a forgotten value (`--fq --rows 5`): a value of `--fq`, `--facet`,
-> `--sort` or `tags --query` cannot start with `--`.
+> `--sort` or `tags --query` cannot start with `--`. And so does a single-value
+> option given twice (`--rows 5 --rows 50`, a second `--base-url`): only `--fq`,
+> `--facet` and `--param` repeat.
 
 ### Paging and list flags
 

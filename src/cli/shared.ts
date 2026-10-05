@@ -64,6 +64,22 @@ export function parseOptionValue(value: string): string {
   return parseNonEmpty(value);
 }
 
+/**
+ * Wrap a commander value-parser for a single-valued option so that a second
+ * occurrence is a usage error. commander otherwise keeps only the last value, so
+ * `--rows 5 --rows 50` (or a second `--base-url`) silently dropped the first. The
+ * wrapper keeps its own count, so it also works for an option with a default (which
+ * commander hands the parser as `previous`); build it per program (`buildProgram`).
+ */
+export function once<T>(parse: (value: string) => T): (value: string) => T {
+  let seen = false;
+  return (value) => {
+    if (seen) throw new InvalidArgumentError("Given more than once; this option takes a single value.");
+    seen = true;
+    return parse(value);
+  };
+}
+
 /** commander accumulator for a repeatable option whose values are checked by parseOptionValue. */
 export function collectNonEmpty(value: string, previous: string[] = []): string[] {
   return previous.concat([parseOptionValue(value)]);

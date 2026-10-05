@@ -248,6 +248,14 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   value and answer with an unfiltered result. The CLI's value parsers
   (`parseNonEmpty`, `collectNonEmpty`, `--param`) apply the same rule as a usage
   error.
+- **Known parameters only.** `packageSearch` (q, fq, rows, start, sort,
+  facet_field, facet_limit), `packageList` (limit, offset), `organizationList` /
+  `groupList` (plus all_fields) and `tagList` (query) throw `CkanValidationError` for
+  any other key, naming the known ones: CKAN ignores a parameter it doesn't know, so
+  a misspelled `fqs` or a JSON `__proto__` key would run the search unfiltered. Any
+  other CKAN parameter goes through `action(name, params)`. In the CLI a
+  single-value option given twice is a usage error (`once` in `shared.ts`); `--fq`,
+  `--facet` and `--param` repeat.
 - **Paging bounds.** The client refuses, before any request, a `limit` that is not a
   positive integer, a `rows`, `start` or `offset` that is not a non-negative safe
   integer (`countProblem`) and a `facet_limit` other than -1 or a non-negative
@@ -312,7 +320,8 @@ node --test dist/test/client.test.js   # one file, after a build
   no stack trace, the exit code kept; runs the built bin; from dwd-cli), P8/P9/P13
   (a declared charset is honoured; a 2xx body that is not a CKAN envelope with the
   expected `result` shape is a `CkanParseError`; a wrong-typed input is a
-  `CkanValidationError`).
+  `CkanValidationError`), P10 (unknown parameter keys and repeated single-value
+  options are refused; from govdata-cli).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:

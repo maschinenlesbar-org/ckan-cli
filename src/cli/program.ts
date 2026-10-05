@@ -11,7 +11,7 @@ import { CkanClient } from "../client/client.js";
 import { DEFAULT_BASE_URL, MAX_RETRIES, MAX_RETRY_AFTER_MS } from "../client/engine.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
 import { redactUrl } from "../client/errors.js";
-import { parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg, parsePortal } from "./shared.js";
+import { once, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg, parsePortal } from "./shared.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 import { registerPortalCommands } from "./commands/portal.js";
 
@@ -50,27 +50,27 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     .version(VERSION)
     .addOption(
       new Option("--base-url <url>", "CKAN site URL (env CKAN_BASE_URL)")
-        .argParser(parseBaseUrl)
+        .argParser(once(parseBaseUrl))
         // The help shows the default without userinfo: a password in
         // CKAN_BASE_URL must not end up in `--help` output or CI logs.
         .default(baseUrlDefault, JSON.stringify(redactUrl(baseUrlDefault))),
     )
     .addOption(
       new Option("--portal <id>", "a known portal by id (see `ckan portals`)")
-        .argParser(parsePortal)
+        .argParser(once(parsePortal))
         .conflicts("baseUrl"),
     )
-    .option("--timeout <ms>", "per-request timeout in milliseconds", parseBoundedInt(0, MAX_TIMEOUT_MS))
-    .option("--user-agent <ua>", "User-Agent header value", parseHeaderValue)
+    .option("--timeout <ms>", "per-request timeout in milliseconds", once(parseBoundedInt(0, MAX_TIMEOUT_MS)))
+    .option("--user-agent <ua>", "User-Agent header value", once(parseHeaderValue))
     .option(
       "--max-retries <n>",
       `retries for transient 429/503 responses (0..${MAX_RETRIES}; each backs off linearly, or waits a longer Retry-After up to ${MAX_RETRY_AFTER_MS / 1000} s)`,
-      parseBoundedInt(0, MAX_RETRIES),
+      once(parseBoundedInt(0, MAX_RETRIES)),
     )
     .option(
       "--max-response-bytes <n>",
       "cap response body size in bytes (0 = unlimited; default 100 MiB)",
-      parseIntArg,
+      once(parseIntArg),
     )
     .option("--compact", "print JSON on a single line instead of pretty-printed")
     .showHelpAfterError();
