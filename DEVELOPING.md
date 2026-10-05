@@ -171,6 +171,15 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   `CkanError`, with the message `Invalid <name>: <reason>`. The CLI's value
   parsers call the same functions, so the CLI and the library refuse the same
   inputs, and `run.ts` reports a `CkanValidationError` as a usage error (exit 1).
+  A wrong-typed input from JavaScript is refused the same way, never as a raw
+  `TypeError`: a non-string id, query, sort, tag query or base URL, a non-list
+  `fq`/`facet_field`, a non-boolean `all_fields`, a `params` that is not an object,
+  an `action()` parameter value the query string can't carry (an object, `NaN`), a
+  `transport` or `sleep` that is not a function, a portal list that is not an array.
+  An unusable action name and a blank `*_show` id are `CkanValidationError`s too.
+  Messages show at most 500 characters of a URL or of server text
+  (`MAX_MESSAGE_VALUE_LENGTH`, `cutForMessage`); the error's `url`, `detail` and
+  `body` keep the full value.
 - **Base URL.** `--base-url` or `--portal` (they conflict) > `CKAN_BASE_URL` > the
   Hamburg default (an empty `CKAN_BASE_URL` counts as unset; in the library only
   `undefined` selects the default). One rule set, `baseUrlProblem`, applied by the
@@ -300,7 +309,10 @@ node --test dist/test/client.test.js   # one file, after a build
   works whatever `CKAN_BASE_URL` holds), P5 (the limits hold for every transport;
   from destatis-genesis-cli, resets not retried), P6 (retries never burst; a Retry-After
   above 30 s fails at once naming the wait; from fim-portal-cli), P7 (closed pipes:
-  no stack trace, the exit code kept; runs the built bin; from dwd-cli).
+  no stack trace, the exit code kept; runs the built bin; from dwd-cli), P8/P9/P13
+  (a declared charset is honoured; a 2xx body that is not a CKAN envelope with the
+  expected `result` shape is a `CkanParseError`; a wrong-typed input is a
+  `CkanValidationError`).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:

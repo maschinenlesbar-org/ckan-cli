@@ -9,7 +9,9 @@ import {
   CkanError,
   CkanNetworkError,
   CkanParseError,
+  CkanValidationError,
   credentialsIn,
+  cutForMessage,
   describeCkanError,
   redactCredentials,
   redactUrl,
@@ -87,6 +89,13 @@ export const MAX_REDIRECTS = 10;
  */
 export function assertHeaderValue(name: string, value: string): string {
   return assertValid(name, value, headerValueProblem);
+}
+
+/** Check an optional function option (`transport`, `sleep`): a function or undefined. */
+function functionOption<F>(name: string, value: F | undefined, fallback: F): F {
+  if (value === undefined) return fallback;
+  if (typeof value !== "function") throw new CkanValidationError(`Invalid ${name}: Expected a function.`);
+  return value;
 }
 
 /** Check an optional numeric engine option against `[min, max]` (CkanValidationError). */
@@ -287,7 +296,7 @@ export class RequestEngine {
         return [raw];
       }
     });
-    this.transport = options.transport ?? nodeHttpTransport;
+    this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only undefined selects the default; a blank or unsendable value is refused.
     this.userAgent =
       options.userAgent === undefined ? DEFAULT_USER_AGENT : assertHeaderValue("userAgent", options.userAgent);
@@ -299,7 +308,7 @@ export class RequestEngine {
     this.maxRedirects = intOption("maxRedirects", options.maxRedirects, 0, MAX_REDIRECTS) ?? 5;
     this.maxResponseBytes =
       intOption("maxResponseBytes", options.maxResponseBytes, 0, Number.MAX_SAFE_INTEGER) ?? DEFAULT_MAX_RESPONSE_BYTES;
-    this.sleep = options.sleep ?? realSleep;
+    this.sleep = functionOption("sleep", options.sleep, realSleep);
   }
 
   /**
@@ -420,7 +429,7 @@ export class RequestEngine {
         // passes through.
         if (cause instanceof CkanError && !(cause instanceof CkanNetworkError)) throw cause;
         const reason = cause instanceof Error ? cause.message : String(cause);
-        throw new CkanNetworkError(`${method} ${redactUrl(url)} failed: ${sanitizeServerText(this.scrub(reason))}`, {
+        throw new CkanNetworkError(`${method} ${cutForMessage(redactUrl(url))} failed: ${sanitizeServerText(this.scrub(reason))}`, {
           cause: this.scrubCause(cause),
         });
       }
@@ -430,7 +439,7 @@ export class RequestEngine {
       const invalid = responseProblem(response);
       if (invalid !== undefined) {
         throw new CkanNetworkError(
-          `${method} ${redactUrl(url)} failed: the transport returned an invalid response (${invalid}).`,
+          `${method} ${cutForMessage(redactUrl(url))} failed: the transport returned an invalid response (${invalid}).`,
         );
       }
       // A transport must not follow redirects itself (`redirect: "manual"`): one that
@@ -439,7 +448,7 @@ export class RequestEngine {
       const finalUrl = (response as { url?: unknown }).url;
       if (typeof finalUrl === "string" && finalUrl !== "" && originOf(finalUrl) !== originOf(url)) {
         throw new CkanNetworkError(
-          `${method} ${redactUrl(url)} failed: the transport followed a redirect to another origin ` +
+          `${method} ${cutForMessage(redactUrl(url))} failed: the transport followed a redirect to another origin ` +
             `(${sanitizeServerText(redactUrl(this.scrub(finalUrl)))}); a transport must not follow redirects ` +
             `(HttpRequest.redirect is "manual").`,
         );
@@ -452,7 +461,7 @@ export class RequestEngine {
       // The size cap holds whatever the transport did: the default one aborts early, a
       // custom one may have read everything.
       if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
-        throw new CkanNetworkError(`${method} ${redactUrl(url)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
+        throw new CkanNetworkError(`${method} ${cutForMessage(redactUrl(url))} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
       }
       const retryable = status === 429 || status === 503;
       // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: the error below
@@ -483,7 +492,7 @@ export class RequestEngine {
         if (nextUrl.protocol !== "http:" && nextUrl.protocol !== "https:") {
           throw new CkanNetworkError(
             `Refusing to follow redirect to unsupported protocol "${sanitizeServerText(nextUrl.protocol)}" ` +
-              `for ${method} ${redactUrl(url)}`,
+              `for ${method} ${cutForMessage(redactUrl(url))}`,
           );
         }
         // Credential-strip guard: if the redirect crosses origin (scheme + host +
@@ -548,8 +557,8 @@ export class RequestEngine {
       // 8-bit CSI U+009B): sanitise it before it reaches stderr.
       const mediaType = sanitizeServerText(res.contentType.split(";")[0]!);
       const message = /json/i.test(mediaType)
-        ? `Invalid JSON from ${redactUrl(res.url)}`
-        : `Expected JSON from ${redactUrl(res.url)} but got ${mediaType || "a body that is not JSON"}`;
+        ? `Invalid JSON from ${cutForMessage(redactUrl(res.url))}`
+        : `Expected JSON from ${cutForMessage(redactUrl(res.url))} but got ${mediaType || "a body that is not JSON"}`;
       throw new CkanParseError(message, { cause: this.scrubCause(cause) });
     }
   }
@@ -641,7 +650,7 @@ function decodeBody(body: Buffer, contentType: string, url: string): string {
     decoder = new TextDecoder(charset);
   } catch {
     throw new CkanParseError(
-      `Unsupported response charset "${sanitizeServerText(charset)}" from ${redactUrl(url)}.`,
+      `Unsupported response charset "${sanitizeServerText(charset)}" from ${cutForMessage(redactUrl(url))}.`,
     );
   }
   return decoder.decode(body);

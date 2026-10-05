@@ -2,9 +2,17 @@
 // Action API (`<site>/api/3/action`).
 
 import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, validateBaseUrl, type EngineOptions } from "./engine.js";
-import { CkanError, CkanParseError, CkanValidationError, describeCkanError, redactUrl } from "./errors.js";
+import { CkanError, CkanParseError, CkanValidationError, cutForMessage, describeCkanError, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
-import { assertValid, blankProblem, countProblem, facetLimitProblem } from "./validate.js";
+import {
+  assertValid,
+  blankProblem,
+  countProblem,
+  facetLimitProblem,
+  queryValueProblem,
+  textListProblem,
+  textProblem,
+} from "./validate.js";
 import type {
   CkanEnvelope,
   Group,
@@ -50,15 +58,34 @@ function entryKey(entry: JsonValue): string {
  * filter such as `tagList({ query: "" })` would silently return everything.
  */
 function prune(params: QueryParams): QueryParams {
+  assertParams(params);
   // A null-prototype object, so a `__proto__` key is kept as a parameter instead
   // of setting the prototype (and being lost).
   const out = Object.create(null) as QueryParams;
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined) continue;
     assertValid("parameter name", k, blankProblem);
-    out[k] = assertValid(k, v, blankProblem);
+    // A value the query string can't carry (an object, NaN, a function) is refused,
+    // not sent as "[object Object]" or "NaN".
+    out[k] = assertValid(k, v, queryValueProblem);
   }
   return out;
+}
+
+/**
+ * A method's parameter object: a plain object (or undefined, for the defaults).
+ * `null`, a string or an array would otherwise fail as a raw TypeError.
+ */
+function assertParams(params: unknown): void {
+  if (params === undefined) return;
+  if (typeof params !== "object" || params === null || Array.isArray(params)) {
+    throw new CkanValidationError("Invalid params: Expected an object.");
+  }
+}
+
+/** Check an optional text parameter (`q`, `sort`, a tag query): a non-blank string. */
+function assertText(name: string, value: unknown): void {
+  if (value !== undefined) assertValid(name, value, textProblem);
 }
 
 /** A JSON object (not null, not an array). */
@@ -125,8 +152,8 @@ export class CkanClient {
 
   /** Call any CKAN action by name and return its unwrapped `result`. */
   async action<T = JsonValue>(name: string, params: QueryParams = {}): Promise<T> {
-    if (!ACTION_NAME.test(name)) {
-      throw new CkanError(`Invalid CKAN action name: "${name}"`);
+    if (typeof name !== "string" || !ACTION_NAME.test(name)) {
+      throw new CkanValidationError(`Invalid CKAN action name: "${cutForMessage(typeof name === "string" ? name : String(name))}"`);
     }
     const env = await this.#engine.getJson<CkanEnvelope<T> | null>(`${ACTION}/${name}`, prune(params));
     // Another JSON API at the same path (or a proxy's JSON error page) is not an
@@ -140,7 +167,7 @@ export class CkanClient {
       // A success:false envelope can come with HTTP 200, so it never passes the
       // engine's error-detail sanitising: strip terminal controls here too.
       throw new CkanError(
-        `CKAN action "${name}" failed: ${sanitizeServerText(this.#engine.scrub(describeCkanError(env.error)))}`,
+        `CKAN action "${name}" failed: ${cutForMessage(sanitizeServerText(this.#engine.scrub(describeCkanError(env.error))))}`,
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
@@ -182,10 +209,11 @@ export class CkanClient {
    * refused (CkanValidationError), never sent or dropped.
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
-    assertValid("q", params.q, blankProblem);
-    assertValid("fq", params.fq, blankProblem);
-    assertValid("sort", params.sort, blankProblem);
-    assertValid("facet_field", params.facet_field, blankProblem);
+    assertParams(params);
+    assertText("q", params.q);
+    if (params.fq !== undefined) assertValid("fq", params.fq, textListProblem);
+    assertText("sort", params.sort);
+    if (params.facet_field !== undefined) assertValid("facet_field", params.facet_field, textListProblem);
     assertCount("rows", params.rows);
     assertCount("start", params.start);
     if (params.facet_limit !== undefined) assertValid("facet_limit", params.facet_limit, facetLimitProblem);
@@ -225,6 +253,7 @@ export class CkanClient {
 
   /** Dataset names, paged with limit/offset (a positive limit, omit it for all; a non-negative offset). */
   async packageList(params: ListParams = {}): Promise<string[]> {
+    assertParams(params);
     assertLimit(params.limit);
     assertCount("offset", params.offset);
     return this.typed<string[]>(
@@ -249,7 +278,9 @@ export class CkanClient {
   }
 
   /** Tags, optionally only those containing a substring (a blank one is refused). */
-  tagList(params: TagListParams = {}): Promise<string[]> {
+  async tagList(params: TagListParams = {}): Promise<string[]> {
+    assertParams(params);
+    assertText("query", params.query);
     return this.typed<string[]>("tag_list", { query: params.query }, Array.isArray, "an array");
   }
 
@@ -271,6 +302,10 @@ export class CkanClient {
    * that ignores `offset` cannot keep it going.
    */
   private async groupOrOrgList(action: string, params: GroupListParams): Promise<JsonValue[]> {
+    assertParams(params);
+    if (params.all_fields !== undefined && typeof params.all_fields !== "boolean") {
+      throw new CkanValidationError("Invalid all_fields: Expected a boolean.");
+    }
     assertLimit(params.limit);
     // Before the first request, and before the all_fields pager steps on from it.
     assertCount("offset", params.offset);
@@ -316,7 +351,7 @@ export class CkanClient {
    * CKAN would answer with a 409 validation error instead.
    */
   private async show<T>(action: string, id: string): Promise<T> {
-    if (id.trim() === "") throw new CkanError(`${action} needs an id or name.`);
+    if (typeof id !== "string" || id.trim() === "") throw new CkanValidationError(`${action} needs an id or name.`);
     return this.typed<T>(action, { id }, isObject, "a JSON object");
   }
 }

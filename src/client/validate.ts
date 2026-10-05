@@ -36,6 +36,36 @@ export function blankProblem(value: unknown): string | undefined {
   return undefined;
 }
 
+/** A non-blank string (an id, a query, a sort expression); anything else is refused. */
+export function textProblem(value: unknown): string | undefined {
+  if (typeof value !== "string") return "Expected a string.";
+  return blankProblem(value);
+}
+
+/** A list of non-blank strings (filter queries, facet fields). */
+export function textListProblem(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return "Expected a list of strings.";
+  if (value.some((v) => typeof v !== "string")) return "Expected a list of strings.";
+  return blankProblem(value);
+}
+
+/**
+ * A value the query-string builder can send: a string, a finite number, a boolean
+ * or a Date, or a list of them (`null`/`undefined` mean "not given"). An object, a
+ * function or `NaN` would go out as `[object Object]` or `NaN`.
+ */
+export function queryValueProblem(value: unknown): string | undefined {
+  const ok = (v: unknown): boolean =>
+    v === null ||
+    v === undefined ||
+    typeof v === "string" ||
+    typeof v === "boolean" ||
+    (typeof v === "number" && Number.isFinite(v)) ||
+    (v instanceof Date && !Number.isNaN(v.getTime()));
+  if (Array.isArray(value) ? value.every(ok) : ok(value)) return blankProblem(value);
+  return "Expected a string, a finite number, a boolean or a Date (or a list of them).";
+}
+
 /**
  * A count or offset (`rows`, `start`, `offset`): a non-negative safe integer.
  * A negative, fractional or non-finite value would go upstream as given, and
@@ -71,6 +101,7 @@ export function intRangeProblem(min: number, max: number): Problem<number> {
  * so the source stays free of control bytes.
  */
 export function headerValueProblem(value: string): string | undefined {
+  if (typeof value !== "string") return "Expected a string.";
   const blank = blankProblem(value);
   if (blank !== undefined) return blank;
   for (let i = 0; i < value.length; i++) {
@@ -100,6 +131,7 @@ export function headerValueProblem(value: string): string | undefined {
  * reasons never quote the value, so a credential in it cannot leak through them.
  */
 export function baseUrlProblem(value: string): string | undefined {
+  if (typeof value !== "string") return "Expected a string with an absolute http(s) URL.";
   if (isBlank(value)) return "Expected an absolute http(s) URL.";
   if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
   for (const ch of value) {

@@ -3,7 +3,7 @@
 
 import { CkanClient, siteRoot } from "./client.js";
 import type { EngineOptions } from "./engine.js";
-import { CkanApiError, CkanNetworkError, CkanParseError } from "./errors.js";
+import { CkanApiError, CkanNetworkError, CkanParseError, CkanValidationError } from "./errors.js";
 import { PORTALS } from "./portals-list.js";
 import type { Portal } from "./types.js";
 import { assertValid, intRangeProblem } from "./validate.js";
@@ -22,6 +22,8 @@ export function portalKey(url: string): string {
 
 /** A portal from `list` by its id (any case) or by any form of its URL. */
 export function findPortal(idOrUrl: string, list: readonly Portal[]): Portal | undefined {
+  if (typeof idOrUrl !== "string") throw new CkanValidationError("Invalid portal: Expected a string.");
+  if (!Array.isArray(list)) throw new CkanValidationError("Invalid portal list: Expected an array.");
   const wanted = idOrUrl.trim().toLowerCase();
   const byId = list.find((p) => p.id.toLowerCase() === wanted);
   if (byId) return byId;
@@ -31,7 +33,13 @@ export function findPortal(idOrUrl: string, list: readonly Portal[]): Portal | u
   } catch {
     return undefined; // not a URL either
   }
-  return list.find((p) => portalKey(p.url) === key);
+  return list.find((p) => {
+    try {
+      return portalKey(p.url) === key;
+    } catch {
+      return false; // an entry without a usable url matches nothing
+    }
+  });
 }
 
 /** The outcome of `checkPortal`. */
@@ -176,6 +184,7 @@ const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTim
  * CkanValidationError for a bad `concurrency` or `retryDelayMs`, before any request.
  */
 export async function checkPortalUrls(urls: readonly string[], options: CheckPortalsOptions = {}): Promise<PortalCheck[]> {
+  if (!Array.isArray(urls)) throw new CkanValidationError("Invalid urls: Expected an array.");
   const concurrency = assertValid(
     "concurrency",
     options.concurrency ?? DEFAULT_CHECK_CONCURRENCY,
@@ -208,6 +217,7 @@ export async function checkPortals(
   portals: readonly Portal[] = PORTALS,
   options: CheckPortalsOptions & { date?: string } = {},
 ): Promise<Portal[]> {
+  if (!Array.isArray(portals)) throw new CkanValidationError("Invalid portals: Expected an array.");
   const date = options.date ?? new Date().toISOString().slice(0, 10);
   const checks = await checkPortalUrls(portals.map((p) => p.url), options);
   return portals.map((portal, i) => withCheck(portal, checks[i]!, date));

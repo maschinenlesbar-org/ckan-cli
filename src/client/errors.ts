@@ -66,6 +66,18 @@ export function redactCredentials(text: string, credentials: readonly string[]):
   return out;
 }
 
+/**
+ * Longest URL or server text (in characters) an error message shows. A long search
+ * query or a 200 kB error page would otherwise put one huge line on stderr or in a CI
+ * log. The error's `url`, `detail` and `body` properties keep the full value.
+ */
+export const MAX_MESSAGE_VALUE_LENGTH = 500;
+
+/** `text` cut to MAX_MESSAGE_VALUE_LENGTH characters, ending in "…" when cut. */
+export function cutForMessage(text: string): string {
+  return text.length > MAX_MESSAGE_VALUE_LENGTH ? `${text.slice(0, MAX_MESSAGE_VALUE_LENGTH)}…` : text;
+}
+
 /** Base class for every error originating from this client. */
 export class CkanError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -106,7 +118,7 @@ export class CkanApiError extends CkanError {
     // The URL is shown without userinfo: a credential in --base-url must not leak.
     const url = redactUrl(args.url);
     const parts: string[] = [];
-    if (args.detail) parts.push(args.detail);
+    if (args.detail) parts.push(cutForMessage(args.detail));
     if (args.retryAfterMs !== undefined) {
       // Say why the retries the caller asked for never ran: the server asked for a
       // wait longer than the engine sleeps, and retrying earlier would land inside it.
@@ -119,7 +131,7 @@ export class CkanApiError extends CkanError {
     // Say that the status persisted through retries, so a user knows whether raising
     // --max-retries could help.
     const retryPart = retries > 0 ? ` (after ${retries} ${retries === 1 ? "retry" : "retries"})` : "";
-    super(`HTTP ${args.status} for ${args.method} ${url}${detailPart}${retryPart}`);
+    super(`HTTP ${args.status} for ${args.method} ${cutForMessage(url)}${detailPart}${retryPart}`);
     this.status = args.status;
     this.url = url;
     this.method = args.method;
