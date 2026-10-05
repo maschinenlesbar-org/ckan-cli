@@ -28,7 +28,7 @@ This skill drives the `ckan` command. **Before anything else, validate it is ava
 
 This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
-Data comes from the `ckan` CLI over the open CKAN Action API of the chosen portal. It is read-only and needs **no API key**. Always pass `--compact` so each result is one line to pipe into `jq`. Without a portal flag, `ckan` talks to the **Hamburg Transparenzportal**; `--portal <id>` picks a known portal (`ckan portals` lists them), `--base-url <url>` any other CKAN site. A search that matches nothing returns `{"count":0,…}` and exits `0` — that is an answer, not an error. Exit `4` is an HTTP 404: after a `package`, `resource`, `organization` or `group` lookup most likely an id that doesn't exist, but after `search`, `status` or a list command it means no CKAN answers at this URL (a wrong `--base-url`, or a portal that left CKAN) — never read it as "nothing there". Exit `1` is a real error, and its message says which (a Solr syntax error, an HTML page instead of a CKAN, a redirect loop). Add `--timeout 60000` for a slow portal.
+Data comes from the `ckan` CLI over the open CKAN Action API of the chosen portal. It is read-only and needs **no API key**. Always pass `--compact` so each result is one line to pipe into `jq`. Without a portal flag, `ckan` talks to the **Hamburg Transparenzportal**; `--portal <id>` picks a known portal (`ckan portals` lists them), `--base-url <url>` any other CKAN site. A search that matches nothing returns `{"count":0,…}` and exits `0` — that is an answer, not an error. Exit `4` is an HTTP 404: after a `package`, `resource`, `organization` or `group` lookup most likely an id that doesn't exist, but after `search`, `status` or a list command it means no CKAN answers at this URL (a wrong `--base-url`, or a portal that left CKAN) — never read it as "nothing there". Exit `1` is a real error, and its message says which (a Solr syntax error, an HTML page instead of a CKAN, a redirect loop). `--timeout` bounds each request, not the whole command (retries and their waits come on top); add `--timeout 60000` for a slow portal.
 
 ## Step 1 — One facet query answers most questions
 
@@ -96,7 +96,9 @@ Use `metadata_created` / `metadata_modified`. Fields from `extras` (e.g. Hamburg
   **ckan-dataset-finder**). GovData harvests most Länder portals, so it overlaps them —
   never add it to a sum.
 - Publisher sizes: `ckan --compact --portal <id> organizations --all-fields` returns every
-  organization with its `package_count` (the CLI pages past CKAN's cap of 25).
+  organization with its `package_count` (the CLI pages past CKAN's cap of 25). A server
+  whose pages never end is stopped after 400 pages with exit 1 — report that as a broken
+  portal, not as its publisher count.
 
 ## Step 6 — Report
 
