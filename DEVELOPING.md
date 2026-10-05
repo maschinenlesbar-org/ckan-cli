@@ -228,6 +228,12 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   until an empty page, stepping by the number of entries returned (safe with a lower
   cap), dedupes by `id`, and stops when a page adds nothing (a server that ignores
   `offset`). A page can be short without being the last: Berlin hides entries.
+  The pager is bounded: pages are `ALL_FIELDS_PAGE_DELAY_MS` (100 ms) apart, and after
+  `MAX_ALL_FIELDS_PAGES` (400 pages, 10,000 entries at 25) without an end it throws
+  `CkanParseError` `<action> with all_fields: stopped after 400 pages
+  (MAX_ALL_FIELDS_PAGES) …`. A server whose pages keep returning new ids (or id-less
+  entries with a changing field, which defeat the duplicate check) once got ~6,000
+  requests a second until the process was killed. Both constants are exported.
 - **Readable failures.** A non-JSON answer names the URL and the content type
   (`Expected JSON from … but got text/html`); JSON that is not a CKAN envelope says so;
   a Solr syntax error is cut down to Solr's `[Reason: …]`; a redirect loop (Bonn and

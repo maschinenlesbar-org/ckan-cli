@@ -12,7 +12,8 @@ function ckan(result: unknown) {
 }
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>, baseUrl?: string): CkanClient {
-  return new CkanClient({ transport: mt.transport, ...(baseUrl ? { baseUrl } : {}) });
+  // No real pause between all_fields pages (ALL_FIELDS_PAGE_DELAY_MS) in unit tests.
+  return new CkanClient({ transport: mt.transport, sleep: async () => {}, ...(baseUrl ? { baseUrl } : {}) });
 }
 
 test("action calls /api/3/action/<name> and unwraps result", async () => {
@@ -312,6 +313,42 @@ test("all_fields paging stops when a server ignores offset", async () => {
   const res = await clientWith(mt).organizationList({ all_fields: true });
   assert.equal(res.length, 2);
   assert.equal(mt.calls.length, 2);
+});
+
+test("all_fields paging is bounded and paced against a server whose pages never end (result 03 Bug 1)", async () => {
+  const { MAX_ALL_FIELDS_PAGES, ALL_FIELDS_PAGE_DELAY_MS } = await import("../src/client/client.js");
+  // Every page holds 25 entries not seen before: new ids, or id-less entries with a
+  // volatile field (which defeats the duplicate check).
+  const shapes: Array<(n: number, i: number) => unknown> = [
+    (n, i) => ({ id: `id-${n}-${i}`, name: `org-${n}-${i}` }),
+    (n, i) => ({ name: "same", modified: `${n}.${i}` }),
+  ];
+  for (const shape of shapes) {
+    let n = 0;
+    const mt = makeMockTransport(() => {
+      n += 1;
+      return jsonResponse(ckan(Array.from({ length: 25 }, (_, i) => shape(n, i))));
+    });
+    const sleeps: number[] = [];
+    const client = new CkanClient({ transport: mt.transport, sleep: async (ms) => void sleeps.push(ms) });
+    await assert.rejects(
+      client.organizationList({ all_fields: true }),
+      (err: unknown) =>
+        err instanceof CkanParseError &&
+        /stopped after 400 pages \(MAX_ALL_FIELDS_PAGES\)/.test(err.message) &&
+        /--limit/.test(err.message),
+    );
+    assert.equal(mt.calls.length, MAX_ALL_FIELDS_PAGES);
+    assert.equal(sleeps.length, MAX_ALL_FIELDS_PAGES - 1, "a pause between every two pages");
+    assert.ok(sleeps.every((ms) => ms === ALL_FIELDS_PAGE_DELAY_MS && ms >= 100));
+  }
+  // With a limit the same server is paged only as far as needed.
+  const mt = makeMockTransport((req) =>
+    jsonResponse(ckan(Array.from({ length: 25 }, (_, i) => ({ id: `${req.url}-${i}` })))),
+  );
+  const res = await clientWith(mt).groupList({ all_fields: true, limit: 100 });
+  assert.equal(res.length, 100);
+  assert.equal(mt.calls.length, 4);
 });
 
 test("a base URL with a query string or fragment is refused", () => {

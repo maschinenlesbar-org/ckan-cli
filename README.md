@@ -171,7 +171,9 @@ action <name> [--param key=value …]    call any CKAN action (generic)
 
 > **`--all-fields` lists are complete.** CKAN caps them at 25 entries
 > (`ckan.group_and_organization_list_all_fields_max`) and drops the rest
-> silently, even for a larger `--limit`; `ckan` pages through them for you.
+> silently, even for a larger `--limit`; `ckan` pages through them for you,
+> 0.1 s apart. A server whose pages never end is stopped after 400 pages
+> (10,000 entries, far more than any portal lists) with an error (exit 1).
 | `tags` | `--query <substring>` |
 
 ### `action`

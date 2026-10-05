@@ -142,7 +142,10 @@ compared as text and returns nonsense.
 whole list. `offset` is a non-negative integer.
 
 **`all_fields`.** On `organizations` / `groups`, return full objects instead of names. CKAN
-caps such a list at 25 entries without saying so; the client pages past the cap.
+caps such a list at 25 entries without saying so; the client pages past the cap, 0.1 s
+between pages, and gives up with an error after 400 pages (10,000 entries,
+`MAX_ALL_FIELDS_PAGES`) — far more than any CKAN portal lists, so only a broken server whose
+pages never end reaches it. `--limit` fetches part of a list.
 
 **Blank value.** An empty or whitespace-only filter, query, sort, facet field, parameter or id
 is refused before any request, never a silently unfiltered search: a usage error in the CLI,

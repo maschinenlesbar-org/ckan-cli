@@ -1,6 +1,6 @@
 // Public entry point for the API client library.
 
-export { CkanClient, siteRoot } from "./client.js";
+export { ALL_FIELDS_PAGE_DELAY_MS, CkanClient, MAX_ALL_FIELDS_PAGES, siteRoot } from "./client.js";
 export {
   RequestEngine,
   DEFAULT_BASE_URL,

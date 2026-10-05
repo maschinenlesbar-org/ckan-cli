@@ -88,7 +88,8 @@ ckan tags --query Alster
 ```
 
 `--all-fields` lists are complete: CKAN caps them at 25 entries, and the client pages past
-that.
+that (0.1 s between pages; a server whose pages never end is stopped after 400 pages with an
+error, exit 1).
 
 ### 8. Another portal
 

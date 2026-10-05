@@ -42,6 +42,23 @@ const ACTION_NAME = /^[a-z0-9_]+$/;
 /** CKAN's default cap on an `all_fields` organization/group list. */
 const ALL_FIELDS_PAGE = 25;
 
+/**
+ * Most pages one `all_fields` list call requests (10,000 entries at CKAN's page size
+ * of 25). Real CKAN portals list a few hundred organizations or groups at most; a
+ * server whose pages keep returning new entries (a broken or hostile one) would
+ * otherwise be paged forever. Past it the call fails with a CkanParseError naming it.
+ */
+export const MAX_ALL_FIELDS_PAGES = 400;
+
+/**
+ * Pause between two `all_fields` pages, in milliseconds. A long list costs a few
+ * tenths of a second more; a server that never ends the list gets 10 requests a
+ * second at most instead of thousands.
+ */
+export const ALL_FIELDS_PAGE_DELAY_MS = 100;
+
+const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** A key for a list entry — its `id`, else its JSON — to drop duplicates across pages. */
 function entryKey(entry: JsonValue): string {
   if (typeof entry === "object" && entry !== null && !Array.isArray(entry)) {
@@ -166,10 +183,14 @@ export class CkanClient {
   readonly #engine: RequestEngine;
   /** The site this client talks to, for error messages (always through redactUrl). */
   readonly #site: string;
+  /** The pause between `all_fields` pages (EngineOptions.sleep, for tests). */
+  readonly #sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
     this.#site = siteRoot(options.baseUrl ?? DEFAULT_BASE_URL);
+    // The engine checks every option, `sleep` included, before the client uses it.
     this.#engine = new RequestEngine({ ...options, baseUrl: this.#site });
+    this.#sleep = options.sleep ?? realSleep;
   }
 
   /** Call any CKAN action by name and return its unwrapped `result`. */
@@ -325,6 +346,10 @@ export class CkanClient {
    * some entries), so only an empty page ends the list. Entries are deduplicated
    * (by `id`), and a page that adds nothing new ends the loop too, so a server
    * that ignores `offset` cannot keep it going.
+   *
+   * Bounds: pages are `ALL_FIELDS_PAGE_DELAY_MS` apart, and after
+   * `MAX_ALL_FIELDS_PAGES` pages without reaching the end (a server whose pages
+   * keep returning new entries) the call fails with a CkanParseError.
    */
   private async groupOrOrgList(action: string, params: GroupListParams): Promise<JsonValue[]> {
     assertParams(params);
@@ -347,17 +372,28 @@ export class CkanClient {
     let offset = params.offset ?? 0;
     const seen = new Set<string>();
     const out: JsonValue[] = [];
+    let pages = 0;
     while (out.length < wanted) {
+      if (pages >= MAX_ALL_FIELDS_PAGES) {
+        throw new CkanParseError(
+          `${action} with all_fields: stopped after ${MAX_ALL_FIELDS_PAGES} pages (MAX_ALL_FIELDS_PAGES) without ` +
+            `reaching the end of the list; the server keeps returning new entries, which no CKAN list has. ` +
+            `Pass a limit (--limit) to fetch part of it.`,
+        );
+      }
+      if (pages > 0) await this.#sleep(ALL_FIELDS_PAGE_DELAY_MS);
+      const limit = Math.min(ALL_FIELDS_PAGE, wanted - out.length);
       const page = await this.typed<JsonValue[]>(
         action,
         {
           all_fields: true,
-          limit: Math.min(ALL_FIELDS_PAGE, wanted - out.length),
+          limit,
           offset: offset === 0 ? undefined : offset,
         },
         Array.isArray,
         "an array",
       );
+      pages += 1;
       let added = 0;
       for (const entry of page) {
         const key = entryKey(entry);

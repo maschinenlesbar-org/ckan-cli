@@ -153,7 +153,10 @@ die ganze Liste `--limit` einfach weglassen. `offset` ist eine nicht negative ga
 
 **`all_fields`.** Bei `organizations` / `groups` vollständige Objekte statt Namen. CKAN
 begrenzt eine solche Liste stillschweigend auf 25 Einträge; der Client blättert über diese
-Grenze hinweg.
+Grenze hinweg, mit 0,1 s Pause zwischen den Seiten, und bricht nach 400 Seiten (10.000
+Einträge, `MAX_ALL_FIELDS_PAGES`) mit einem Fehler ab — weit mehr, als ein CKAN-Portal
+listet; das erreicht nur ein fehlerhafter Server, dessen Seiten nie enden. `--limit` holt
+einen Teil der Liste.
 
 **Leerer Wert.** Ein leerer oder nur aus Leerzeichen bestehender Filter, Suchbegriff,
 Sortierausdruck, Facettenname, Parameter oder eine leere ID wird vor jeder Anfrage abgelehnt,
