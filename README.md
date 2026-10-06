@@ -24,7 +24,7 @@ search, inspect, filter and pipe straight into [`jq`](https://jqlang.github.io/j
   `status`, `portals`, and a generic `action` escape hatch for everything else.
 
 > Want to use this as a TypeScript library or understand how it's built?
-> See **[DEVELOPING.md](DEVELOPING.md)**.
+> See **[DEVELOPING.md](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/DEVELOPING.md)**.
 
 ## Install
 
@@ -114,7 +114,7 @@ The list is built into the CLI, so it needs no outside service:
 
 Counts as of the last check, 2026-09-19. The list is refreshed from Wikidata,
 the CKAN project's instance registry and GovData's harvest sources, keeping only
-portals that pass a live check (see [DEVELOPING.md](DEVELOPING.md#the-portal-list)).
+portals that pass a live check (see [DEVELOPING.md](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/DEVELOPING.md#the-portal-list)).
 Many portals those lists name have left CKAN (Köln, Düsseldorf, Bonn, …).
 
 ## Commands
@@ -197,7 +197,7 @@ before any request is sent.
   matches nothing, and a full word such as `verwaltungsvorschriften` over-matches.
   List the values that work, with their counts:
   `ckan --compact search --rows 0 --facet extras_registerobject_type --facet-limit -1`.
-  The [Glossary](GLOSSARY.md) has the details.
+  The [Glossary](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/GLOSSARY.md) has the details.
 - **Several filters work.** Hamburg's API page says only one filter can be
   used; with `fq_list` (repeat `--fq`) they combine:
   `ckan search --fq extras_registerobject_type:verwaltungsvorschrift --fq organization:workflows`.
@@ -286,7 +286,7 @@ when it carries a `user:password@` (never printed). stdout and the exit code are
 
 ## Claude Code skills
 
-Three [Agent Skills](SKILLS.md) teach Claude Code to use `ckan` for real questions: find
+Three [Agent Skills](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/SKILLS.md) teach Claude Code to use `ckan` for real questions: find
 which portals have data on a topic and rank the hits (**ckan-dataset-finder**), build
 publisher/format/licence statistics (**ckan-catalogue-stats**), and search the Hamburg
 Transparenzportal's contracts, Gutachten and Senate papers
@@ -297,7 +297,7 @@ Transparenzportal's contracts, Gutachten and Senate papers
 /plugin install ckan@maschinenlesbar
 ```
 
-Real runs of each skill are in [EXAMPLE.md](EXAMPLE.md).
+Real runs of each skill are in [EXAMPLE.md](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/EXAMPLE.md).
 
 ## Data license
 

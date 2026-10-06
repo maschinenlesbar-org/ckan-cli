@@ -343,7 +343,9 @@ node --test dist/test/client.test.js   # one file, after a build
   expected `result` shape is a `CkanParseError`; a wrong-typed input is a
   `CkanValidationError`), P10 (unknown parameter keys and repeated single-value
   options are refused; from govdata-cli), P20 (a plain-`http:` base URL draws one stderr
-  warning naming the host; the other-secret case is skipped: the CLI sends no API token).
+  warning naming the host; the other-secret case is skipped: the CLI sends no API token),
+  P21 (the README's relative links: README.md ships to npmjs.com, so a link to a document
+  the `files` allowlist leaves out must be an absolute GitHub URL).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
