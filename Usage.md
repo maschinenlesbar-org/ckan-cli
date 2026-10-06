@@ -126,6 +126,13 @@ ckan action help_show --param name=package_search
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`; each backs off linearly, or waits the server's `Retry-After` when that is longer, up to 30 s — a longer one is not retried and the error names it) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
+A base URL on plain `http:` (from `--base-url` or `CKAN_BASE_URL`) to a host other than
+loopback (`localhost`, `127.0.0.0/8`, `::1`) works, but the CLI writes one line to stderr
+before the first request, e.g.
+`warning: requests to ckan.example are sent unencrypted (http:, not https:)`, or
+`warning: the base URL's credentials are sent unencrypted to ckan.example (http:, not https:)`
+when it carries a `user:password@` (never printed). stdout and the exit code are unchanged.
+
 Blank values (`search ""`, `--fq ""`, an empty id, `--param q=`) are usage errors, never an unfiltered
 search. So is a single-value option given twice (`--rows 5 --rows 50`, a second `--base-url`):
 only `--fq`, `--facet` and `--param` repeat. Exit codes: `0` success, `4` not found (HTTP 404: an unknown id, or no CKAN at this URL), `1`

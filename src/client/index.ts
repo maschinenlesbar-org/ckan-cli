@@ -10,6 +10,7 @@ export {
   MAX_RETRY_AFTER_MS,
   parseRetryAfter,
   validateBaseUrl,
+  cleartextProblem,
 } from "./engine.js";
 export type { EngineOptions, RawResponse } from "./engine.js";
 export { MAX_TIMEOUT_MS, nodeHttpTransport } from "./http.js";

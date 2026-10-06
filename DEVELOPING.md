@@ -290,6 +290,15 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   follow redirects itself, and a response whose `HttpResponse.url` lies on another
   origin is rejected as a `CkanNetworkError`. Messages show the request URL without
   the userinfo.
+- **Plain `http:` gets a warning, not a refusal.** `cleartextProblem(baseUrl, secrets)`
+  (engine, exported) returns one sentence naming the host (`url.host`, never the
+  userinfo) and what travels unencrypted — the base URL's credentials when it carries
+  userinfo — or `undefined` for `https:`, an unparseable URL and loopback hosts
+  (`localhost`, `127.0.0.0/8`, `::1`). The CLI's `action()` wrapper (`shared.ts`,
+  `warnOnCleartext`) prints it once per run as `warning: <sentence>` on stderr for the
+  effective base URL (`--portal` > `--base-url` > `CKAN_BASE_URL` > default), after the
+  options are parsed and before the first request; `--help`, `--version`, usage errors and
+  `portals` (the built-in https list) never get there.
 - **Credentials in logged objects.** The client and the engine keep the base URL in
   real `#private` fields, so `console.log(client)`, `util.inspect` and
   `JSON.stringify` never show its password. The engine scrubs the base URL's
@@ -333,7 +342,8 @@ node --test dist/test/client.test.js   # one file, after a build
   (a declared charset is honoured; a 2xx body that is not a CKAN envelope with the
   expected `result` shape is a `CkanParseError`; a wrong-typed input is a
   `CkanValidationError`), P10 (unknown parameter keys and repeated single-value
-  options are refused; from govdata-cli).
+  options are refused; from govdata-cli), P20 (a plain-`http:` base URL draws one stderr
+  warning naming the host; the other-secret case is skipped: the CLI sends no API token).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:

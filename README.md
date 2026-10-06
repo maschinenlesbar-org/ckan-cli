@@ -277,6 +277,13 @@ CKAN's error text is shown on stderr, e.g.
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`). Each retry backs off linearly (0.2 s, 0.4 s, …) or waits the server's `Retry-After` when that is longer, up to 30 s; a longer one is not retried, and the error names the wait. A reset or other network error is not retried |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
+A base URL on plain `http:` (from `--base-url` or `CKAN_BASE_URL`) to a host other than
+loopback (`localhost`, `127.0.0.0/8`, `::1`) works, but the CLI writes one line to stderr
+before the first request, e.g.
+`warning: requests to ckan.example are sent unencrypted (http:, not https:)`, or
+`warning: the base URL's credentials are sent unencrypted to ckan.example (http:, not https:)`
+when it carries a `user:password@` (never printed). stdout and the exit code are unchanged.
+
 ## Claude Code skills
 
 Three [Agent Skills](SKILLS.md) teach Claude Code to use `ckan` for real questions: find
