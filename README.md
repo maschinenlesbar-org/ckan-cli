@@ -216,6 +216,9 @@ Found by running the same commands against many portals:
 - **The default sort differs** (ZBW sorts by `metadata_created desc`).
 - **Field types vary**: licence ids are URIs on GovData, and some portals send
   booleans as the strings `"True"`/`"False"`.
+- **A purely negative query matches nothing**: `ckan search -- -elbe` answers
+  `count: 0` on Hamburg rather than "everything but elbe". Negate a filter instead
+  (`--fq -organization:allris`), next to a positive query or none.
 - **Solr syntax errors** come back as HTTP 409; `ckan` prints Solr's own reason,
   e.g. `Search Error: Cannot parse 'title:(': Encountered "<EOF>" …`.
 - **A site that is not (or no longer) a CKAN** answers with a 404, an HTML page or
