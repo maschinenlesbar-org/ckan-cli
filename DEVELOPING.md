@@ -181,7 +181,11 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   An unusable action name and a blank `*_show` id are `CkanValidationError`s too.
   Messages show at most 500 characters of a URL or of server text
   (`MAX_MESSAGE_VALUE_LENGTH`, `cutForMessage`), never cut inside a surrogate pair
-  (`cutText`), so a message stays well-formed; the error's `url`, `detail` and
+  (`cutText`), so a message stays well-formed. Every other value an own message quotes
+  from a server answer or the user's input (a redirect target, a charset or Content-Type,
+  an action name, a scheme, a `--param` or `--portal` value, an unknown command) is cut
+  there too, so `err.message` stays bounded for a library caller (a typed value after its
+  userinfo is redacted, so a cut never leaves part of a password); the error's `url`, `detail` and
   `body` keep the full value.
 - **Base URL.** `--base-url` or `--portal` (they conflict) > `CKAN_BASE_URL` > the
   Hamburg default (an empty `CKAN_BASE_URL` counts as unset; in the library only
@@ -444,8 +448,9 @@ the message (text) or the whole JSON object (jsonl), which writes CR and LF as `
 every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
 controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
 forge another one or steer the terminal. Before that a lone surrogate (half a
-character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`).
-The areas are `cli` (usage errors, commander's messages and the help it shows
+character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
+and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
+code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, unexpected errors, an answer that is not a CKAN envelope), `api` (the portal's
 error answers) and `http` (the connection, the cleartext warning). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the

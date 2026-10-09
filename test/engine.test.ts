@@ -501,3 +501,30 @@ test("a server message cut at 500 characters keeps the message well-formed (erro
     }
   }
 });
+
+test("a charset, a content type, a redirect target and an action name are quoted at most 500 characters long (L3)", async () => {
+  const x = "x".repeat(5000);
+  const answers: HttpResponse[] = [
+    { status: 200, headers: { "content-type": `application/json; charset=${x}` }, body: Buffer.from("{}") },
+    { status: 200, headers: { "content-type": `text/${x}` }, body: Buffer.from("<html>") },
+    { status: 302, headers: { location: `${x}:/elsewhere` }, body: Buffer.from("") },
+    { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from("{}"), url: `https://other.example.test/${x}` },
+  ];
+  for (const answer of answers) {
+    const engine = new RequestEngine({ transport: async () => answer });
+    await assert.rejects(engine.getJson("/api/3/action/status_show"), (err: Error) => {
+      assert.ok(err.message.length < 800, `${err.message.length}: ${err.message.slice(0, 100)}`);
+      assert.match(err.message, /x…/);
+      return true;
+    });
+  }
+  const name = "a".repeat(5000);
+  for (const answer of [jsonResponse({ success: false, error: { message: "denied" } }), jsonResponse({ hello: "world" })]) {
+    const client = new CkanClient({ transport: async () => answer });
+    await assert.rejects(client.action(name), (err: Error) => {
+      assert.ok(err.message.length < 800, `${err.message.length}`);
+      assert.match(err.message, /a…/);
+      return true;
+    });
+  }
+});

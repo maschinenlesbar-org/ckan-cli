@@ -482,7 +482,7 @@ export class RequestEngine {
       if (typeof finalUrl === "string" && finalUrl !== "" && originOf(finalUrl) !== originOf(url)) {
         throw new CkanNetworkError(
           `${method} ${cutForMessage(redactUrl(url))} failed: the transport followed a redirect to another origin ` +
-            `(${sanitizeServerText(redactUrl(this.scrub(finalUrl)))}); a transport must not follow redirects ` +
+            `(${cutForMessage(sanitizeServerText(redactUrl(this.scrub(finalUrl))))}); a transport must not follow redirects ` +
             `(HttpRequest.redirect is "manual").`,
         );
       }
@@ -524,7 +524,7 @@ export class RequestEngine {
         // never reaches a transport (a custom one may not check the scheme).
         if (nextUrl.protocol !== "http:" && nextUrl.protocol !== "https:") {
           throw new CkanNetworkError(
-            `Refusing to follow redirect to unsupported protocol "${sanitizeServerText(nextUrl.protocol)}" ` +
+            `Refusing to follow redirect to unsupported protocol "${cutForMessage(sanitizeServerText(nextUrl.protocol))}" ` +
               `for ${method} ${cutForMessage(redactUrl(url))}`,
           );
         }
@@ -563,7 +563,7 @@ export class RequestEngine {
             target !== undefined
               ? `stopped after ${this.maxRedirects} redirects (a redirect loop?)`
               : location
-                ? `redirect to ${sanitizeServerText(location)} not followed`
+                ? `redirect to ${cutForMessage(sanitizeServerText(location))} not followed`
                 : "redirect not followed (no Location header)";
           throw new CkanApiError({ status, url, method, body: this.scrub(body.toString("utf8")), detail });
         }
@@ -588,7 +588,7 @@ export class RequestEngine {
       // path) typically answers with an HTML page and HTTP 200.
       // The Content-Type is server text (latin-1 decoded, so a 0x9B byte is the
       // 8-bit CSI U+009B): sanitise it before it reaches stderr.
-      const mediaType = sanitizeServerText(res.contentType.split(";")[0]!);
+      const mediaType = cutForMessage(sanitizeServerText(res.contentType.split(";")[0]!));
       const message = /json/i.test(mediaType)
         ? `Invalid JSON from ${cutForMessage(redactUrl(res.url))}`
         : `Expected JSON from ${cutForMessage(redactUrl(res.url))} but got ${mediaType || "a body that is not JSON"}`;
@@ -683,7 +683,7 @@ function decodeBody(body: Buffer, contentType: string, url: string): string {
     decoder = new TextDecoder(charset);
   } catch {
     throw new CkanParseError(
-      `Unsupported response charset "${sanitizeServerText(charset)}" from ${cutForMessage(redactUrl(url))}.`,
+      `Unsupported response charset "${cutForMessage(sanitizeServerText(charset))}" from ${cutForMessage(redactUrl(url))}.`,
     );
   }
   return decoder.decode(body);

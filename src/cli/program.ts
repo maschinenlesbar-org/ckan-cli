@@ -10,7 +10,7 @@ import { defaultIO } from "./io.js";
 import { CkanClient } from "../client/client.js";
 import { DEFAULT_BASE_URL, MAX_RETRIES, MAX_RETRY_AFTER_MS } from "../client/engine.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
-import { redactUrl } from "../client/errors.js";
+import { cutForMessage, redactUrl } from "../client/errors.js";
 import { once, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg, parsePortal } from "./shared.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 import { registerPortalCommands } from "./commands/portal.js";
@@ -100,7 +100,9 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
   program.action(() => {
     const [unknown] = program.args;
     if (unknown !== undefined) {
-      program.error(`error: unknown command '${unknown}'`, { code: "commander.unknownCommand" });
+      // The name is the user's: cut, after its credentials are redacted (a cut could
+      // otherwise leave part of a password without the "@" the redaction keys on).
+      program.error(`error: unknown command '${cutForMessage(redactUrl(unknown))}'`, { code: "commander.unknownCommand" });
     }
     program.help();
   });

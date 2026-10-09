@@ -5,7 +5,7 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
 import { cleartextProblem, DEFAULT_BASE_URL, isBidiControl, type EngineOptions } from "../client/engine.js";
-import { CkanError } from "../client/errors.js";
+import { CkanError, cutForMessage, redactUrl } from "../client/errors.js";
 import { findPortal } from "../client/portals.js";
 import { baseUrlProblem, blankProblem, countProblem, headerValueProblem, intRangeProblem } from "../client/validate.js";
 import { PORTALS } from "../client/portals-list.js";
@@ -112,7 +112,7 @@ export function parseBaseUrl(value: string): string {
 export function parsePortal(value: string): string {
   const portal = findPortal(value, PORTALS);
   if (!portal) {
-    throw new InvalidArgumentError(`Unknown portal "${value}". \`ckan portals\` lists the known ones.`);
+    throw new InvalidArgumentError(`Unknown portal "${cutForMessage(redactUrl(value))}". \`ckan portals\` lists the known ones.`);
   }
   return portal.url;
 }

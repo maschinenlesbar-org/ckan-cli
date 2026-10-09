@@ -7,6 +7,16 @@ import { action, renderJson, toEngineOptions, type GlobalOptions } from "../shar
 import { checkPortals } from "../../client/portals.js";
 import { PORTALS } from "../../client/portals-list.js";
 import { isBlank } from "../../client/validate.js";
+import { cutForMessage, redactUrl } from "../../client/errors.js";
+
+/**
+ * A typed value as a message quotes it: cut at MAX_MESSAGE_VALUE_LENGTH, after its
+ * credentials are redacted (a cut could otherwise leave part of a password without the
+ * "@" the argv redaction keys on).
+ */
+function shown(value: string): string {
+  return cutForMessage(redactUrl(value));
+}
 
 /** commander accumulator for repeatable `key=value` pairs into a record. */
 function collectKeyValue(
@@ -20,18 +30,18 @@ function collectKeyValue(
   const key = value.slice(0, Math.max(eq, 0));
   // A blank key (`=x`, ` =x`) names no parameter: the library refuses it too.
   if (eq < 0 || isBlank(key)) {
-    throw new InvalidArgumentError(`Invalid --param "${value}". Expected key=value.`);
+    throw new InvalidArgumentError(`Invalid --param "${shown(value)}". Expected key=value.`);
   }
   // Reject a duplicated key rather than silently overwriting the earlier value.
   if (Object.prototype.hasOwnProperty.call(previous, key)) {
-    throw new InvalidArgumentError(`Duplicate --param key "${key}".`);
+    throw new InvalidArgumentError(`Duplicate --param key "${shown(key)}".`);
   }
   // A blank value is refused by the library as well (CKAN reads an empty
   // parameter as unset, so `--param q=` would run the action unfiltered); here it
   // is a usage error that names the flag.
   const paramValue = value.slice(eq + 1);
   if (isBlank(paramValue)) {
-    throw new InvalidArgumentError(`Invalid --param "${value}". The value must not be blank.`);
+    throw new InvalidArgumentError(`Invalid --param "${shown(value)}". The value must not be blank.`);
   }
   // A computed key in a literal is an own data property, even for `__proto__`.
   return { ...previous, [key]: paramValue };

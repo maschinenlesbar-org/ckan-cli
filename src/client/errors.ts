@@ -69,7 +69,10 @@ export function redactCredentials(text: string, credentials: readonly string[]):
 /**
  * Longest URL or server text (in characters) an error message shows. A long search
  * query or a 200 kB error page would otherwise put one huge line on stderr or in a CI
- * log. The error's `url`, `detail` and `body` properties keep the full value.
+ * log. The error's `url`, `detail` and `body` properties keep the full value. Every
+ * value an own message quotes from a server answer or the user's input (a redirect
+ * target, a charset, a Content-Type, an action name, a typed option value) is cut at
+ * this length too, so a library caller's `err.message` stays bounded.
  */
 export const MAX_MESSAGE_VALUE_LENGTH = 500;
 

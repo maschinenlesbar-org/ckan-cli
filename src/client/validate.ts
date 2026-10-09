@@ -3,7 +3,7 @@
 // enforce them with `assertValid` before any request; the CLI's value parsers call
 // the same functions, so a rule is written once and the CLI and the library agree.
 
-import { CkanValidationError } from "./errors.js";
+import { CkanValidationError, cutForMessage } from "./errors.js";
 
 /** A rule: the reason `value` is invalid (one sentence), or `undefined` when it is valid. */
 export type Problem<T = unknown> = (value: T) => string | undefined;
@@ -145,7 +145,7 @@ export function baseUrlProblem(value: string): string | undefined {
     return "Expected an absolute http(s) URL.";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
+    return `Unsupported scheme "${cutForMessage(url.protocol)}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "Expected a site URL without a query string or fragment.";
   // The engine decodes the userinfo into the Authorization header; a "%" that isn't an

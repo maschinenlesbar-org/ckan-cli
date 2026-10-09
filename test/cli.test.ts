@@ -567,3 +567,18 @@ test("a line break typed into --portal, an action name or --param never forges a
     assert.ok(lines.some((line) => line.includes("x\\n2026-10-09T00:00:00.000Z ERROR [ckan.api] forged")), lines.join("\n"));
   }
 });
+
+test("the CLI's own usage errors quote a typed value at most 500 characters long (L3)", async () => {
+  // Short enough that commander's own echo leaves room for ckan's quote within the record cap.
+  const long = "x".repeat(3000);
+  for (const argv of [["--portal", long, "status"], [long], ["action", "status_show", "--param", long], ["action", "status_show", "--param", `${long}= `]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1);
+    assert.equal(cli.mt.calls.length, 0);
+    const record = cli.err[0] ?? "";
+    // ckan's own quote is cut; commander's echo of a rejected option value
+    // (`argument '…' is invalid.`) is bounded by the record cap only.
+    assert.match(record, /["']x{500}…["']/, record.slice(0, 200));
+    if (argv[0] === long) assert.ok(record.length < 700, `${record.length}`);
+  }
+});

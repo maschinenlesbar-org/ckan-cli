@@ -203,14 +203,14 @@ export class CkanClient {
     // envelope; say so rather than "failed: undefined".
     if (typeof env !== "object" || env === null || Array.isArray(env) || typeof env.success !== "boolean") {
       throw new CkanParseError(
-        `The answer to "${name}" is not a CKAN Action API response; is ${redactUrl(this.#site)} a CKAN site?`,
+        `The answer to "${cutForMessage(name)}" is not a CKAN Action API response; is ${redactUrl(this.#site)} a CKAN site?`,
       );
     }
     if (!env.success) {
       // A success:false envelope can come with HTTP 200, so it never passes the
       // engine's error-detail sanitising: strip terminal controls here too.
       throw new CkanError(
-        `CKAN action "${name}" failed: ${cutForMessage(sanitizeServerText(this.#engine.scrub(describeCkanError(env.error))))}`,
+        `CKAN action "${cutForMessage(name)}" failed: ${cutForMessage(sanitizeServerText(this.#engine.scrub(describeCkanError(env.error))))}`,
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
