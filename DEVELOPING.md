@@ -467,7 +467,11 @@ after one, unexpected errors, an answer that is not a CKAN envelope), `api` (the
 error answers) and `http` (the connection, the cleartext warning). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
 logger from argv before commander parses it, so commander's own usage errors are records
-too, and with the run's redaction (`withRedactedOutput`), which replaces a secret (a
+too: its `error: …` an ERROR of `cli` (a `(Did you mean …?)` line joined to it; the root
+action's own unknown-command error carries the same hint, `suggestSimilar`), the help it
+shows after one an INFO record per line, and a command group run without its subcommand
+an ERROR "missing command: `ckan <group> <subcommand>`" before that help, so every failed
+run has an ERROR record (`writeCommanderErr`). The log is built with the run's redaction (`withRedactedOutput`), which replaces a secret (a
 password in `--base-url` or `CKAN_BASE_URL`) in the message only, before it is escaped:
 the frame is never touched, and the secret is kept out of the log in either format. `CliDeps.now` makes the
 timestamps testable. stdout carries data only. The one line left raw is the bin shim's
