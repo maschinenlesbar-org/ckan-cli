@@ -607,3 +607,19 @@ test("a base URL without its scheme still carries a credential: --base-url, --po
   assert.equal(await run(["status"], env.deps), 1);
   assert.doesNotMatch([...env.out, ...env.err].join("\n"), /hunter2/);
 });
+
+test("an unknown command suggests the closest known one, as commander does for its own", async () => {
+  const cases: [string[], RegExp][] = [
+    [["statsu"], /unknown command 'statsu'(?:\\n| )\(Did you mean status\?\)/],
+    [["help", "serach"], /unknown command 'serach'(?:\\n| )\(Did you mean search\?\)/],
+    [["packag"], /unknown command 'packag'(?:\\n| )\(Did you mean package\?\)/],
+  ];
+  for (const [argv, expected] of cases) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.match(cli.err.join("\n"), expected, argv.join(" "));
+  }
+  const far = makeCli(() => jsonResponse(ckan({})));
+  await run(["xyzzy"], far.deps);
+  assert.doesNotMatch(far.err.join("\n"), /Did you mean/);
+});
