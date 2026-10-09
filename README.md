@@ -233,7 +233,7 @@ prints one line. Every global option works before or after the command.
 
 Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
 `INFO`) and a topic, the program and the area it comes from (`ckan.cli` for usage
-errors, `ckan.api` for the portal's answers, `ckan.http` for the connection,
+errors, `ckan.api` for the portal's answers, a malformed one included, `ckan.http` for the connection,
 `ckan.output` when stdout can't be written). By default
 it is written log4j style; `--log-format jsonl` writes one JSON object per line instead.
 A record is always one line: a line break, a control character or a bidi control in a

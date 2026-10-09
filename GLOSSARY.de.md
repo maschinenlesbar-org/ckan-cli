@@ -103,6 +103,15 @@ gekürzt.
 **Generische Aktion.** `ckan action <name> --param key=value …` ruft jede lesende Aktion auf,
 auch solche aus Erweiterungen.
 
+**Log-Eintrag (log record).** Jede Diagnosezeile, die die CLI nach stderr schreibt: ein
+Zeitstempel, eine Stufe (`ERROR`, `WARN`, `INFO`) und ein Thema `ckan.<Bereich>`, als Text
+(im Stil von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die
+Bereiche: `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler), `api` (die
+Antworten des Portals: ein Fehlerstatus und eine fehlerhafte Antwort — ungültiges JSON, kein
+JSON, kein CKAN-Umschlag, die falsche Form des Ergebnisses), `http` (die Verbindung, die
+Klartext-Warnung) und `output` (Schreibfehler auf stdout). Ein Eintrag ist immer eine Zeile;
+Steuerzeichen darin werden maskiert.
+
 ---
 
 ## Suchparameter (Solr)

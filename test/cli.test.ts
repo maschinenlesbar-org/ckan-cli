@@ -255,7 +255,7 @@ test("a result of the wrong shape exits 1 with a clear message, not an Unexpecte
   for (const [argv, body, expected] of cases) {
     const cli = makeCli(() => jsonResponse(body));
     assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
-    assert.equal(untimed(cli.err.join("\n")), `ERROR [ckan.cli] Unexpected response shape from ${ACTION}/${expected}`, argv.join(" "));
+    assert.equal(untimed(cli.err.join("\n")), `ERROR [ckan.api] Unexpected response shape from ${ACTION}/${expected}`, argv.join(" "));
   }
   // The generic action passes any result through, null included.
   const generic = makeCli(() => jsonResponse(ckan(null)));
@@ -641,4 +641,24 @@ test("the log format is commander's: in a parse error, before a CKAN_BASE_URL ch
     assert.match(env.err[0] ?? "", /CKAN_BASE_URL/);
     assert.ok(env.err.every((line) => isJsonl(line) === jsonl), `${argv.join(" ")}:\n${env.err.join("\n")}`);
   }
+});
+
+test("a malformed answer is an ERROR record of ckan.api: bad JSON, not JSON, not an envelope, a bad charset (L9)", async () => {
+  const answers: HttpResponse[] = [
+    rawResponse("{not json", "application/json"),
+    rawResponse("<html></html>", "text/html"),
+    jsonResponse({ hello: "world" }),
+    rawResponse("{}", "application/json; charset=x-unknown"),
+  ];
+  for (const answer of answers) {
+    const cli = makeCli(() => answer);
+    assert.equal(await run(["status"], cli.deps), 1);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[ckan\.api\] /, cli.err.join("\n"));
+  }
+  // Printing an answer is not the answer's shape: a response nested too deeply stays cli.
+  let deep: unknown = 1;
+  for (let i = 0; i < 20_000; i++) deep = [deep];
+  const nested = makeCli(() => rawResponse(JSON.stringify(ckan(deep)), "application/json"));
+  assert.equal(await run(["action", "anything"], nested.deps), 1);
+  assert.match(untimed(nested.err.join("\n")), /^ERROR \[ckan\.cli\] The response is nested too deeply/);
 });

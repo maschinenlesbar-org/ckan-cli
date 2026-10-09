@@ -10,6 +10,7 @@ import {
   CkanApiError,
   CkanError,
   CkanNetworkError,
+  CkanParseError,
   CkanValidationError,
   credentialsIn,
   echoedCredentialForms,
@@ -230,6 +231,19 @@ export function processLogger(argv: readonly string[], env: Record<string, strin
   });
 }
 
+/**
+ * The log area of a `CkanError` that is neither an API error nor a usage error: the
+ * connection (`http`), a malformed answer (`api`: bad JSON, not JSON, not a CKAN
+ * envelope, the wrong result shape, an unknown charset — the portal's answer as much as
+ * an error status is), else `cli` (a response nested too deeply to print is about
+ * printing the answer, not its shape).
+ */
+function areaOf(err: CkanError): string {
+  if (err instanceof CkanNetworkError) return "http";
+  if (err instanceof CkanParseError) return "api";
+  return "cli";
+}
+
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {
   // The log replaces the secrets of the run in every message, in either format.
   deps = withRedactedOutput(deps, argv);
@@ -267,7 +281,7 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
       return 1;
     }
     if (err instanceof CkanError) {
-      log.error(err instanceof CkanNetworkError ? "http" : "cli", err.message);
+      log.error(areaOf(err), err.message);
       return 1;
     }
     log.error("cli", `Unexpected error: ${err instanceof Error ? err.message : String(err)}`);

@@ -95,6 +95,14 @@ portals lock it (Berlin answers 403).
 **Generic action.** `ckan action <name> --param key=value …` calls any read action,
 including those added by extensions.
 
+**Log record.** Every diagnostic line the CLI writes to stderr: a timestamp, a level
+(`ERROR`, `WARN`, `INFO`) and a topic `ckan.<area>`, as text (log4j style) or with
+`--log-format jsonl` as one JSON object per line. The areas: `cli` (usage errors,
+commander's messages, unexpected errors), `api` (the portal's answers: an error status,
+and a malformed answer — bad JSON, not JSON, not a CKAN envelope, the wrong result
+shape), `http` (the connection, the cleartext warning) and `output` (stdout failures). A
+record is always one line; control characters in it are escaped.
+
 ---
 
 ## Search parameters (Solr)
