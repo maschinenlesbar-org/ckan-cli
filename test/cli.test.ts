@@ -668,3 +668,14 @@ test("a CKAN error answer on HTTP 200 (success:false) is an ERROR record of ckan
   assert.equal(await run(["status"], cli.deps), 1);
   assert.equal(untimed(cli.err.join("\n")), 'ERROR [ckan.api] CKAN action "status_show" failed: Authorization Error: Access denied');
 });
+
+test("CKAN's Not Found Error sent with HTTP 200 exits 4, like the same error on a 404 (Bug 01-1)", async () => {
+  const notFound = makeCli(() => jsonResponse({ success: false, error: { __type: "Not Found Error", message: "Not found" } }));
+  assert.equal(await run(["package", "no-such-id"], notFound.deps), 4);
+  assert.equal(untimed(notFound.err.join("\n")), 'ERROR [ckan.api] CKAN action "package_show" failed: Not Found Error: Not found');
+  // Any other CKAN error on HTTP 200 stays 1.
+  for (const error of [{ __type: "Authorization Error", message: "Access denied" }, { message: "Not found" }]) {
+    const cli = makeCli(() => jsonResponse({ success: false, error }));
+    assert.equal(await run(["package", "x"], cli.deps), 1, JSON.stringify(error));
+  }
+});

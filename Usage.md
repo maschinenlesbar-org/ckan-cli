@@ -136,5 +136,5 @@ when it carries a `user:password@` (never printed). stdout and the exit code are
 
 Blank values (`search ""`, `--fq ""`, an empty id, `--param q=`) are usage errors, never an unfiltered
 search. So is a single-value option given twice (`--rows 5 --rows 50`, a second `--base-url`):
-only `--fq`, `--facet` and `--param` repeat. Exit codes: `0` success, `4` not found (HTTP 404: an unknown id, or no CKAN at this URL), `1`
+only `--fq`, `--facet` and `--param` repeat. Exit codes: `0` success, `4` not found (HTTP 404, or CKAN's `Not Found Error` with HTTP 200: an unknown id, or no CKAN at this URL), `1`
 anything else.

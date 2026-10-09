@@ -282,6 +282,11 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
       if (err.status === 404) return 4;
       return 1;
     }
+    if (err instanceof CkanActionError) {
+      log.error(areaOf(err), err.message);
+      // CKAN's Not Found Error is a not-found whatever the HTTP status it came with.
+      return err.isNotFound ? 4 : 1;
+    }
     if (err instanceof CkanError) {
       log.error(areaOf(err), err.message);
       return 1;

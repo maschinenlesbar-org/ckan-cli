@@ -226,6 +226,11 @@ export class CkanActionError extends CkanError {
     this.action = args.action;
     this.errorType = args.errorType;
   }
+
+  /** True for CKAN's `Not Found Error`: what a 404 says, sent with HTTP 200. */
+  get isNotFound(): boolean {
+    return this.errorType === "Not Found Error";
+  }
 }
 
 /** A transport-level failure (DNS, connection reset, timeout, ...). */

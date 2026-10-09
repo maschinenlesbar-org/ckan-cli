@@ -438,12 +438,13 @@ test("a success:false envelope is a CkanActionError naming the action and CKAN's
     assert.ok(err instanceof CkanActionError && err instanceof CkanError);
     assert.equal(err.action, "package_show");
     assert.equal(err.errorType, "Not Found Error");
+    assert.equal(err.isNotFound, true);
     assert.equal(err.message, 'CKAN action "package_show" failed: Not Found Error: Not found');
     return true;
   });
   // Without a __type (or with one that is no string) the type is undefined.
   for (const error of [{ message: "denied" }, "denied", { __type: 42, message: "x" }]) {
     const other = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
-    await assert.rejects(clientWith(other).status(), (err: unknown) => err instanceof CkanActionError && err.errorType === undefined);
+    await assert.rejects(clientWith(other).status(), (err: unknown) => err instanceof CkanActionError && err.errorType === undefined && !err.isNotFound);
   }
 });

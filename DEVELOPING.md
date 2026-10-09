@@ -327,7 +327,8 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   A transport failure of any kind (the default transport's `CkanNetworkError`, or
   anything a custom transport throws) becomes a `CkanNetworkError`
   `GET <url, redacted> failed: <reason>`, with the original as `cause`.
-- **Exit codes** (`run.ts`): 0 success/help/version, 4 for HTTP 404, 1 for
+- **Exit codes** (`run.ts`): 0 success/help/version, 4 for HTTP 404 and for CKAN's
+  `Not Found Error` sent with HTTP 200 (`CkanActionError.isNotFound`), 1 for
   everything else.
 - **Closed pipes** (`io.ts`, `handleOutputErrors`, installed by the bin before
   `run()`): an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly; an

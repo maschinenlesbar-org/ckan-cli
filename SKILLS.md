@@ -104,7 +104,7 @@ encode the non-obvious parts of these portals, for example:
   Hamburg's own API page over-counts; many Hamburg records have no organization, and the
   `publishing_date` field can't be range-filtered (see **ckan-hamburg-transparency**);
 - an empty search is `{"count":0,…}` at exit `0` (a valid "nothing matched"), exit `4` is an
-  HTTP 404 (a not-found id, or no CKAN at this URL), exit `1` is a real error with a
+  HTTP 404 or CKAN's `Not Found Error` (a not-found id, or no CKAN at this URL), exit `1` is a real error with a
   readable reason.
 
 Real runs of each skill are in [EXAMPLE.md](EXAMPLE.md).
