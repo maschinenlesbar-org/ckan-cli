@@ -488,5 +488,8 @@ the frame is never touched, and the secret is kept out of the log in either form
 timestamps testable. stdout carries data only. What happens outside `run()`, in the bin
 shim, is logged too: a failed stdout write is an ERROR record of `ckan.output`
 (`handleOutputErrors`, through `processLogger(argv)`, in the format argv asks for, with
-the run's redaction). Conformance test P23 checks all of this, and its body is
+the run's redaction), and so are Node's own process warnings (`NODE_TLS_REJECT_UNAUTHORIZED=0`):
+WARN records of `ckan.cli`, through `installWarningLog`, which removes Node's default
+`warning` listener and logs `(node) <name>: <message>` through `processLogger(argv)`.
+Conformance test P23 checks all of this, and its body is
 shared across the *-cli repos.
