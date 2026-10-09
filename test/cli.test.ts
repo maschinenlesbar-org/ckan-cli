@@ -655,12 +655,8 @@ test("a malformed answer is an ERROR record of ckan.api: bad JSON, not JSON, not
     assert.equal(await run(["status"], cli.deps), 1);
     assert.match(untimed(cli.err.join("\n")), /^ERROR \[ckan\.api\] /, cli.err.join("\n"));
   }
-  // Printing an answer is not the answer's shape: a response nested too deeply stays cli.
-  let deep: unknown = 1;
-  for (let i = 0; i < 20_000; i++) deep = [deep];
-  const nested = makeCli(() => rawResponse(JSON.stringify(ckan(deep)), "application/json"));
-  assert.equal(await run(["action", "anything"], nested.deps), 1);
-  assert.match(untimed(nested.err.join("\n")), /^ERROR \[ckan\.cli\] The response is nested too deeply/);
+  // Printing an answer is not the answer's shape: a response nested too deeply stays cli
+  // ("a response nested too deeply to pretty-print is a clear error" checks that).
 });
 
 test("a CKAN error answer on HTTP 200 (success:false) is an ERROR record of ckan.api (Bug 01-1)", async () => {
