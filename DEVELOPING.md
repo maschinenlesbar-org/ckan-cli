@@ -370,8 +370,12 @@ node --test dist/test/client.test.js   # one file, after a build
   warning naming the host; the other-secret case is skipped: the CLI sends no API token),
   P21 (the README's relative links: README.md ships to npmjs.com, so a link to a document
   the `files` allowlist leaves out must be an absolute GitHub URL), P23 (the log on
-  stderr: record format, `--log-format jsonl`, no secret in either format; from
-  dip-bundestag-cli, with a `USAGE_EXIT` adapter switch since ckan's usage errors exit 1).
+  stderr: record format, `--log-format jsonl`, no secret in either format; since the
+  2026-10-09 fix plan also one line with nothing raw, well-formed and bounded, the
+  secret replaced in the message only, commander's help one record per line, the format
+  commander parsed, a malformed answer under `api`, echoed credentials replaced, an
+  `a:b@c` value left alone; from dip-bundestag-cli, with a `USAGE_EXIT` adapter switch
+  since ckan's usage errors exit 1, and no `OUTPUT_OPTION`: ckan has no `-o`).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
