@@ -3,7 +3,7 @@
 
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
-import type { CliDeps } from "./io.js";
+import { logOf, type CliDeps } from "./io.js";
 import { cleartextProblem, DEFAULT_BASE_URL, isBidiControl, type EngineOptions } from "../client/engine.js";
 import { CkanError } from "../client/errors.js";
 import { findPortal } from "../client/portals.js";
@@ -191,7 +191,7 @@ export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown)
 }
 
 /**
- * Write one `warning: …` line to stderr when the effective base URL (--portal >
+ * Log a warning (`ckan.http`) when the effective base URL (--portal >
  * --base-url > CKAN_BASE_URL > default) is plain `http:` to a host other than loopback
  * (cleartextProblem): requests, and any credentials in the URL, travel unencrypted.
  * Called once per run, after the options are parsed and before the first request;
@@ -199,7 +199,7 @@ export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown)
  */
 export function warnOnCleartext(deps: CliDeps, global: GlobalOptions): void {
   const problem = cleartextProblem(global.portal ?? global.baseUrl ?? DEFAULT_BASE_URL);
-  if (problem !== undefined) deps.io.err(`warning: ${problem}`);
+  if (problem !== undefined) logOf(deps).warn("http", problem);
 }
 
 export interface ActionContext {

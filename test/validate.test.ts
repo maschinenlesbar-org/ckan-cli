@@ -6,7 +6,7 @@ import * as library from "../src/index.js";
 import { CkanClient } from "../src/client/client.js";
 import { run } from "../src/cli/run.js";
 import type { CliDeps } from "../src/cli/io.js";
-import { parity } from "./helpers.js";
+import { parity, untimed } from "./helpers.js";
 
 const positive = (n: number): string | undefined => (n > 0 ? undefined : "Expected a positive number.");
 
@@ -41,7 +41,7 @@ test("run() reports a CkanValidationError from an action as a usage error", asyn
     },
   };
   assert.equal(await run(["status"], deps), 1);
-  assert.deepEqual(err, ["Error: Invalid rows: Expected a positive number."]);
+  assert.deepEqual(err.map(untimed), ["ERROR [ckan.cli] Invalid rows: Expected a positive number."]);
   assert.deepEqual(out, []);
 });
 

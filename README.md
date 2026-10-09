@@ -231,6 +231,20 @@ Every command prints the **unwrapped `result`** as pretty JSON to stdout.
 Errors go to stderr, so piping stdout into `jq` stays clean. `--compact`
 prints one line. Every global option works before or after the command.
 
+Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
+`INFO`) and a topic, the program and the area it comes from (`ckan.cli` for usage
+errors, `ckan.api` for the portal's answers, `ckan.http` for the connection). By default
+it is written log4j style; `--log-format jsonl` writes one JSON object per line instead:
+
+```text
+2026-10-09T14:03:12.481Z WARN  [ckan.http] requests to ckan.example are sent unencrypted (http:, not https:)
+2026-10-09T14:03:12.902Z ERROR [ckan.api] HTTP 404 for GET http://ckan.example/api/3/action/status_show: Not Found Error: Not found
+```
+
+```bash
+ckan --log-format jsonl package no-such-id 2>log.jsonl   # {"ts":"…","level":"ERROR","topic":"ckan.api","msg":"HTTP 404 …"}
+```
+
 ```bash
 # How many records a portal has
 ckan search --rows 0 | jq '.count'
@@ -253,7 +267,7 @@ ckan package bezirk-wandsbek-drucksache-22-3573-2 | jq '.resources[] | {format, 
 A reader that stops early (`| head`) ends `ckan` quietly with exit 0; a failed
 run keeps its exit code even when nothing reads stderr.
 
-CKAN's error text is shown on stderr, e.g.
+CKAN's error text is shown on stderr (in an `ERROR` record of `ckan.api`), e.g.
 `Validation Error: rows: Invalid integer` or
 `Bad request - Action name not known: …`.
 
@@ -270,6 +284,7 @@ CKAN's error text is shown on stderr, e.g.
 | `-V, --version` | Print the version number |
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
+| `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [ckan.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
 | `--base-url <url>` | CKAN site URL (env `CKAN_BASE_URL`; default `https://suche.transparenz.hamburg.de`) |
 | `--portal <id>` | a known portal by id (`ckan portals`); cannot be combined with `--base-url` |
 | `--timeout <ms>` | Per-request timeout (default `30000`; at most `2147483647`) |
@@ -278,10 +293,10 @@ CKAN's error text is shown on stderr, e.g.
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 A base URL on plain `http:` (from `--base-url` or `CKAN_BASE_URL`) to a host other than
-loopback (`localhost`, `127.0.0.0/8`, `::1`) works, but the CLI writes one line to stderr
-before the first request, e.g.
-`warning: requests to ckan.example are sent unencrypted (http:, not https:)`, or
-`warning: the base URL's credentials are sent unencrypted to ckan.example (http:, not https:)`
+loopback (`localhost`, `127.0.0.0/8`, `::1`) works, but the CLI writes one `WARN` record of
+`ckan.http` to stderr before the first request, e.g.
+`… WARN  [ckan.http] requests to ckan.example are sent unencrypted (http:, not https:)`, or
+`… WARN  [ckan.http] the base URL's credentials are sent unencrypted to ckan.example (http:, not https:)`
 when it carries a `user:password@` (never printed). stdout and the exit code are unchanged.
 
 ## Claude Code skills

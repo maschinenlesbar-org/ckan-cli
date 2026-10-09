@@ -147,7 +147,8 @@ src/
     portals.ts   # portalKey, findPortal, checkPortal (live check), withCheck, checkPortals
     portals-list.ts  # PORTALS: the built-in list, rewritten by scripts/update-portals.ts
   cli/
-    io.ts        # injectable I/O + env seam (CliDeps / CliIO)
+    io.ts        # injectable I/O + env seam (CliDeps / CliIO), the logger and the clock
+    log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
     commands/
       catalogue.ts  # search, package(s), resource, organization(s), group(s), tags
@@ -295,7 +296,7 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   userinfo) and what travels unencrypted — the base URL's credentials when it carries
   userinfo — or `undefined` for `https:`, an unparseable URL and loopback hosts
   (`localhost`, `127.0.0.0/8`, `::1`). The CLI's `action()` wrapper (`shared.ts`,
-  `warnOnCleartext`) prints it once per run as `warning: <sentence>` on stderr for the
+  `warnOnCleartext`) logs it once per run as a `WARN` record of `ckan.http` on stderr for the
   effective base URL (`--portal` > `--base-url` > `CKAN_BASE_URL` > default), after the
   options are parsed and before the first request; `--help`, `--version`, usage errors and
   `portals` (the built-in https list) never get there.
@@ -345,7 +346,9 @@ node --test dist/test/client.test.js   # one file, after a build
   options are refused; from govdata-cli), P20 (a plain-`http:` base URL draws one stderr
   warning naming the host; the other-secret case is skipped: the CLI sends no API token),
   P21 (the README's relative links: README.md ships to npmjs.com, so a link to a document
-  the `files` allowlist leaves out must be an absolute GitHub URL).
+  the `files` allowlist leaves out must be an absolute GitHub URL), P23 (the log on
+  stderr: record format, `--log-format jsonl`, no secret in either format; from
+  dip-bundestag-cli, with a `USAGE_EXIT` adapter switch since ckan's usage errors exit 1).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
@@ -426,3 +429,21 @@ or the `--base-url` default shown on the site is that value instead of Hamburg's
 Dual-licensed under **[AGPL-3.0-or-later](LICENSE)** or a commercial license — see
 **[LICENSING.md](LICENSING.md)**. This project does **not** accept external code
 contributions; see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+## The log on stderr
+
+Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+(`ERROR`, `WARN`, `INFO`) and a topic, `ckan.<area>`. `--log-format text` (the default)
+writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
+`--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
+and `msg`. The areas are `cli` (usage errors, commander's messages and the help it shows
+after one, unexpected errors, an answer that is not a CKAN envelope), `api` (the portal's
+error answers) and `http` (the connection, the cleartext warning). Code logs through
+`logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
+logger from argv before commander parses it, so commander's own usage errors are records
+too, and on top of the redacted `io.err`, so a secret (a password in `--base-url` or
+`CKAN_BASE_URL`) is kept out of the log in either format. `CliDeps.now` makes the
+timestamps testable. stdout carries data only. The one line left raw is the bin shim's
+`Output error: …` (`handleOutputErrors`), written straight to `process.stderr` when stdout
+itself fails, outside `run()`. Conformance test P23 checks all of this, and its body is
+shared across the *-cli repos.

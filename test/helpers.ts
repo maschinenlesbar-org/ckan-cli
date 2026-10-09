@@ -67,6 +67,18 @@ export function constantJson(body: unknown, status = 200): MockTransport {
 }
 
 /** What `run()` did with one argv: exit code, captured output and the requests sent. */
+// ---- the log on stderr -------------------------------------------------------
+
+/**
+ * stderr with each text record's timestamp taken off: `ERROR [ckan.api] HTTP 404 …`.
+ * The format itself — timestamp, level, topic — is the conformance test's
+ * (conformance-p23-log-format); the other tests check what was said, at which level
+ * and under which topic.
+ */
+export function untimed(text: string): string {
+  return text.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /gm, "");
+}
+
 export interface CliOutcome {
   code: number;
   out: string;
@@ -115,7 +127,7 @@ export async function parity<T>(
     lib = { ok: false, error, requests: [] };
   }
   lib.requests = mt.calls.splice(0);
-  return { cli: { code, out: out.join("\n"), err: err.join("\n"), requests: cliRequests }, lib };
+  return { cli: { code, out: out.join("\n"), err: untimed(err.join("\n")), requests: cliRequests }, lib };
 }
 
 /**

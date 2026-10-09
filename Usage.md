@@ -119,6 +119,7 @@ ckan action help_show --param name=package_search
 | Option | Description |
 | --- | --- |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
+| `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [ckan.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
 | `--base-url <url>` | CKAN site URL (env `CKAN_BASE_URL`; default `https://suche.transparenz.hamburg.de`) |
 | `--portal <id>` | a known portal by id (`ckan portals`); cannot be combined with `--base-url` |
 | `--timeout <ms>` | Per-request timeout (default `30000`; at most `2147483647`) |
@@ -127,10 +128,10 @@ ckan action help_show --param name=package_search
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 A base URL on plain `http:` (from `--base-url` or `CKAN_BASE_URL`) to a host other than
-loopback (`localhost`, `127.0.0.0/8`, `::1`) works, but the CLI writes one line to stderr
-before the first request, e.g.
-`warning: requests to ckan.example are sent unencrypted (http:, not https:)`, or
-`warning: the base URL's credentials are sent unencrypted to ckan.example (http:, not https:)`
+loopback (`localhost`, `127.0.0.0/8`, `::1`) works, but the CLI writes one `WARN` record of
+`ckan.http` to stderr before the first request, e.g.
+`… WARN  [ckan.http] requests to ckan.example are sent unencrypted (http:, not https:)`, or
+`… WARN  [ckan.http] the base URL's credentials are sent unencrypted to ckan.example (http:, not https:)`
 when it carries a `user:password@` (never printed). stdout and the exit code are unchanged.
 
 Blank values (`search ""`, `--fq ""`, an empty id, `--param q=`) are usage errors, never an unfiltered

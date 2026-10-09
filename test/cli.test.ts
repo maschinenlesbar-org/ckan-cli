@@ -4,7 +4,7 @@ import { run } from "../src/cli/run.js";
 import { CkanClient } from "../src/client/client.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
+import { makeMockTransport, jsonResponse, rawResponse, untimed } from "./helpers.js";
 import { PORTALS } from "../src/client/portals-list.js";
 import type { Portal } from "../src/client/types.js";
 
@@ -254,7 +254,7 @@ test("a result of the wrong shape exits 1 with a clear message, not an Unexpecte
   for (const [argv, body, expected] of cases) {
     const cli = makeCli(() => jsonResponse(body));
     assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
-    assert.equal(cli.err.join("\n"), `Error: Unexpected response shape from ${ACTION}/${expected}`, argv.join(" "));
+    assert.equal(untimed(cli.err.join("\n")), `ERROR [ckan.cli] Unexpected response shape from ${ACTION}/${expected}`, argv.join(" "));
   }
   // The generic action passes any result through, null included.
   const generic = makeCli(() => jsonResponse(ckan(null)));
@@ -267,14 +267,14 @@ test("a response nested too deeply to pretty-print is a clear error, not a stack
   const deep = `{"help":"h","success":true,"result":{"a":${"[".repeat(depth)}${"]".repeat(depth)}}}`;
   const pretty = makeCli(() => rawResponse(deep, "application/json"));
   assert.equal(await run(["package", "x"], pretty.deps), 1);
-  assert.equal(pretty.err.join("\n"), "Error: The response is nested too deeply to pretty-print; try --compact.");
+  assert.equal(untimed(pretty.err.join("\n")), "ERROR [ckan.cli] The response is nested too deeply to pretty-print; try --compact.");
 
   const compact = makeCli(() => rawResponse(deep, "application/json"));
   const code = await run(["--compact", "package", "x"], compact.deps);
   // Compact output may fit the stack; if it does not, the message says so.
   if (code !== 0) {
     assert.equal(code, 1);
-    assert.equal(compact.err.join("\n"), "Error: The response is nested too deeply to print.");
+    assert.equal(untimed(compact.err.join("\n")), "ERROR [ckan.cli] The response is nested too deeply to print.");
   }
 });
 
@@ -341,8 +341,8 @@ test("a password in --base-url or CKAN_BASE_URL is redacted in errors and in --h
   assert.equal(notFound.mt.last().headers?.["Authorization"], `Basic ${Buffer.from("user:s3cret").toString("base64")}`);
   // ...and no message shows it.
   assert.equal(
-    notFound.err.join("\n"),
-    `Error: HTTP 404 for GET http://127.0.0.1:9/404${ACTION}/status_show: Not Found Error: Not found`,
+    untimed(notFound.err.join("\n")),
+    `ERROR [ckan.api] HTTP 404 for GET http://127.0.0.1:9/404${ACTION}/status_show: Not Found Error: Not found`,
   );
 
   const html = makeCli(() => rawResponse("<html></html>", "text/html"));
@@ -422,7 +422,7 @@ test("help, help <command>, --help and --version exit 0; an unknown command is n
   }
   const foo = makeCli(() => jsonResponse(ckan({})));
   await run(["foo"], foo.deps);
-  assert.match(foo.err.join("\n"), /error: unknown command 'foo'/);
+  assert.match(untimed(foo.err.join("\n")), /^ERROR \[ckan\.cli\] unknown command 'foo'/);
 });
 
 test("--base-url and CKAN_BASE_URL with a query string are usage errors", async () => {
@@ -503,7 +503,7 @@ test("help <unknown> names the unknown command, like <unknown> does (result 06 B
   for (const argv of [["help", "nonexistent"], ["--compact", "help", "nonexistent"], ["--base-url", "https://h.example", "help", "nonexistent"]]) {
     const cli = makeCli(() => jsonResponse(ckan({})));
     assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
-    assert.match(cli.err.join("\n"), /^error: unknown command 'nonexistent'/, argv.join(" "));
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[ckan\.cli\] unknown command 'nonexistent'/, argv.join(" "));
     assert.equal(cli.mt.calls.length, 0);
   }
   // A known topic still prints that command's help, exit 0.
