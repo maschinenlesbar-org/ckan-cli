@@ -180,7 +180,8 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   `transport` or `sleep` that is not a function, a portal list that is not an array.
   An unusable action name and a blank `*_show` id are `CkanValidationError`s too.
   Messages show at most 500 characters of a URL or of server text
-  (`MAX_MESSAGE_VALUE_LENGTH`, `cutForMessage`); the error's `url`, `detail` and
+  (`MAX_MESSAGE_VALUE_LENGTH`, `cutForMessage`), never cut inside a surrogate pair
+  (`cutText`), so a message stays well-formed; the error's `url`, `detail` and
   `body` keep the full value.
 - **Base URL.** `--base-url` or `--portal` (they conflict) > `CKAN_BASE_URL` > the
   Hamburg default (an empty `CKAN_BASE_URL` counts as unset; in the library only
@@ -442,7 +443,9 @@ and `msg`. A record is always one line: `formatLogRecord` runs `escapeForRecord`
 the message (text) or the whole JSON object (jsonl), which writes CR and LF as `\r`/`\n`,
 every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
 controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
-forge another one or steer the terminal. The areas are `cli` (usage errors, commander's messages and the help it shows
+forge another one or steer the terminal. Before that a lone surrogate (half a
+character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`).
+The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, unexpected errors, an answer that is not a CKAN envelope), `api` (the portal's
 error answers) and `http` (the connection, the cleartext warning). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the

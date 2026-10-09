@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { checkPortal, checkPortalUrls, checkPortals, findPortal, portalKey } from "../src/client/portals.js";
-import { CkanNetworkError, CkanValidationError } from "../src/client/errors.js";
+import { CkanNetworkError, CkanValidationError, toWellFormed } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
 import type { Portal } from "../src/client/types.js";
@@ -208,4 +208,14 @@ test("a portal entry without a url is a failed check, never Hamburg's (result 04
     assert.match(check?.problem ?? "", /^Invalid base URL/);
   }
   assert.equal(mt.calls.length, 0, "no request, to Hamburg or anywhere");
+});
+
+test("checkPortal's problem, cut to 80 characters, never leaves half a character", async () => {
+  for (const message of ["\u{1f600}".repeat(100), "a" + "\u{1f600}".repeat(100)]) {
+    const mt = makeMockTransport(() => jsonResponse({ success: false, error: { message } }));
+    const res = await checkPortal(new CkanClient({ baseUrl: "https://x.example.test", transport: mt.transport, maxRetries: 0 }));
+    assert.equal(res.working, false);
+    assert.ok((res.problem ?? "").length <= 80, res.problem ?? "");
+    assert.equal(toWellFormed(res.problem ?? ""), res.problem);
+  }
 });

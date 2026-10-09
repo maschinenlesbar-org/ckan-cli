@@ -3,7 +3,7 @@
 
 import { CkanClient, siteRoot } from "./client.js";
 import { validateBaseUrl, type EngineOptions } from "./engine.js";
-import { CkanApiError, CkanNetworkError, CkanParseError, CkanValidationError } from "./errors.js";
+import { CkanApiError, CkanNetworkError, CkanParseError, CkanValidationError, cutText } from "./errors.js";
 import { PORTALS } from "./portals-list.js";
 import type { Portal } from "./types.js";
 import { assertValid, intRangeProblem } from "./validate.js";
@@ -120,9 +120,9 @@ function problemOf(err: unknown): string {
     if (/timed out|deadline/.test(message)) return "timeout";
     // The engine's "GET <url> failed: <reason>": the reason is what tells portals apart.
     const reason = /^[A-Z]+ \S+ failed: (.+)$/.exec(message)?.[1];
-    if (reason !== undefined) return reason.slice(0, 80);
+    if (reason !== undefined) return cutText(reason, 80);
   }
-  return message.slice(0, 80);
+  return cutText(message, 80);
 }
 
 /**

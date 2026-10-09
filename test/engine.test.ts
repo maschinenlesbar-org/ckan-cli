@@ -5,7 +5,10 @@ import {
   CkanApiError,
   CkanNetworkError,
   CkanParseError,
+  cutText,
+  toWellFormed,
 } from "../src/client/errors.js";
+import { CkanClient } from "../src/client/client.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 import type { HttpResponse } from "../src/client/http.js";
 
@@ -476,4 +479,25 @@ test("a redirect to a non-http(s) scheme is refused before the transport sees it
     (err: unknown) => err instanceof CkanNetworkError && /unsupported protocol "ftp:"/.test(err.message),
   );
   assert.equal(mt.calls.length, 1);
+});
+
+test("cutText never cuts inside a surrogate pair; toWellFormed replaces half a character", () => {
+  assert.equal(cutText("ab\u{1f600}cd", 3), "ab");
+  assert.equal(cutText("ab\u{1f600}cd", 4), "ab\u{1f600}");
+  assert.equal(cutText("short", 10), "short");
+  assert.equal(toWellFormed("a\ud83d b\ude00 \u{1f600}"), "a\ufffd b\ufffd \u{1f600}");
+});
+
+test("a server message cut at 500 characters keeps the message well-formed (error answer and success:false)", async () => {
+  for (const message of ["\u{1f600}".repeat(400), "a" + "\u{1f600}".repeat(400)]) {
+    const error = { __type: "Search Error", message };
+    for (const answer of [jsonResponse({ success: false, error }, 409), jsonResponse({ success: false, error })]) {
+      const client = new CkanClient({ transport: async () => answer });
+      await assert.rejects(client.status(), (err: Error) => {
+        assert.equal(toWellFormed(err.message), err.message);
+        assert.match(err.message, /…$/);
+        return true;
+      });
+    }
+  }
 });
