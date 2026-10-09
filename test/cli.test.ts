@@ -623,3 +623,22 @@ test("an unknown command suggests the closest known one, as commander does for i
   await run(["xyzzy"], far.deps);
   assert.doesNotMatch(far.err.join("\n"), /Did you mean/);
 });
+
+test("the log format is commander's: in a parse error, before a CKAN_BASE_URL check and after a value that looks like --log-format (L6)", async () => {
+  const isJsonl = (line: string): boolean => line.startsWith("{");
+  // The token after --user-agent is its value: "unknown command 'jsonl'", logged in text.
+  const ua = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["--user-agent", "--log-format", "jsonl", "status"], ua.deps), 1);
+  assert.match(ua.err[0] ?? "", /^\S+ ERROR \[ckan\.cli\] unknown command 'jsonl'/);
+  // The first --log-format is the one commander keeps; the second is the error.
+  const twice = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["--log-format", "jsonl", "--log-format", "text", "status"], twice.deps), 1);
+  assert.ok(twice.err.every(isJsonl), twice.err.join("\n"));
+  // A CKAN_BASE_URL error comes after commander's parse: in the format it parsed.
+  for (const [argv, jsonl] of [[["--user-agent", "--log-format=jsonl", "status"], false], [["--user-agent", "--", "--log-format", "jsonl", "status"], true]] as const) {
+    const env = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: "ftp://broken.example" });
+    assert.equal(await run([...argv], env.deps), 1);
+    assert.match(env.err[0] ?? "", /CKAN_BASE_URL/);
+    assert.ok(env.err.every((line) => isJsonl(line) === jsonl), `${argv.join(" ")}:\n${env.err.join("\n")}`);
+  }
+});

@@ -14,7 +14,7 @@ import { cutForMessage, redactUrl } from "../client/errors.js";
 import { once, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg, parsePortal } from "./shared.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 import { registerPortalCommands } from "./commands/portal.js";
-import { DEFAULT_LOG_FORMAT, logFormatProblem } from "./log.js";
+import { DEFAULT_LOG_FORMAT, logFormatProblem, type LogFormat } from "./log.js";
 
 /**
  * Single source of truth for the version: read from package.json at runtime
@@ -159,6 +159,14 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
   // prints the built-in list or checks each portal at its own URL — a user whose
   // variable is broken is exactly the one looking for a working portal id.
   const offline = new Set(["help", "portals"]);
+  // One source for the log format once commander has parsed argv: its value, not the
+  // scan of argv (an option's value can look like --log-format; `--` ends the scan, not
+  // commander's parse of a value). The first hook, so the CKAN_BASE_URL check below
+  // already logs in that format.
+  program.hook("preAction", (_program, actionCommand) => {
+    const format = (actionCommand.optsWithGlobals() as { logFormat?: LogFormat }).logFormat;
+    if (deps.log !== undefined) deps.log.format = format ?? DEFAULT_LOG_FORMAT;
+  });
   program.hook("preAction", (_program, actionCommand) => {
     if (actionCommand === program || offline.has(actionCommand.name())) return;
     if (program.getOptionValueSource("baseUrl") !== "default" || program.opts()["portal"] !== undefined) return;

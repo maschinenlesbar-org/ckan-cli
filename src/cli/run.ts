@@ -34,6 +34,17 @@ function configureTree(command: Command, deps: CliDeps, state: { errorLogged: bo
   for (const child of command.commands) configureTree(child, deps, state);
 }
 
+/** The names (long and short) of every option in the tree that requires a value. */
+function valueOptionsOf(command: Command, names: Set<string> = new Set()): Set<string> {
+  for (const option of command.options) {
+    if (!option.required) continue;
+    if (option.long !== undefined) names.add(option.long);
+    if (option.short !== undefined) names.add(option.short);
+  }
+  for (const child of command.commands) valueOptionsOf(child, names);
+  return names;
+}
+
 /** `ckan search`: the command's name with its parents'. */
 function commandPath(command: Command): string {
   const names: string[] = [];
@@ -210,6 +221,10 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
   deps = withRedactedOutput(deps, argv);
   const program = buildProgram(deps);
   configureTree(program, deps);
+  // For the records of a parse error: the scan of argv, now knowing which options take
+  // a value, as commander reads them. Once commander has parsed argv, the program's
+  // first preAction hook sets the format it parsed (`buildProgram`).
+  if (deps.log !== undefined) deps.log.format = logFormatFromArgv(argv, valueOptionsOf(program));
 
   // `help <unknown>` is answered like `<unknown>`: "error: unknown command '<unknown>'",
   // the help after it, exit 1 — not the help alone with a failure code.

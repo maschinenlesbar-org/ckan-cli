@@ -466,7 +466,11 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 after one, unexpected errors, an answer that is not a CKAN envelope), `api` (the portal's
 error answers) and `http` (the connection, the cleartext warning). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
-logger from argv before commander parses it, so commander's own usage errors are records
+logger from argv before commander parses it (`logFormatFromArgv`, which skips the value
+of every option that takes one and takes the first `--log-format`, used only for the
+records of a parse error; the program's first `preAction` hook then sets the format
+commander parsed, so `--user-agent --log-format=jsonl` logs text, and so does the
+`CKAN_BASE_URL` check after it), so commander's own usage errors are records
 too: its `error: …` an ERROR of `cli` (a `(Did you mean …?)` line joined to it; the root
 action's own unknown-command error carries the same hint, `suggestSimilar`), the help it
 shows after one an INFO record per line, and a command group run without its subcommand
