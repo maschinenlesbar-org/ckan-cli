@@ -7,6 +7,7 @@ import type { HttpRequest, HttpResponse } from "../src/client/http.js";
 import { makeMockTransport, jsonResponse, rawResponse, untimed } from "./helpers.js";
 import { PORTALS } from "../src/client/portals-list.js";
 import type { Portal } from "../src/client/types.js";
+import { credentialsIn } from "../src/client/errors.js";
 
 const ACTION = "/api/3/action";
 
@@ -581,4 +582,28 @@ test("the CLI's own usage errors quote a typed value at most 500 characters long
     assert.match(record, /["']x{500}…["']/, record.slice(0, 200));
     if (argv[0] === long) assert.ok(record.length < 700, `${record.length}`);
   }
+});
+
+test("an a:b@c argument (here a User-Agent) is neither a credential in the log nor rewritten in the JSON on stdout (L14)", async () => {
+  const cli = makeCli(() => jsonResponse(ckan({ site_title: "run:2026-10-09@x" })));
+  assert.equal(await run(["--user-agent", "run:2026-10-09@x", "status"], cli.deps), 0);
+  assert.match(cli.out.join("\n"), /"site_title": "run:2026-10-09@x"/);
+  const search = makeCli(() => jsonResponse({ success: false, error: { message: "Not found: run:2026-10-09@x" } }, 404));
+  assert.equal(await run(["package", "run:2026-10-09@x"], search.deps), 4);
+  assert.match(search.err.join("\n"), /Not found: run:2026-10-09@x/);
+  assert.deepEqual(credentialsIn("run:2026-10-09@x"), []);
+  assert.deepEqual(credentialsIn("https://alice:pw@host"), ["alice:pw"]);
+});
+
+test("a base URL without its scheme still carries a credential: --base-url, --portal and CKAN_BASE_URL (L14)", async () => {
+  for (const argv of [["--base-url", "alice:hunter2@ckan.example/x", "status"], ["--portal=alice:hunter2@ckan.example", "status"]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1);
+    const text = cli.err.join("\n");
+    assert.match(text, /\*\*\*@ckan\.example/, text);
+    assert.doesNotMatch(text, /hunter2/, text);
+  }
+  const env = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: "alice:hunter2@ckan.example" });
+  assert.equal(await run(["status"], env.deps), 1);
+  assert.doesNotMatch([...env.out, ...env.err].join("\n"), /hunter2/);
 });

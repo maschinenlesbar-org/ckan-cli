@@ -52,6 +52,25 @@ export function redactUserinfo(text: string): string {
   return text.replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#']*@/gi, "$1***@");
 }
 
+/**
+ * The options whose value is a base URL (`--portal` takes a portal's URL as well as its
+ * id): a `user:password@host` given there without its scheme is still a credential, like
+ * one in CKAN_BASE_URL (anywhere else a bare `a:b@c` is not).
+ */
+const BASE_URL_FLAGS = ["--base-url", "--portal"];
+
+/** The values of the `flags` in `argv`, in both forms (`--flag value`, `--flag=value`). */
+function flagValues(argv: readonly string[], flags: readonly string[]): string[] {
+  const found: string[] = [];
+  argv.forEach((token, i) => {
+    const next = argv[i + 1];
+    if (flags.includes(token) && next !== undefined) found.push(next);
+    const eq = token.indexOf("=");
+    if (eq > 0 && flags.includes(token.slice(0, eq))) found.push(token.slice(eq + 1));
+  });
+  return found;
+}
+
 /** The secrets of a run, and the two ways they are replaced. */
 export interface Redaction {
   /**
@@ -76,7 +95,12 @@ export interface Redaction {
 export function redactionFor(argv: readonly string[], env: Record<string, string | undefined>): Redaction {
   // An `--option=value` token is echoed as its value alone.
   const values = argv.map((token) => (token.startsWith("-") && token.includes("=") ? token.slice(token.indexOf("=") + 1) : token));
-  const sources = [...argv, ...values, env["CKAN_BASE_URL"] ?? ""];
+  // A base URL typed without its scheme is read as if it had one (anywhere else a bare
+  // `a:b@c` is no credential: a dataset id, a search text, a User-Agent).
+  const baseUrls = [...flagValues(argv, BASE_URL_FLAGS), env["CKAN_BASE_URL"] ?? ""].map((value) =>
+    value === "" || /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) ? value : `http://${value}`,
+  );
+  const sources = [...values, ...baseUrls];
   const secrets = new Set<string>();
   const encoded = new Set<string>();
   const echoed = new Set<string>();

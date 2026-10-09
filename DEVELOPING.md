@@ -202,11 +202,15 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   still re-checks the scheme on every hop and redirect). Userinfo is allowed and
   redacted in messages; the reasons never repeat the value. The CLI also redacts on
   output: `run.ts` (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of
-  every argument and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it
+  every URL argument and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it
   with `***` in everything it prints — commander's usage errors, which echo a rejected
   `--base-url` or `--portal` value or a URL typed where the command goes, the
   client's own messages and the help's defaults — so a password with spaces,
-  quotes, `#`, `?` or `/` is caught as well as an ordinary one. The log replaces it
+  quotes, `#`, `?` or `/` is caught as well as an ordinary one. Only a value that
+  starts with a scheme counts (a bare `a:b@c` is a dataset id, a search text or a
+  User-Agent as often as a credential), except as the `--base-url` or `--portal` value
+  and in `CKAN_BASE_URL`, where a `user:password@host` without its scheme is still a
+  credential. The log replaces it
   in each record's *message*, before the record is cut and escaped, and writes it to
   the raw stderr: the frame (time, level, topic) is never touched, and a password with
   DEL, C1 or bidi characters is matched in its raw form. The forms a server echoes a
