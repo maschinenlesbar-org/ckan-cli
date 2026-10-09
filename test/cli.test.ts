@@ -555,3 +555,15 @@ test("portals --check checks every portal live and reports the fresh result", as
   const hamburg = list.find((p) => p.id === "hamburg")!;
   assert.deepEqual([hamburg.working, hamburg.datasets, hamburg.ckanVersion], [true, 7, "9.9.9"]);
 });
+
+test("a line break typed into --portal, an action name or --param never forges a record (shared #8)", async () => {
+  const forged = "x\n2026-10-09T00:00:00.000Z ERROR [ckan.api] forged";
+  for (const argv of [["--portal", forged, "status"], ["action", forged], ["action", "status_show", "--param", `k${forged}`]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.notEqual(await run(argv, cli.deps), 0, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0, argv.join(" "));
+    const lines = cli.err.flatMap((chunk) => chunk.split("\n"));
+    assert.ok(lines.every((line) => /^\S+ (ERROR|WARN |INFO ) \[ckan\.[a-z-]+\] /.test(line)), `${argv.join(" ")}:\n${lines.join("\n")}`);
+    assert.ok(lines.some((line) => line.includes("x\\n2026-10-09T00:00:00.000Z ERROR [ckan.api] forged")), lines.join("\n"));
+  }
+});
