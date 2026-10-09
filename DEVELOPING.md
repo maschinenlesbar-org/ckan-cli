@@ -209,7 +209,10 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   quotes, `#`, `?` or `/` is caught as well as an ordinary one. The log replaces it
   in each record's *message*, before the record is cut and escaped, and writes it to
   the raw stderr: the frame (time, level, topic) is never touched, and a password with
-  DEL, C1 or bidi characters is matched in its raw form. `redactUrl` falls
+  DEL, C1 or bidi characters is matched in its raw form. The forms a server echoes a
+  userinfo back in are replaced too: the `Basic` value and the decoded `user:password`
+  on stdout and stderr, the password alone (4 characters or more) on stderr only, since
+  it may well occur in the data. `redactUrl` falls
   back to the same text-based cut (`redactCredentials`) for a value that doesn't
   parse as a URL, so an unparseable `CKAN_BASE_URL` shows as `https://***@…` in
   `--help` too. `siteRoot()` drops a trailing `/api/3/action` or `/api/3`,
@@ -311,7 +314,9 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
 - **Credentials in logged objects.** The client and the engine keep the base URL in
   real `#private` fields, so `console.log(client)`, `util.inspect` and
   `JSON.stringify` never show its password. The engine scrubs the base URL's
-  userinfo (raw and percent-decoded) from error bodies and details, a CKAN
+  userinfo (raw and percent-decoded) and the forms a server echoes it back in (the
+  `Basic` value, the decoded `user:password`, the password alone from 4 characters:
+  `echoedCredentialForms`) from error bodies and details, a CKAN
   `success:false` message, transport error text and the `cause` chain it attaches.
   A transport failure of any kind (the default transport's `CkanNetworkError`, or
   anything a custom transport throws) becomes a `CkanNetworkError`

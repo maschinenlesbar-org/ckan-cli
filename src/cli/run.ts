@@ -12,7 +12,9 @@ import {
   CkanNetworkError,
   CkanValidationError,
   credentialsIn,
+  echoedCredentialForms,
   redactCredentials,
+  redactSecrets,
 } from "../client/errors.js";
 
 /** The exit code of a usage error: commander's own for a rejected option value. */
@@ -52,9 +54,13 @@ export function redactUserinfo(text: string): string {
 
 /** The secrets of a run, and the two ways they are replaced. */
 export interface Redaction {
-  /** stdout text: the userinfo of every URL-like argument and of CKAN_BASE_URL replaced (`***@`). */
+  /**
+   * stdout text: the userinfo of every URL-like argument and of CKAN_BASE_URL replaced
+   * (`***@`), and the forms a server echoes it back in (the Basic value, the decoded
+   * `user:password`).
+   */
   out(text: string): string;
-  /** stderr text, a record's message: the same replacements. */
+  /** stderr text, a record's message: that, and the password alone (`***`). */
   err(text: string): string;
 }
 
@@ -73,6 +79,8 @@ export function redactionFor(argv: readonly string[], env: Record<string, string
   const sources = [...argv, ...values, env["CKAN_BASE_URL"] ?? ""];
   const secrets = new Set<string>();
   const encoded = new Set<string>();
+  const echoed = new Set<string>();
+  const passwords = new Set<string>();
   for (const source of sources) {
     for (const secret of credentialsIn(source)) {
       secrets.add(secret);
@@ -80,16 +88,25 @@ export function redactionFor(argv: readonly string[], env: Record<string, string
       // A URL sent as a parameter (`package <url>`) is echoed percent-encoded in a
       // 404 message: `id=https%3A%2F%2Fuser%3Apw%40host`.
       encoded.add(encodeURIComponent(`${secret}@`));
+      // What a server echoes back: the Basic value and the decoded user:password on
+      // stdout and stderr, the password alone (it may well occur in the data) on stderr.
+      const [basic, pair, password] = echoedCredentialForms(secret);
+      if (basic !== undefined) echoed.add(basic);
+      if (pair !== undefined) echoed.add(pair);
+      if (password !== undefined) passwords.add(password);
     }
   }
   if (secrets.size === 0) return { out: (text) => text, err: (text) => text };
   const list = [...secrets];
-  const redact = (text: string): string => {
-    let out = redactUserinfo(redactCredentials(text, list));
-    for (const form of encoded) out = out.split(form).join("***%40");
-    return out;
+  // Longest first, so a secret is never left half-replaced by one of its own substrings.
+  const echoedList = [...echoed].sort((a, b) => b.length - a.length);
+  const passwordList = [...passwords].sort((a, b) => b.length - a.length);
+  const out = (text: string): string => {
+    let result = redactUserinfo(redactCredentials(text, list));
+    for (const form of encoded) result = result.split(form).join("***%40");
+    return redactSecrets(result, echoedList);
   };
-  return { out: redact, err: redact };
+  return { out, err: (text) => redactSecrets(out(text), passwordList) };
 }
 
 /**
