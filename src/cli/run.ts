@@ -5,7 +5,7 @@
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
 import { logOf, type CliDeps } from "./io.js";
-import { createLogger, logFormatFromArgv } from "./log.js";
+import { createLogger, logFormatFromArgv, type Logger } from "./log.js";
 import {
   CkanApiError,
   CkanError,
@@ -214,6 +214,20 @@ export function unknownHelpTopic(program: Command, argv: readonly string[]): num
     return known ? undefined : i;
   }
   return undefined;
+}
+
+/**
+ * The log for what happens outside `run()`, in the bin shim: a stdout write error
+ * (`handleOutputErrors`) and Node's process warnings. Its format is the one argv asks
+ * for (`logFormatFromArgv`), and it replaces the secrets of argv and `env` like the
+ * run's own log; it writes to the raw stderr.
+ */
+export function processLogger(argv: readonly string[], env: Record<string, string | undefined> = process.env): Logger {
+  return createLogger({
+    format: logFormatFromArgv(argv),
+    write: (line) => process.stderr.write(line + "\n"),
+    redact: redactionFor(argv, env).err,
+  });
 }
 
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {

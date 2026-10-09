@@ -330,7 +330,8 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
 - **Closed pipes** (`io.ts`, `handleOutputErrors`, installed by the bin before
   `run()`): an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly; an
   EPIPE on stderr is ignored, so a failed run keeps its exit code (`2>&1 | true` no
-  longer turns a usage error into 0).
+  longer turns a usage error into 0). Any other stdout write error (EBADF, EIO) is an
+  ERROR record of `ckan.output`, `Could not write to stdout: …`, and exits 1.
 
 ## Testing
 
@@ -464,7 +465,8 @@ character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellF
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, unexpected errors, an answer that is not a CKAN envelope), `api` (the portal's
-error answers) and `http` (the connection, the cleartext warning). Code logs through
+error answers), `http` (the connection, the cleartext warning) and `output` (a failed
+stdout write). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
 logger from argv before commander parses it (`logFormatFromArgv`, which skips the value
 of every option that takes one and takes the first `--log-format`, used only for the
@@ -478,7 +480,8 @@ an ERROR "missing command: `ckan <group> <subcommand>`" before that help, so eve
 run has an ERROR record (`writeCommanderErr`). The log is built with the run's redaction (`withRedactedOutput`), which replaces a secret (a
 password in `--base-url` or `CKAN_BASE_URL`) in the message only, before it is escaped:
 the frame is never touched, and the secret is kept out of the log in either format. `CliDeps.now` makes the
-timestamps testable. stdout carries data only. The one line left raw is the bin shim's
-`Output error: …` (`handleOutputErrors`), written straight to `process.stderr` when stdout
-itself fails, outside `run()`. Conformance test P23 checks all of this, and its body is
+timestamps testable. stdout carries data only. What happens outside `run()`, in the bin
+shim, is logged too: a failed stdout write is an ERROR record of `ckan.output`
+(`handleOutputErrors`, through `processLogger(argv)`, in the format argv asks for, with
+the run's redaction). Conformance test P23 checks all of this, and its body is
 shared across the *-cli repos.
