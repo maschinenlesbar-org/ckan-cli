@@ -78,6 +78,13 @@ backoff). A `Retry-After` above `MAX_RETRY_AFTER_MS` (30 s) is not retried; the
 the client waits; not retried — try again after that`) and carries `retryAfterMs`.
 After spent retries the message ends `(after N retries)` and `retries` holds the count.
 
+Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
+`{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
+redacted) `}`) is called once per retry right before the sleep, never when there is none, and
+a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
+`ckan.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
+seconds, ms under 1 s). Tests: `test/retry-hook.test.ts`, `test/retry-log.test.ts`.
+
 `timeoutMs` and `maxResponseBytes` hold for every transport, not only the built-in
 one: the engine runs each transport call under the `timeoutMs` deadline (passing an
 `AbortSignal` in `HttpRequest.signal`, which the built-in transport honours; the call

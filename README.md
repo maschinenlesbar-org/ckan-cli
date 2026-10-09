@@ -294,7 +294,7 @@ CKAN's error text is shown on stderr (in an `ERROR` record of `ckan.api`), e.g.
 | `--portal <id>` | a known portal by id (`ckan portals`); cannot be combined with `--base-url` |
 | `--timeout <ms>` | Per-request timeout (default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`). Each retry backs off linearly (0.2 s, 0.4 s, …) or waits the server's `Retry-After` when that is longer, up to 30 s; a longer one is not retried, and the error names the wait. A reset or other network error is not retried |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`). Each retry backs off linearly (0.2 s, 0.4 s, …) or waits the server's `Retry-After` when that is longer, up to 30 s; a longer one is not retried, and the error names the wait. A reset or other network error is not retried. Each retry logs one WARN record of `ckan.http` before it waits (`HTTP 503 from host: retry 1 of 3 in 2 s`). |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 A base URL on plain `http:` (from `--base-url` or `CKAN_BASE_URL`) to a host other than

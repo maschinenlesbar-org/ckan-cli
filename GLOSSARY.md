@@ -100,7 +100,7 @@ including those added by extensions.
 `--log-format jsonl` as one JSON object per line. The areas: `cli` (usage errors,
 commander's messages, unexpected errors), `api` (the portal's answers: an error status,
 CKAN's `success: false` envelope even on HTTP 200, and a malformed answer — bad JSON, not JSON, not a CKAN envelope, the wrong result
-shape), `http` (the connection, the cleartext warning) and `output` (stdout failures). A
+shape), `http` (the connection, the cleartext warning, and one WARN per retry before it waits) and `output` (stdout failures). A
 record is always one line; control characters in it are escaped.
 
 ---

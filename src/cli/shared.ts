@@ -4,7 +4,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
-import { cleartextProblem, DEFAULT_BASE_URL, isBidiControl, type EngineOptions } from "../client/engine.js";
+import { cleartextProblem, DEFAULT_BASE_URL, isBidiControl, type EngineOptions, type RetryEvent } from "../client/engine.js";
 import { CkanError, cutForMessage, redactUrl } from "../client/errors.js";
 import { findPortal } from "../client/portals.js";
 import { baseUrlProblem, blankProblem, countProblem, headerValueProblem, intRangeProblem } from "../client/validate.js";
@@ -202,6 +202,19 @@ export function warnOnCleartext(deps: CliDeps, global: GlobalOptions): void {
   if (problem !== undefined) logOf(deps).warn("http", problem);
 }
 
+/** `HTTP 503 from host: retry 1 of 3 in 2 s` (host only; whole seconds, ms under 1 s). */
+export function retryMessage(event: RetryEvent): string {
+  let host: string;
+  try {
+    host = new URL(event.url).host;
+  } catch {
+    host = "the server";
+  }
+  const why = event.status === undefined ? "connection reset" : `HTTP ${event.status}`;
+  const wait = event.delayMs < 1000 ? `${event.delayMs} ms` : `${Math.round(event.delayMs / 1000)} s`;
+  return `${why} from ${host}: retry ${event.retry} of ${event.maxRetries} in ${wait}`;
+}
+
 export interface ActionContext {
   client: ReturnType<CliDeps["createClient"]>;
   global: GlobalOptions;
@@ -226,7 +239,9 @@ export function action(
     const positionals = args.slice(0, Math.max(0, args.length - 2)) as string[];
     const global = command.optsWithGlobals() as GlobalOptions;
     warnOnCleartext(deps, global);
-    const client = deps.createClient(toEngineOptions(global));
+    const options = toEngineOptions(global);
+    options.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));
+    const client = deps.createClient(options);
     await fn({ client, global, opts: command.opts() }, positionals);
   };
 }
