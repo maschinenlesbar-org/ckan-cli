@@ -201,12 +201,15 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   `CkanNetworkError`, which stays for transport failures (the default transport
   still re-checks the scheme on every hop and redirect). Userinfo is allowed and
   redacted in messages; the reasons never repeat the value. The CLI also redacts on
-  output: `run.ts` (`withRedactedOutput`) takes the exact userinfo of every
-  argument and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it with
-  `***` in everything it prints — commander's usage errors, which echo a rejected
+  output: `run.ts` (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of
+  every argument and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it
+  with `***` in everything it prints — commander's usage errors, which echo a rejected
   `--base-url` or `--portal` value or a URL typed where the command goes, the
   client's own messages and the help's defaults — so a password with spaces,
-  quotes, `#`, `?` or `/` is caught as well as an ordinary one. `redactUrl` falls
+  quotes, `#`, `?` or `/` is caught as well as an ordinary one. The log replaces it
+  in each record's *message*, before the record is cut and escaped, and writes it to
+  the raw stderr: the frame (time, level, topic) is never touched, and a password with
+  DEL, C1 or bidi characters is matched in its raw form. `redactUrl` falls
   back to the same text-based cut (`redactCredentials`) for a value that doesn't
   parse as a URL, so an unparseable `CKAN_BASE_URL` shows as `https://***@…` in
   `--help` too. `siteRoot()` drops a trailing `/api/3/action` or `/api/3`,
@@ -455,8 +458,9 @@ after one, unexpected errors, an answer that is not a CKAN envelope), `api` (the
 error answers) and `http` (the connection, the cleartext warning). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
 logger from argv before commander parses it, so commander's own usage errors are records
-too, and on top of the redacted `io.err`, so a secret (a password in `--base-url` or
-`CKAN_BASE_URL`) is kept out of the log in either format. `CliDeps.now` makes the
+too, and with the run's redaction (`withRedactedOutput`), which replaces a secret (a
+password in `--base-url` or `CKAN_BASE_URL`) in the message only, before it is escaped:
+the frame is never touched, and the secret is kept out of the log in either format. `CliDeps.now` makes the
 timestamps testable. stdout carries data only. The one line left raw is the bin shim's
 `Output error: …` (`handleOutputErrors`), written straight to `process.stderr` when stdout
 itself fails, outside `run()`. Conformance test P23 checks all of this, and its body is

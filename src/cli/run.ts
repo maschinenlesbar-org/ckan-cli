@@ -50,21 +50,27 @@ export function redactUserinfo(text: string): string {
   return text.replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#']*@/gi, "$1***@");
 }
 
+/** The secrets of a run, and the two ways they are replaced. */
+export interface Redaction {
+  /** stdout text: the userinfo of every URL-like argument and of CKAN_BASE_URL replaced (`***@`). */
+  out(text: string): string;
+  /** stderr text, a record's message: the same replacements. */
+  err(text: string): string;
+}
+
 /**
- * `deps` with an `io` that redacts the credentials of every argument and of
- * CKAN_BASE_URL from everything it prints. Commander echoes rejected values in its
- * errors (`--base-url`, `--portal`, a URL typed where the command goes), the
- * client's own messages name the values they refuse, and help shows the base URL's
- * default: whatever path a credential takes to stdout or stderr, the exact userinfo
- * (as `credentialsIn` finds it, plus its JSON-escaped and percent-encoded forms) is
- * replaced by `***`. A pattern alone can't delimit a password with spaces, quotes,
- * `#`, `?` or `/`; the exact strings can. Without credentials the output passes
- * through unchanged.
+ * The secrets of the run in `argv` and CKAN_BASE_URL. Commander echoes rejected values in
+ * its errors (`--base-url`, `--portal`, a URL typed where the command goes), the client's
+ * own messages name the values they refuse, and help shows the base URL's default:
+ * whatever path a credential takes to stdout or stderr, the exact userinfo (as
+ * `credentialsIn` finds it, plus its JSON-escaped and percent-encoded forms) is replaced
+ * by `***`. A pattern alone can't delimit a password with spaces, quotes, `#`, `?` or
+ * `/`; the exact strings can. Without credentials the text passes through unchanged.
  */
-export function withRedactedOutput(deps: CliDeps, argv: readonly string[]): CliDeps {
+export function redactionFor(argv: readonly string[], env: Record<string, string | undefined>): Redaction {
   // An `--option=value` token is echoed as its value alone.
   const values = argv.map((token) => (token.startsWith("-") && token.includes("=") ? token.slice(token.indexOf("=") + 1) : token));
-  const sources = [...argv, ...values, deps.env["CKAN_BASE_URL"] ?? ""];
+  const sources = [...argv, ...values, env["CKAN_BASE_URL"] ?? ""];
   const secrets = new Set<string>();
   const encoded = new Set<string>();
   for (const source of sources) {
@@ -76,14 +82,36 @@ export function withRedactedOutput(deps: CliDeps, argv: readonly string[]): CliD
       encoded.add(encodeURIComponent(`${secret}@`));
     }
   }
-  if (secrets.size === 0) return deps;
+  if (secrets.size === 0) return { out: (text) => text, err: (text) => text };
   const list = [...secrets];
   const redact = (text: string): string => {
     let out = redactUserinfo(redactCredentials(text, list));
     for (const form of encoded) out = out.split(form).join("***%40");
     return out;
   };
-  return { ...deps, io: { out: (text) => deps.io.out(redact(text)), err: (text) => deps.io.err(redact(text)) } };
+  return { out: redact, err: redact };
+}
+
+/**
+ * `deps` that keep the secrets of this run (`redactionFor`) out of everything they
+ * print: `io.out` is redacted, and the log (`deps.log`) replaces them in each record's
+ * message before formatting it, then writes to the raw `io.err`, so the frame is never
+ * touched and a password with DEL, C1 or bidi characters is matched in its raw form.
+ * `io.err` itself is redacted too, for anything that writes to stderr without the log.
+ */
+export function withRedactedOutput(deps: CliDeps, argv: readonly string[]): CliDeps {
+  const redaction = redactionFor(argv, deps.env);
+  const { out, err } = deps.io;
+  return {
+    ...deps,
+    io: { ...deps.io, out: (text) => out(redaction.out(text)), err: (text) => err(redaction.err(text)) },
+    log: createLogger({
+      format: logFormatFromArgv(argv),
+      write: err,
+      redact: redaction.err,
+      ...(deps.now === undefined ? {} : { now: deps.now }),
+    }),
+  };
 }
 
 /**
@@ -112,14 +140,8 @@ export function unknownHelpTopic(program: Command, argv: readonly string[]): num
 }
 
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {
+  // The log replaces the secrets of the run in every message, in either format.
   deps = withRedactedOutput(deps, argv);
-  // Every record goes through the redacted `io.err`, so a secret is kept out of the
-  // log in either format.
-  const redacted = deps;
-  deps = {
-    ...deps,
-    log: createLogger({ format: logFormatFromArgv(argv), write: (line) => redacted.io.err(line), ...(deps.now === undefined ? {} : { now: deps.now }) }),
-  };
   const program = buildProgram(deps);
   configureTree(program, deps);
 
