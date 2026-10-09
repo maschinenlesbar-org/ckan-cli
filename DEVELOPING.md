@@ -478,7 +478,7 @@ result shape, an unknown charset), `http` (the connection, the cleartext warning
 stdout write). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
 logger from argv before commander parses it (`logFormatFromArgv`, which skips the value
-of every option that takes one and takes the first `--log-format`, used only for the
+of one of the program's own value options and takes the first `--log-format`, used only for the
 records of a parse error; the program's first `preAction` hook then sets the format
 commander parsed, so `--user-agent --log-format=jsonl` logs text, and so does the
 `CKAN_BASE_URL` check after it), so commander's own usage errors are records

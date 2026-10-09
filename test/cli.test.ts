@@ -675,3 +675,11 @@ test("CKAN's Not Found Error sent with HTTP 200 exits 4, like the same error on 
     assert.equal(await run(["package", "x"], cli.deps), 1, JSON.stringify(error));
   }
 });
+
+test("a subcommand's value option does not swallow the program's --log-format, in a parse error too (L6)", async () => {
+  // commander takes the program's --log-format out of argv first; --rows is left without its value.
+  const cli = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["search", "--rows", "--log-format", "jsonl"], cli.deps), 1);
+  assert.ok(cli.err.length > 0 && cli.err.every((line) => line.startsWith("{")), cli.err.join("\n"));
+  assert.match((JSON.parse(cli.err[0] ?? "") as Record<string, unknown>)["msg"] as string, /--rows <n>' argument missing/);
+});
