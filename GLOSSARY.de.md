@@ -107,7 +107,8 @@ auch solche aus Erweiterungen.
 Zeitstempel, eine Stufe (`ERROR`, `WARN`, `INFO`) und ein Thema `ckan.<Bereich>`, als Text
 (im Stil von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die
 Bereiche: `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler), `api` (die
-Antworten des Portals: ein Fehlerstatus und eine fehlerhafte Antwort — ungültiges JSON, kein
+Antworten des Portals: ein Fehlerstatus, CKANs Umschlag mit `success: false` auch bei HTTP
+200 und eine fehlerhafte Antwort — ungültiges JSON, kein
 JSON, kein CKAN-Umschlag, die falsche Form des Ergebnisses), `http` (die Verbindung, die
 Klartext-Warnung) und `output` (Schreibfehler auf stdout). Ein Eintrag ist immer eine Zeile;
 Steuerzeichen darin werden maskiert.

@@ -2,7 +2,7 @@
 // Action API (`<site>/api/3/action`).
 
 import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, validateBaseUrl, type EngineOptions } from "./engine.js";
-import { CkanError, CkanParseError, CkanValidationError, cutForMessage, describeCkanError, redactUrl } from "./errors.js";
+import { CkanActionError, CkanParseError, CkanValidationError, cutForMessage, describeCkanError, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
 import {
   assertValid,
@@ -209,8 +209,10 @@ export class CkanClient {
     if (!env.success) {
       // A success:false envelope can come with HTTP 200, so it never passes the
       // engine's error-detail sanitising: strip terminal controls here too.
-      throw new CkanError(
+      const type = (env.error as { __type?: unknown } | null | undefined)?.__type;
+      throw new CkanActionError(
         `CKAN action "${cutForMessage(name)}" failed: ${cutForMessage(sanitizeServerText(this.#engine.scrub(describeCkanError(env.error))))}`,
+        { action: name, errorType: typeof type === "string" ? cutForMessage(sanitizeServerText(type)) : undefined },
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI

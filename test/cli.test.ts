@@ -662,3 +662,9 @@ test("a malformed answer is an ERROR record of ckan.api: bad JSON, not JSON, not
   assert.equal(await run(["action", "anything"], nested.deps), 1);
   assert.match(untimed(nested.err.join("\n")), /^ERROR \[ckan\.cli\] The response is nested too deeply/);
 });
+
+test("a CKAN error answer on HTTP 200 (success:false) is an ERROR record of ckan.api (Bug 01-1)", async () => {
+  const cli = makeCli(() => jsonResponse({ success: false, error: { __type: "Authorization Error", message: "Access denied" } }));
+  assert.equal(await run(["status"], cli.deps), 1);
+  assert.equal(untimed(cli.err.join("\n")), 'ERROR [ckan.api] CKAN action "status_show" failed: Authorization Error: Access denied');
+});

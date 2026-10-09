@@ -20,6 +20,7 @@ export type { QueryParams, QueryValue } from "./query.js";
 export {
   CkanError,
   CkanApiError,
+  CkanActionError,
   CkanNetworkError,
   CkanParseError,
   CkanValidationError,

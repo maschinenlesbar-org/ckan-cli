@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CkanClient } from "../src/client/client.js";
-import { CkanError, CkanParseError, CkanValidationError } from "../src/client/errors.js";
+import { CkanActionError, CkanError, CkanParseError, CkanValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse } from "./helpers.js";
 
 const ACTION = "/api/3/action";
@@ -427,5 +427,23 @@ test("a base URL with whitespace is refused by the constructor, siteRoot and the
     assert.throws(() => siteRoot(baseUrl), isValidation, JSON.stringify(baseUrl));
     assert.throws(() => new RequestEngine({ transport: mt.transport, baseUrl }), isValidation, JSON.stringify(baseUrl));
     assert.equal(mt.calls.length, 0);
+  }
+});
+
+test("a success:false envelope is a CkanActionError naming the action and CKAN's error type", async () => {
+  const mt = makeMockTransport(() =>
+    jsonResponse({ help: "h", success: false, error: { __type: "Not Found Error", message: "Not found" } }),
+  );
+  await assert.rejects(clientWith(mt).packageShow("x"), (err: unknown) => {
+    assert.ok(err instanceof CkanActionError && err instanceof CkanError);
+    assert.equal(err.action, "package_show");
+    assert.equal(err.errorType, "Not Found Error");
+    assert.equal(err.message, 'CKAN action "package_show" failed: Not Found Error: Not found');
+    return true;
+  });
+  // Without a __type (or with one that is no string) the type is undefined.
+  for (const error of [{ message: "denied" }, "denied", { __type: 42, message: "x" }]) {
+    const other = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
+    await assert.rejects(clientWith(other).status(), (err: unknown) => err instanceof CkanActionError && err.errorType === undefined);
   }
 });

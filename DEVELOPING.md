@@ -141,7 +141,7 @@ src/
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
     engine.ts    # URL building, retry/backoff, redirects, JSON decoding, error mapping
-    errors.ts    # CkanError / CkanApiError / CkanNetworkError / CkanParseError / CkanValidationError
+    errors.ts    # CkanError / CkanApiError / CkanActionError / CkanNetworkError / CkanParseError / CkanValidationError
     validate.ts  # the input rules (`…Problem` functions) and assertValid
     client.ts    # CkanClient — CKAN actions over the engine (with result-unwrapping)
     portals.ts   # portalKey, findPortal, checkPortal (live check), withCheck, checkPortals
@@ -228,7 +228,9 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
   built-in list, or checks each portal at its own URL) work whatever the variable
   holds.
 - **Envelope.** The client unwraps CKAN's `{ help, success, result }` and raises
-  `CkanError` when `success` is false. The typed methods also check the top-level
+  `CkanActionError` (a `CkanError` with `action` and CKAN's `__type` as `errorType`)
+  when `success` is false: CKAN can send its error envelope with HTTP 200, and the CLI
+  logs it under `api` like the same error on an error status. The typed methods also check the top-level
   shape of `result` (never a deep schema): an object for `status` and the `*_show`
   calls, `{ count, results[] }` for `packageSearch`, an array for the `*_list` calls
   (every `all_fields` page too). A missing `result` or a wrong shape raises
@@ -465,8 +467,9 @@ character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellF
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, unexpected errors, a response nested too deeply to print), `api` (the portal's
-answers: an error status, and a malformed answer, a `CkanParseError`: bad JSON, not JSON,
-not a CKAN envelope, the wrong result shape, an unknown charset), `http` (the connection, the cleartext warning) and `output` (a failed
+answers: an error status, CKAN's error envelope on HTTP 200, a `CkanActionError`, and a
+malformed answer, a `CkanParseError`: bad JSON, not JSON, not a CKAN envelope, the wrong
+result shape, an unknown charset), `http` (the connection, the cleartext warning) and `output` (a failed
 stdout write). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
 logger from argv before commander parses it (`logFormatFromArgv`, which skips the value
