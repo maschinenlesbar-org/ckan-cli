@@ -19,7 +19,7 @@ npm i -g @maschinenlesbar.org/ckan-cli
 ```
 
 This installs the **`ckan`** binary. Without a global install you can run it straight from
-the build output: `node dist/src/cli/index.js <command>`. The examples use `ckan`.
+the build output: `node apps/cli/dist/src/cli/index.js <command>`. The examples use `ckan`.
 
 ## Use cases
 

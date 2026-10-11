@@ -22,8 +22,8 @@ the read actions of any [CKAN](https://ckan.org/) portal's Action API
 
 ```bash
 npm install
-npm run build        # compiles TypeScript to dist/
-node dist/src/cli/index.js --help
+npm run build        # compiles every workspace (tsc -b) to its dist/
+node apps/cli/dist/src/cli/index.js --help    # or: npm start -- --help
 ```
 
 ## Library usage
@@ -83,7 +83,7 @@ Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exporte
 redacted) `}`) is called once per retry right before the sleep, never when there is none, and
 a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
 `ckan.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
-seconds, ms under 1 s). Tests: `test/retry-hook.test.ts`, `test/retry-log.test.ts`.
+seconds, ms under 1 s). Tests: `packages/client/test/retry-hook.test.ts`, `apps/cli/test/retry-log.test.ts`.
 
 `timeoutMs` and `maxResponseBytes` hold for every transport, not only the built-in
 one: the engine runs each transport call under the `timeoutMs` deadline (passing an
@@ -141,9 +141,49 @@ and `date`. A URL the client refuses is a failed check, not a throw — a missin
 
 ## Architecture
 
+The repository is an **npm workspace** with two folders: `apps/` holds the programs it
+publishes, `packages/` the libraries they are built from.
+
 ```
-src/
-  client/
+package.json         # private workspace manifest: no version, never packed
+apps/cli/            # @maschinenlesbar.org/ckan-cli — the published package
+  package.json       # its version, bin, files, bundleDependencies
+  src/index.ts       # library entry: re-exports @maschinenlesbar.org/ckan-client
+  src/cli/           # the CLI (below)
+  test/              # CLI tests and every conformance-*.test.ts
+packages/client/     # @maschinenlesbar.org/ckan-client — private, bundled into the CLI
+  src/               # the API client (below)
+  scripts/           # update-portals, which rewrites src/portals-list.ts (below; not shipped)
+  test/              # tests that only touch the client, + the transport helpers
+tools/pack/          # prepack/postpack: bundle the client and commander into the tarball
+tools/bump.mjs       # version bump + commit + tag (npm run bump)
+tsconfig.docs.json   # TypeDoc only: the package entry, with the client read from its sources
+```
+
+- **The client is its own package** so a later MCP app can share it with the CLI. It is
+  never published on its own: `apps/cli`'s `prepack` copies it (and commander) into the
+  app's `node_modules`, and `bundleDependencies` ships it inside the tarball. The library
+  entry re-exports the client's `"."`, so `import { CkanClient } from
+  "@maschinenlesbar.org/ckan-cli"` is unchanged.
+- **The client's exports:** `"."` is the public library surface (`src/index.ts`);
+  `"./internal/*"` maps to any module (`…/ckan-client/internal/engine`) for what the
+  CLI needs beyond that; `"./test/*"` reaches the client's test helpers from the CLI's
+  tests (not bundled). Only `"."` is part of the library.
+- **Dependencies point one way:** the app depends on the client, the client on nothing
+  in the workspace.
+- **The version lives in `apps/cli/package.json`.** The root has none; a plain
+  `npm version` at the root is refused. Release with `npm run bump -- <patch|minor|major>`,
+  which bumps the app, commits (the bare version as the message) and tags `vX.Y.Z`.
+- **TypeScript:** `tsconfig.base.json` holds the compiler options; every workspace has a
+  `tsconfig.json` (`src/`, and the client's `scripts/`) and a `tsconfig.test.json`
+  (`test/`), and the root `tsconfig.json`/`tsconfig.test.json` reference them, built with
+  `tsc -b`.
+
+The client (`packages/client/src/`), the CLI (`apps/cli/src/`) and the portal-list script
+(`packages/client/scripts/`):
+
+```
+packages/client/src/
     types.ts     # CkanEnvelope, Status, PackageSearchResult + parameter objects
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
@@ -153,7 +193,8 @@ src/
     client.ts    # CkanClient — CKAN actions over the engine (with result-unwrapping)
     portals.ts   # portalKey, findPortal, checkPortal (live check), withCheck, checkPortals
     portals-list.ts  # PORTALS: the built-in list, rewritten by scripts/update-portals.ts
-  cli/
+    index.ts     # the client's public surface (the library entry re-exports it)
+apps/cli/src/cli/
     io.ts        # injectable I/O + env seam (CliDeps / CliIO), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
@@ -163,13 +204,14 @@ src/
     program.ts   # assembles the commander program from injectable deps
     run.ts       # parses argv -> exit code (no process.exit; testable)
     index.ts     # #! bin shim
-scripts/
+packages/client/scripts/
   portal-sources.ts  # pure: parse the upstream lists, merge, read/write the list file
-  update-portals.ts  # I/O: fetch, check, rewrite src/client/portals-list.ts
+  update-portals.ts  # I/O: fetch, check, rewrite packages/client/src/portals-list.ts
 ```
 
-`scripts/` is compiled with the rest (to `dist/scripts/`, so the pure part is
-unit-tested) but is not in the npm package, which ships only `dist/src`.
+`packages/client/scripts/` is compiled with the client (to `packages/client/dist/scripts/`,
+so the pure part is unit-tested) but is not in the npm package: the client ships only its
+`dist/src`.
 
 **Design notes**
 
@@ -348,17 +390,22 @@ unit-tested) but is not in the npm package, which ships only `dist/src`.
 Developed test-first (red, green, refactor), so every behaviour above has a test.
 
 ```bash
-npm test          # builds, then runs `node --test` over dist/test
-node --test dist/test/client.test.js   # one file, after a build
+npm test          # builds, then runs `node --test` over each workspace's dist/test
+npm run coverage  # the same tests in one run, with a coverage report
+node --test packages/client/dist/test/client.test.js   # one file, after a build
 ```
+
+The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `client`,
+`retry-hook`, `portals`, `portal-sources`), everything that drives the CLI is in
+`apps/cli/test/`.
 
 - **`query.test.ts`** — query-string serialisation.
 - **`validate.test.ts`** — `assertValid`, the `…Problem` rules, and how `run.ts` reports a `CkanValidationError`.
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
 - **`engine.test.ts`** — URL building, JSON decoding, the three CKAN error shapes, 429/503 retry, redirects.
 - **`client.test.ts`** — action URL/param mapping, base-URL normalisation, result unwrapping, `fq`/`fq_list`, facets, blank ids.
-- **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `helpers.ts`), same outcome on both sides.
-- **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
+- **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `apps/cli/test/helpers.ts`), same outcome on both sides.
+- **`log.test.ts`** — the record helpers of `apps/cli/src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
 - **`cli.test.ts`** — every command, `--portal`/`CKAN_BASE_URL` precedence, blank-value rejection, output escaping and exit codes.
 - **`portals.test.ts`** — `portalKey`, `findPortal`, `checkPortal` outcomes, `checkPortals` / `checkPortalUrls` (retry, concurrency), and the invariants of the built-in list.
@@ -388,13 +435,13 @@ node --test dist/test/client.test.js   # one file, after a build
 No test touches the network. To check a portal by hand:
 
 ```bash
-node dist/src/cli/index.js status
-node dist/src/cli/index.js search --fq extras_registerobject_type:verwaltungsvorschrift --rows 1
+node apps/cli/dist/src/cli/index.js status
+node apps/cli/dist/src/cli/index.js search --fq extras_registerobject_type:verwaltungsvorschrift --rows 1
 ```
 
 ## The portal list
 
-`src/client/portals-list.ts` holds the known CKAN portals in Germany as plain JSON in a
+`packages/client/src/portals-list.ts` holds the known CKAN portals in Germany as plain JSON in a
 TypeScript module, so it is compiled into the CLI: `ckan portals` and `--portal <id>`
 never need an outside service. Refresh it with
 
@@ -403,7 +450,7 @@ npm run update-portals              # build, check, rewrite the list
 npm run update-portals -- --dry-run # check and report only
 ```
 
-`scripts/update-portals.ts` collects candidate URLs from three lists — **Wikidata**
+`packages/client/scripts/update-portals.ts` collects candidate URLs from three lists — **Wikidata**
 (open-data portals in Germany with their API endpoint or website), the CKAN project's
 **instance registry** (`ckan/ckan-instances`) and **GovData's harvest sources** (DCAT
 feeds; the feed's directory and origin are tried) — and checks every candidate and every
@@ -428,9 +475,13 @@ shows what changed.
 GitHub Actions workflows under `.github/workflows/`, identical to the other
 maschinenlesbar.org CLIs:
 
-- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR.
-- **release.yml** — on a `v*` tag: verify the tag matches `package.json`, test, `npm pack`, SBOMs, and a GitHub Release.
-- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): publish to npm via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
+- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR; then pack the
+  real tarball, check the pack left nothing behind, install it globally with the registry out
+  of reach and run the bin.
+- **release.yml** — on a `v*` tag (made by `npm run bump`): verify the tag matches
+  `apps/cli/package.json`, test, write the SBOMs (scoped to the `apps/cli` workspace), then
+  `npm pack --workspace apps/cli`, and create a GitHub Release with the tarball.
+- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): `npm publish --workspace apps/cli` via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
 - **docs.yml** — the project website and TypeDoc API docs to GitHub Pages on each `v*` tag.
   TypeDoc runs from the lockfile-pinned `tools/docs/` toolchain; locally, run
   `npm ci --prefix tools/docs` once before `npm run docs`.
@@ -444,8 +495,9 @@ The project website — <https://maschinenlesbar-org.github.io/ckan-cli/> in Eng
 reference under `/api/`. Its content comes from this repository: the README intro and quick
 start, and the command tree of the built CLI (`site/scripts/cli-reference.mjs`). `Usage.md`,
 `GLOSSARY.md` (+ `GLOSSARY.de.md`), `EXAMPLE.md` (+ `EXAMPLE.de.md`) and the skills get pages
-too once they exist. The only repo-specific files are `site/_config.yml` and
-`site/_data/project.yml` (the German intro and the access requirements); the rest of `site/` is
+too once they exist. The only repo-specific files are `site/_config.yml` (which also says
+where the published manifest and the built program are: `manifest: apps/cli/package.json`,
+`program: apps/cli/dist/src/cli/program.js`) and `site/_data/project.yml` (the German intro and the access requirements); the rest of `site/` is
 identical in every maschinenlesbar.org CLI, so change it in all of them together. When the
 README intro changes, update the German intro in `site/_data/project.yml`.
 
@@ -466,7 +518,7 @@ contributions; see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## The log on stderr
 
-Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+Every diagnostic line on stderr is a log record (`apps/cli/src/cli/log.ts`): a timestamp, a level
 (`ERROR`, `WARN`, `INFO`) and a topic, `ckan.<area>`. `--log-format text` (the default)
 writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
 `--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
