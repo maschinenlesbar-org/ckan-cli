@@ -1,0 +1,136 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { assertValid } from "@maschinenlesbar.org/ckan-client/internal/validate";
+import { CkanError, CkanValidationError } from "@maschinenlesbar.org/ckan-client/internal/errors";
+import * as library from "../src/index.js";
+import { CkanClient } from "@maschinenlesbar.org/ckan-client/internal/client";
+import { run } from "../src/cli/run.js";
+import type { CliDeps } from "../src/cli/io.js";
+import { parity, untimed } from "./helpers.js";
+
+const positive = (n: number): string | undefined => (n > 0 ? undefined : "Expected a positive number.");
+
+test("assertValid returns a valid value unchanged", () => {
+  assert.equal(assertValid("rows", 5, positive), 5);
+});
+
+test("assertValid throws CkanValidationError 'Invalid <name>: <reason>'", () => {
+  assert.throws(
+    () => assertValid("rows", 0, positive),
+    (err: unknown) =>
+      err instanceof CkanValidationError &&
+      err instanceof CkanError &&
+      err.name === "CkanValidationError" &&
+      err.message === "Invalid rows: Expected a positive number.",
+  );
+});
+
+test("the package root exports CkanValidationError and assertValid", () => {
+  assert.equal(library.CkanValidationError, CkanValidationError);
+  assert.equal(library.assertValid, assertValid);
+});
+
+test("run() reports a CkanValidationError from an action as a usage error", async () => {
+  const out: string[] = [];
+  const err: string[] = [];
+  const deps: CliDeps = {
+    io: { out: (s) => out.push(s), err: (s) => err.push(s) },
+    env: {},
+    createClient: (): CkanClient => {
+      throw new CkanValidationError("Invalid rows: Expected a positive number.");
+    },
+  };
+  assert.equal(await run(["status"], deps), 1);
+  assert.deepEqual(err.map(untimed), ["ERROR [ckan.cli] Invalid rows: Expected a positive number."]);
+  assert.deepEqual(out, []);
+});
+
+test("parity() runs the CLI and the library on one transport and splits their requests", async () => {
+  const result = await parity(["--compact", "status"], (transport) => new CkanClient({ transport }).status(), {
+    responder: () => ({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: Buffer.from(JSON.stringify({ success: true, result: { ckan_version: "2.10.11" } })),
+    }),
+  });
+  assert.equal(result.cli.code, 0);
+  assert.equal(result.cli.out, '{"ckan_version":"2.10.11"}');
+  assert.equal(result.cli.requests.length, 1);
+  assert.deepEqual(result.lib, { ok: true, value: { ckan_version: "2.10.11" }, requests: result.lib.requests });
+  assert.equal(result.lib.requests.length, 1);
+  assert.equal(result.cli.requests[0]!.url, result.lib.requests[0]!.url);
+});
+
+test("blankProblem: blank strings and lists with a blank entry are invalid", async () => {
+  const { blankProblem, isBlank } = await import("@maschinenlesbar.org/ckan-client/internal/validate");
+  for (const value of ["", " ", "\t\n", [""], ["a", " "]]) {
+    assert.equal(blankProblem(value), "Expected a non-empty value.", JSON.stringify(value));
+  }
+  for (const value of ["a", " a ", [], ["a", "b"], 0, true, undefined, null]) {
+    assert.equal(blankProblem(value), undefined, JSON.stringify(value));
+  }
+  assert.equal(isBlank(" "), true);
+  assert.equal(isBlank("x"), false);
+});
+
+test("countProblem: a non-negative safe integer", async () => {
+  const { countProblem } = await import("@maschinenlesbar.org/ckan-client/internal/validate");
+  for (const n of [0, 1, Number.MAX_SAFE_INTEGER]) assert.equal(countProblem(n), undefined, String(n));
+  for (const n of [-1, 1.5, NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(countProblem(n), "Expected a non-negative integer.", String(n));
+  }
+});
+
+test("facetLimitProblem: -1 or a non-negative safe integer", async () => {
+  const { facetLimitProblem } = await import("@maschinenlesbar.org/ckan-client/internal/validate");
+  for (const n of [-1, 0, 50]) assert.equal(facetLimitProblem(n), undefined, String(n));
+  for (const n of [-2, 1.5, NaN, Infinity]) {
+    assert.equal(facetLimitProblem(n), "Expected -1 or a non-negative integer.", String(n));
+  }
+});
+
+test("intRangeProblem: a safe integer within [min, max], with the CLI's messages", async () => {
+  const { intRangeProblem } = await import("@maschinenlesbar.org/ckan-client/internal/validate");
+  const problem = intRangeProblem(0, 10);
+  for (const n of [0, 5, 10]) assert.equal(problem(n), undefined, String(n));
+  assert.equal(problem(-1), "Must be >= 0.");
+  assert.equal(problem(11), "Must be <= 10.");
+  for (const n of [1.5, NaN, Infinity]) assert.equal(problem(n), "Expected an integer from 0 to 10.", String(n));
+});
+
+test("headerValueProblem: no blank value, C0 controls but tab, DEL or code points above U+00FF", async () => {
+  const { headerValueProblem } = await import("@maschinenlesbar.org/ckan-client/internal/validate");
+  assert.equal(headerValueProblem(""), "Expected a non-empty value.");
+  assert.equal(headerValueProblem("  "), "Expected a non-empty value.");
+  for (const code of [0x00, 0x0a, 0x0d, 0x1f, 0x7f]) {
+    assert.equal(headerValueProblem(`a${String.fromCharCode(code)}b`), "Value contains control characters.", String(code));
+  }
+  assert.equal(headerValueProblem("agent€"), "Value contains characters outside Latin-1 (above U+00FF).");
+  for (const ok of ["ua/1", "a\tb", "café", "ÿ"]) assert.equal(headerValueProblem(ok), undefined, ok);
+});
+
+test("baseUrlProblem: no surrounding or embedded whitespace or control characters", async () => {
+  const { baseUrlProblem } = await import("@maschinenlesbar.org/ckan-client/internal/validate");
+  for (const value of ["https://x.org ", " https://x.org", "https://x.org\n"]) {
+    assert.equal(baseUrlProblem(value), "A base URL cannot have surrounding whitespace.", JSON.stringify(value));
+  }
+  for (const value of ["https://x.org/a b", "https://x.org/a\tb", `https://x.org/a${String.fromCharCode(0x7f)}`]) {
+    assert.equal(baseUrlProblem(value), "A base URL cannot contain whitespace or control characters.", JSON.stringify(value));
+  }
+  assert.equal(baseUrlProblem("https://x.org/ckan"), undefined);
+});
+
+test("baseUrlProblem: an absolute http(s) URL without a query string or fragment", async () => {
+  const { baseUrlProblem } = await import("@maschinenlesbar.org/ckan-client/internal/validate");
+  for (const value of ["", "   ", "not-a-url", "http://", "/relative"]) {
+    assert.equal(baseUrlProblem(value), "Expected an absolute http(s) URL.", JSON.stringify(value));
+  }
+  assert.equal(baseUrlProblem("ftp://h.example?x"), 'Unsupported scheme "ftp:". Expected an http(s) URL.');
+  assert.equal(baseUrlProblem("file:///etc/passwd"), 'Unsupported scheme "file:". Expected an http(s) URL.');
+  for (const value of ["https://h.example?x=1", "https://h.example/?", "https://h.example#f"]) {
+    assert.equal(baseUrlProblem(value), "Expected a site URL without a query string or fragment.", value);
+  }
+  for (const value of ["https://h.example", "http://127.0.0.1:9/ckan/", "http://user:pw@h.example"]) {
+    assert.equal(baseUrlProblem(value), undefined, value);
+  }
+});
