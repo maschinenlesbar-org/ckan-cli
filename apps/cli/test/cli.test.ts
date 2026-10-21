@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run } from "../src/cli/run.js";
-import { renderJson } from "../src/cli/shared.js";
+import { renderJson } from "../src/cli/output.js";
 import { CkanClient } from "@maschinenlesbar.org/ckan-client/internal/client";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "@maschinenlesbar.org/ckan-client/internal/http";

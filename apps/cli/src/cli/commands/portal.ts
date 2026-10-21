@@ -3,7 +3,8 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "../io.js";
-import { action, renderJson, toEngineOptions, type GlobalOptions } from "../shared.js";
+import { action, toEngineOptions, type GlobalOptions } from "../shared.js";
+import { renderJson } from "../output.js";
 import { checkPortals } from "@maschinenlesbar.org/ckan-client/internal/portals";
 import { PORTALS } from "@maschinenlesbar.org/ckan-client/internal/portals-list";
 import { isBlank } from "@maschinenlesbar.org/ckan-client/internal/validate";

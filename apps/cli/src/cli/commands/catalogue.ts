@@ -12,8 +12,8 @@ import {
   parseIntArg,
   parseNonEmpty,
   parseOptionValue,
-  renderJson,
 } from "../shared.js";
+import { renderJson } from "../output.js";
 
 /**
  * commander value-parser for a list --limit: 1 or more. CKAN reads `limit=0` as

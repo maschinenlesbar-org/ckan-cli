@@ -208,7 +208,8 @@ packages/client/src/
 apps/cli/src/cli/
     io.ts        # injectable I/O + env seam (CliDeps / CliIO), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
-    shared.ts    # option parsers, global-option resolver, JSON renderer
+    shared.ts    # option parsers, global-option resolver
+    output.ts    # the JSON renderer: escaping, deep and huge answers
     commands/
       catalogue.ts  # search, package(s), resource, organization(s), group(s), tags
       portal.ts     # status, licenses, portals, action
