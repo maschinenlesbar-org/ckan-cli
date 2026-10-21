@@ -98,7 +98,8 @@ one: the engine runs each transport call under the `timeoutMs` deadline (passing
 rejects at the deadline either way) and checks the size of the body it gets back
 (`Response exceeded the size limit of N bytes (maxResponseBytes; --max-response-bytes
 on the CLI)`). A custom transport may return its headers as a plain object in any
-case, a fetch `Headers` object or a `Map`, and its body as a `Buffer`, any
+case, a fetch `Headers` object or a `Map` (read into a record without a prototype, so a
+header named `__proto__` is an ordinary header), and its body as a `Buffer`, any
 `ArrayBuffer` view (fetch's `Uint8Array`) or an `ArrayBuffer`. Anything it throws, and
 a response without a valid status, headers object or body, becomes a
 `CkanNetworkError`. A reset connection is not retried (only 429/503 are), and a
