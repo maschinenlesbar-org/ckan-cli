@@ -312,6 +312,11 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   requests a second until the process was killed. Both constants are exported.
 - **Readable failures.** A non-JSON answer names the URL and the content type
   (`Expected JSON from … but got text/html`); JSON that is not a CKAN envelope says so;
+  a number JSON.parse cannot carry exactly (out of a double's range, `1e400`; past 2^53 in
+  any written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but
+  too small, `1e-400`) is a `CkanParseError` `Unexpected response from <url>: the number
+  <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a
+  linear scan that skips strings; below 2^53 a decimal fraction keeps a double's precision);
   a Solr syntax error is cut down to Solr's `[Reason: …]`; a redirect loop (Bonn and
   Bielefeld redirect every API URL to itself) ends with `stopped after 5 redirects`,
   and a 3xx with a missing or malformed `Location` with `redirect not followed (no
@@ -540,7 +545,7 @@ and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cu
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, unexpected errors, a response nested too deeply to print), `api` (the portal's
 answers: an error status, CKAN's error envelope on HTTP 200, a `CkanActionError`, and a
-malformed answer, a `CkanParseError`: bad JSON, not JSON, not a CKAN envelope, the wrong
+malformed answer, a `CkanParseError`: bad JSON, not JSON, a number it cannot carry exactly, not a CKAN envelope, the wrong
 result shape, an unknown charset), `http` (the connection, the cleartext warning) and `output` (a failed
 stdout write). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
