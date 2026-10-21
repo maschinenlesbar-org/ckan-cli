@@ -321,9 +321,11 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   (`Expected JSON from … but got text/html`); JSON that is not a CKAN envelope says so;
   a number JSON.parse cannot carry exactly (out of a double's range, `1e400`; past 2^53 in
   any written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but
-  too small, `1e-400`) is a `CkanParseError` `Unexpected response from <url>: the number
+  too small, `1e-400`; a subnormal that does not print as written, `3e-324`, printed `5e-324`)
+  is a `CkanParseError` `Unexpected response from <url>: the number
   <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a
-  linear scan that skips strings; below 2^53 a decimal fraction keeps a double's precision;
+  linear scan that skips strings; below 2^53 and above the smallest normal double,
+  2.2250738585072014e-308, a decimal fraction keeps a double's precision;
   past 2^53 the number as written is compared with the number as printed, `String(value)`,
   so a double a server wrote in its shortest form, `1E23` or `1.7976931348623157E308`,
   passes, while `12345678901234567890`, printed `12345678901234567000`, is refused);

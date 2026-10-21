@@ -279,7 +279,8 @@ CKAN's error text is shown on stderr (in an `ERROR` record of `ckan.api`), e.g.
 > **Numbers pass through JavaScript.** The output is the parsed and re-serialised
 > JSON. A number that would not print as the server wrote it (an integer above 2⁵³,
 > 9,007,199,254,740,992, that loses its last digits, a number beyond the double range,
-> `1e400`, or one too small, `1e-400`) is an error (exit 1, `the number … cannot be
+> `1e400`, one too small, `1e-400`, or one below the normal double range that a double
+> would change, `3e-324`) is an error (exit 1, `the number … cannot be
 > represented exactly`), never a changed value; one the server wrote in a double's
 > shortest form (`1E23`) prints as written. CKAN metadata rarely holds such numbers; for
 > an exact copy of the raw answer, use `curl` on `<site>/api/3/action/<name>`.
