@@ -422,6 +422,11 @@ test("a password in --portal, an unparseable CKAN_BASE_URL or an id is never pri
   assert.equal(await run(["package", `https://bob:${pw}@ckan.example.org`], refused.deps), 1);
   assert.equal(refused.mt.calls.length, 0);
   assert.doesNotMatch(refused.err.join("\n"), /hunter2/);
+  // A URL given as a parameter goes out percent-encoded; a 404 message echoes that form.
+  const id = makeCli(() => jsonResponse({ success: false, error: { message: "Not found" } }, 404));
+  assert.equal(await run(["action", "package_show", "--param", `id=https://bob:${pw}@ckan.example.org`], id.deps), 4);
+  assert.match(id.mt.last().url, /id=https%3A%2F%2Fbob%3Ahunter2%40/);
+  assert.doesNotMatch(id.err.join("\n"), /hunter2/);
 });
 
 test("--user-agent refuses a blank value, control characters and non-Latin-1 before any request", async () => {

@@ -279,7 +279,7 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   still re-checks the scheme on every hop and redirect). Userinfo is allowed and
   redacted in messages; the reasons never repeat the value. The CLI also redacts on
   output: `run.ts` (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of
-  every URL argument and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it
+  every URL argument (the value of a `key=value` pair too, `--param id=<url>`) and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it
   with `***` in everything it prints — commander's usage errors, which echo a rejected
   `--base-url` or `--portal` value or a URL typed where the command goes, the
   client's own messages and the help's defaults — so a password with spaces,

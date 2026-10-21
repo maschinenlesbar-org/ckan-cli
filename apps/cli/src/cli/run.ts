@@ -171,8 +171,13 @@ export interface Redaction {
  * `/`; the exact strings can. Without credentials the text passes through unchanged.
  */
 export function redactionFor(argv: readonly string[], env: Record<string, string | undefined>): Redaction {
-  // An `--option=value` token is echoed as its value alone.
-  const values = argv.map((token) => (token.startsWith("-") && token.includes("=") ? token.slice(token.indexOf("=") + 1) : token));
+  // An `--option=value` token is echoed as its value alone; a `key=value` pair (`--param
+  // id=https://user:pw@host`) carries its value after the "=", which a URL there starts.
+  const values = argv.flatMap((token) => {
+    const eq = token.indexOf("=");
+    if (eq < 0) return [token];
+    return token.startsWith("-") ? [token.slice(eq + 1)] : [token, token.slice(eq + 1)];
+  });
   // A base URL typed without its scheme is read as if it had one (anywhere else a bare
   // `a:b@c` is no credential: a dataset id, a search text, a User-Agent).
   const baseUrls = [...flagValues(argv, BASE_URL_FLAGS), env["CKAN_BASE_URL"] ?? ""].map((value) =>
