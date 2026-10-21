@@ -323,7 +323,10 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   any written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but
   too small, `1e-400`) is a `CkanParseError` `Unexpected response from <url>: the number
   <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a
-  linear scan that skips strings; below 2^53 a decimal fraction keeps a double's precision);
+  linear scan that skips strings; below 2^53 a decimal fraction keeps a double's precision;
+  past 2^53 the number as written is compared with the number as printed, `String(value)`,
+  so a double a server wrote in its shortest form, `1E23` or `1.7976931348623157E308`,
+  passes, while `12345678901234567890`, printed `12345678901234567000`, is refused);
   a Solr syntax error is cut down to Solr's `[Reason: …]`; a redirect loop (Bonn and
   Bielefeld redirect every API URL to itself) ends with `stopped after 5 redirects`,
   and a 3xx with a missing or malformed `Location` with `redirect not followed (no
