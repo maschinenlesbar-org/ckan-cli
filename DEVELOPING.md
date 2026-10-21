@@ -466,7 +466,8 @@ The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `c
   that goes into a path, the action name: canonical or refused on both sides, never sent
   raw; from the 2026-10-21 kit) and P25 (a number the answer can't carry exactly, or an
   empty answer, is an error, never a changed value). Both adapters wrap `parity` into the
-  kit's shape and report a ckan usage error (exit 1, `ckan.cli`) as the kit's exit 2. P26
+  kit's shape; P24's `USAGE_EXIT` is 1, ckan's usage exit (an ERROR record of `ckan.cli`),
+  compared as it is. P26
   (`-o` integrity) is not copied: ckan has no `-o`.
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
