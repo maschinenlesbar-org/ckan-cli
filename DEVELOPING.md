@@ -510,7 +510,7 @@ shows what changed.
 GitHub Actions workflows under `.github/workflows/`, identical to the other
 maschinenlesbar.org CLIs:
 
-- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR; then pack the
+- **ci.yml** — type-check, build and test on Node 22/24/26 for every push and PR; then pack the
   real tarball, check the pack left nothing behind, install it globally with the registry out
   of reach and run the bin.
 - **release.yml** — on a `v*` tag (made by `npm run bump`): verify the tag matches
