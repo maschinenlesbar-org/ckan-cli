@@ -45,7 +45,10 @@ export function findPortal(idOrUrl: string, list: readonly Portal[]): Portal | u
 /** The outcome of `checkPortal`. */
 export interface PortalCheck {
   working: boolean;
-  /** A short reason when not working, e.g. `HTTP 404`, `host not found`. */
+  /**
+   * A short reason when not working, e.g. `HTTP 404`, `host not found`, `not JSON (text/html)`,
+   * `invalid JSON`, `inexact number` (valid JSON with a number a double can't carry), `empty answer`.
+   */
   problem: string | null;
   datasets: number | null;
   /** From `status_show`, which some portals lock (Berlin): then null. */
@@ -110,6 +113,10 @@ function problemOf(err: unknown): string {
     if (got) return `not JSON (${got[1]})`;
     if (/: the answer is not a CKAN Action API response; /.test(message)) return "not a CKAN Action API";
     if (/: unexpected response shape: /.test(message)) return "unexpected response shape";
+    // Valid JSON whose number a double can't carry, or no body at all: not "invalid JSON".
+    if (/: the number .* cannot be represented exactly\.$/.test(message)) return "inexact number";
+    if (/: empty response body\.$/.test(message)) return "empty answer";
+    if (/: unsupported response charset /.test(message)) return "unsupported charset";
     return "invalid JSON";
   }
   if (err instanceof CkanNetworkError) {

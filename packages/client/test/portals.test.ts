@@ -94,6 +94,11 @@ test("checkPortal names the problem when the search fails", async () => {
     ["not JSON (text/html)", () => rawResponse("<!DOCTYPE html>", "text/html")],
     ["not a CKAN Action API", () => jsonResponse({ hello: "world" })],
     ["unexpected response shape", () => jsonResponse({ help: "h", success: true, result: [] })],
+    // Valid JSON with a number a double can't carry is not "invalid JSON" (Bug 05-1).
+    ["inexact number", () => rawResponse('{"help":"h","success":true,"result":{"count":12345678901234567890,"results":[]}}', "application/json")],
+    ["inexact number", () => rawResponse('{"help":"h","success":true,"result":{"count":0,"results":[1e400]}}', "application/json")],
+    ["empty answer", () => rawResponse("", "application/json")],
+    ["invalid JSON", () => rawResponse('{"help":', "application/json")],
     ["host not found", () => Promise.reject(new CkanNetworkError("getaddrinfo ENOTFOUND x", { cause: Object.assign(new Error("x"), { code: "ENOTFOUND" }) }))],
     ["timeout", () => Promise.reject(new CkanNetworkError("Request timed out after 15000ms"))],
     ["redirect loop", () => ({ status: 301, headers: { location: "/api/3/action/package_search" }, body: Buffer.from("") })],
