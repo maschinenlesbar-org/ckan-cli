@@ -329,6 +329,11 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   and a 3xx with a missing or malformed `Location` with `redirect not followed (no
   Location header)` / `redirect to <location> not followed`. A response nested too
   deeply to pretty-print says so (`try --compact`) instead of overflowing the stack.
+  `--compact` takes V8's fast path (`JSON.stringify(value)`, the only one that prints very
+  deep nesting on Node 26) unless the answer holds a string or key of 64 Mi characters or
+  more (`holdsHugeString`): on Node 26 the fast path aborts the process on a ~250 MB
+  string from JSON.parse, so such an answer goes through the gap path (an empty gap, the
+  same text).
 - **Filters.** CKAN reads a repeated `fq=` as a Python list and pastes it into
   Solr (HTTP 409), and splits a lone `fq_list` value into characters. So one
   filter goes out as `fq`, two or more as `fq_list`. Facet fields go out as the
