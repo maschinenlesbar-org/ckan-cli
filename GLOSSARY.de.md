@@ -120,10 +120,13 @@ Steuerzeichen darin werden maskiert.
 Die CKAN-Suche läuft auf **Apache Solr**, die Parameter folgen daher der Solr-Syntax.
 
 **`q` (Query).** Die Volltextsuche, z. B. `elbe` oder `title:haushalt`. CLI: `search
-[query]`.
+[query]`. Wird ohne umgebende Leerzeichen und in zusammengesetztem Unicode (NFC) gesendet,
+sodass ein zerlegter Umlaut aus einem Dateinamen trifft; die Solr-Syntax darin bleibt, wie
+sie geschrieben ist.
 
 **`fq` (Filter-Query).** Ein Filter, der die Treffer einschränkt, ohne ihre Reihenfolge zu
 ändern, z. B. `organization:allris`. CLI: `--fq`, wiederholbar; jeder Filter muss zutreffen.
+Wird genau so gesendet, wie er geschrieben ist (seine Werte sind meist exakt verglichene Codes).
 CKAN beantwortet einen wiederholten `fq`-Schlüssel mit HTTP 409, deshalb wird ein Filter als
 `fq` und mehrere als `fq_list` gesendet.
 

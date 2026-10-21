@@ -110,10 +110,12 @@ record is always one line; control characters in it are escaped.
 CKAN search runs on **Apache Solr**, so its parameters use Solr syntax.
 
 **`q` (query).** The full-text query, e.g. `elbe` or `title:haushalt`. CLI: `search
-[query]`.
+[query]`. Sent trimmed and in composed Unicode (NFC), so a decomposed umlaut pasted from a
+file name matches; the Solr syntax in it is left as written.
 
 **`fq` (filter query).** A filter that narrows the results without changing their order,
-e.g. `organization:allris`. CLI: `--fq`, repeatable; every filter must match. CKAN answers a
+e.g. `organization:allris`. CLI: `--fq`, repeatable; every filter must match. Sent exactly
+as written (its values are mostly exact-match codes). CKAN answers a
 repeated `fq` key with HTTP 409, so one filter is sent as `fq` and several as `fq_list`.
 
 **`rows` / `start`.** Page size and zero-based offset, each a non-negative integer (the CLI

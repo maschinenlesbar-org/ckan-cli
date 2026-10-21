@@ -42,6 +42,20 @@ export function textProblem(value: unknown): string | undefined {
   return blankProblem(value);
 }
 
+/**
+ * A free-text value as CKAN matches it: without surrounding whitespace (a value pasted
+ * with a trailing space matched nothing) and in composed Unicode, NFC (a decomposed
+ * "Gewässer", a plus U+0308 as pasted from a macOS file name, matched nothing the
+ * composed form matches). Inner whitespace is kept. Used for the search text (`q`) and
+ * the tag query, never for ids, Solr filters (`fq`), sort expressions or field names.
+ * NFC changes no character of Solr's query syntax (all ASCII), so a `q` keeps its
+ * meaning; NFKC is not used, because it would rewrite characters (`ﬁ` to `fi`, full-width
+ * forms) that a phrase or a wildcard may mean literally.
+ */
+export function normalizeText(value: string): string {
+  return value.trim().normalize("NFC");
+}
+
 /** A list of non-blank strings (filter queries, facet fields). */
 export function textListProblem(value: unknown): string | undefined {
   if (!Array.isArray(value)) return "Expected a list of strings.";

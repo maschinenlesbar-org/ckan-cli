@@ -9,6 +9,7 @@ import {
   blankProblem,
   countProblem,
   facetLimitProblem,
+  normalizeText,
   queryValueProblem,
   textListProblem,
   textProblem,
@@ -251,7 +252,8 @@ export class CkanClient {
    * match). `fq_list` is only used for two or more, because CKAN splits a lone
    * `fq_list` value into characters. Facet fields go out as the JSON list CKAN
    * expects in `facet.field`. A blank `q`, `sort`, filter or facet field is
-   * refused (CkanValidationError), never sent or dropped.
+   * refused (CkanValidationError), never sent or dropped. The search text `q` goes
+   * out trimmed and in NFC (`normalizeText`); filters, sort and facet fields as given.
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     assertParams(params);
@@ -266,7 +268,7 @@ export class CkanClient {
     const fq = params.fq ?? [];
     const facetFields = params.facet_field ?? [];
     return this.typed<PackageSearchResult>("package_search", {
-      q: params.q,
+      q: params.q === undefined ? undefined : normalizeText(params.q),
       fq: fq.length === 1 ? fq[0] : undefined,
       fq_list: fq.length > 1 ? fq : undefined,
       rows: params.rows,
@@ -324,12 +326,13 @@ export class CkanClient {
     return this.groupOrOrgList("group_list", params);
   }
 
-  /** Tags, optionally only those containing a substring (a blank one is refused). */
+  /** Tags, optionally only those containing a substring (a blank one is refused; sent trimmed, in NFC). */
   async tagList(params: TagListParams = {}): Promise<string[]> {
     assertParams(params);
     assertKeys("tagList", "tag_list", params, TAG_LIST_KEYS);
     assertText("query", params.query);
-    return this.typed<string[]>("tag_list", { query: params.query }, Array.isArray, "an array");
+    const query = params.query === undefined ? undefined : normalizeText(params.query);
+    return this.typed<string[]>("tag_list", { query }, Array.isArray, "an array");
   }
 
   /** The licences this portal offers. */

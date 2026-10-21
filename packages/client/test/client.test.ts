@@ -147,6 +147,27 @@ test("packageSearch sends several filters as fq_list, never a repeated fq (HTTP 
   assert.deepEqual(url.searchParams.getAll("fq_list"), ["type:document", "organization:allris"]);
 });
 
+test("the search text and the tag query go out trimmed and composed (NFC); Solr filters, sort and facets as given", async () => {
+  // A decomposed "Gewässer" (a plus U+0308, as pasted from a macOS file name) and a trailing
+  // space matched nothing the composed form matches. fq, sort and facet fields are Solr syntax
+  // over exact-match fields and field names: sent exactly as written.
+  const nfd = "Gewa\u0308sser";
+  const mt = makeMockTransport((req) =>
+    jsonResponse(ckan(req.url.includes("tag_list") ? [] : { count: 0, results: [] })),
+  );
+  const client = clientWith(mt);
+  await client.packageSearch({ q: `  title:${nfd}  `, fq: [` tags:${nfd}`], sort: "score desc", facet_field: ["tags"] });
+  const search = new URL(mt.last().url).searchParams;
+  assert.equal(search.get("q"), "title:Gew\u00e4sser");
+  assert.equal(search.get("fq"), ` tags:${nfd}`);
+  assert.equal(search.get("sort"), "score desc");
+  await client.tagList({ query: `\u00a0${nfd} ` });
+  assert.equal(new URL(mt.last().url).searchParams.get("query"), "Gew\u00e4sser");
+  // Inner whitespace and Solr syntax stay as written.
+  await client.packageSearch({ q: ' "Elbe  Hafen" AND -type:x ' });
+  assert.equal(new URL(mt.last().url).searchParams.get("q"), '"Elbe  Hafen" AND -type:x');
+});
+
 test("blank search values, filters, tag queries and params are refused before any request", async () => {
   const cases: [string, (c: CkanClient) => Promise<unknown>][] = [
     ["Invalid q: Expected a non-empty value.", (c) => c.packageSearch({ q: " " })],

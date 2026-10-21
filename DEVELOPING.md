@@ -347,6 +347,15 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   value and answer with an unfiltered result. The CLI's value parsers
   (`parseNonEmpty`, `collectNonEmpty`, `--param`) apply the same rule as a usage
   error.
+- **Free text goes out canonical.** The search text (`q`, `ckan search <query>`) and the
+  tag query (`tagList({ query })`, `ckan tags --query`) are sent trimmed and in composed
+  Unicode, NFC (`normalizeText`, exported): a decomposed "Gewässer" pasted from a macOS
+  file name, or a trailing space, matched nothing. Inner whitespace is kept, and NFC
+  changes no character of Solr's query syntax (all ASCII), so a `q` such as
+  `title:Haushalt AND -type:x` keeps its meaning. Solr filters (`fq`), the sort
+  expression, facet fields, ids and `action()` parameters go out exactly as given: they
+  are query syntax over exact-match fields, field names or codes, where only the stored
+  form decides what matches. The CLI passes the values on as typed.
 - **Known parameters only.** `packageSearch` (q, fq, rows, start, sort,
   facet_field, facet_limit), `packageList` (limit, offset), `organizationList` /
   `groupList` (plus all_fields) and `tagList` (query) throw `CkanValidationError` for

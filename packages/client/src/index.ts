@@ -32,7 +32,7 @@ export {
   MAX_MESSAGE_VALUE_LENGTH,
 } from "./errors.js";
 
-export { assertValid } from "./validate.js";
+export { assertValid, normalizeText } from "./validate.js";
 export type { Problem } from "./validate.js";
 
 export { PORTALS } from "./portals-list.js";
