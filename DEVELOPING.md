@@ -458,7 +458,13 @@ The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `c
   secret replaced in the message only, commander's help one record per line, the format
   commander parsed, a malformed answer under `api`, echoed credentials replaced, an
   `a:b@c` value left alone; from dip-bundestag-cli, with a `USAGE_EXIT` adapter switch
-  since ckan's usage errors exit 1, and no `OUTPUT_OPTION`: ckan has no `-o`).
+  since ckan's usage errors exit 1, and no `OUTPUT_OPTION`: ckan has no `-o`), P24 (an
+  input corpus through every text filter, the search text and the tag query, and the one id
+  that goes into a path, the action name: canonical or refused on both sides, never sent
+  raw; from the 2026-10-21 kit) and P25 (a number the answer can't carry exactly, or an
+  empty answer, is an error, never a changed value). Both adapters wrap `parity` into the
+  kit's shape and report a ckan usage error (exit 1, `ckan.cli`) as the kit's exit 2. P26
+  (`-o` integrity) is not copied: ckan has no `-o`.
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
