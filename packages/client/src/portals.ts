@@ -161,18 +161,18 @@ export const DEFAULT_CHECK_CONCURRENCY = 6;
 /** Options for `checkPortalUrls` and `checkPortals`. */
 export interface CheckPortalsOptions {
   /** Client options for every check; `baseUrl` is replaced by each portal's URL. */
-  engineOptions?: EngineOptions;
+  engineOptions?: EngineOptions | undefined;
   /** Builds the client for one portal. Defaults to `new CkanClient(options)`. */
-  createClient?: (options: EngineOptions) => CkanClient;
+  createClient?: ((options: EngineOptions) => CkanClient) | undefined;
   /** Checks in flight at once, 1 or more. Defaults to `DEFAULT_CHECK_CONCURRENCY` (6). */
-  concurrency?: number;
+  concurrency?: number | undefined;
   /**
    * When set, a failed check is repeated once after this pause (ms), so one
    * timeout does not count as down. Unset (the default): a single try.
    */
-  retryDelayMs?: number;
+  retryDelayMs?: number | undefined;
   /** Injectable sleep for the retry pause, for tests. */
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: ((ms: number) => Promise<void>) | undefined;
 }
 
 const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -219,7 +219,7 @@ export async function checkPortalUrls(urls: readonly string[], options: CheckPor
  */
 export async function checkPortals(
   portals: readonly Portal[] = PORTALS,
-  options: CheckPortalsOptions & { date?: string } = {},
+  options: CheckPortalsOptions & { date?: string | undefined } = {},
 ): Promise<Portal[]> {
   if (!Array.isArray(portals)) throw new CkanValidationError("Invalid portals: Expected an array.");
   const date = options.date ?? new Date().toISOString().slice(0, 10);

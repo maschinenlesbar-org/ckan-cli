@@ -65,6 +65,13 @@ new CkanClient({
 });
 ```
 
+Every optional field of the exported option and parameter types (`EngineOptions`,
+`PackageSearchParams`, `ListParams`, `GroupListParams`, `TagListParams`,
+`CheckPortalsOptions`) is typed `?: T | undefined`, so a consumer compiled with
+`exactOptionalPropertyTypes` can pass `{ baseUrl: process.env.CKAN_BASE_URL }`: an
+option given as `undefined` means its default, as an omitted one does
+(`packages/client/test/types.test.ts`).
+
 The numeric options (`timeoutMs`, `maxRetries`, `retryDelayMs` up to
 `MAX_RETRY_AFTER_MS`, `maxRedirects` up to `MAX_REDIRECTS`, `maxResponseBytes`) must be non-negative safe integers within their
 range. The constructor throws `CkanValidationError` otherwise: a negative or `NaN`
@@ -404,7 +411,7 @@ node --test packages/client/dist/test/client.test.js   # one file, after a build
 ```
 
 The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `client`,
-`retry-hook`, `portals`, `portal-sources`), everything that drives the CLI is in
+`retry-hook`, `portals`, `portal-sources`, `types`), everything that drives the CLI is in
 `apps/cli/test/`.
 
 - **`query.test.ts`** — query-string serialisation.

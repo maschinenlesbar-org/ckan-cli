@@ -49,22 +49,22 @@ export interface PackageSearchResult {
 /** Parameters for `package_search`. */
 export interface PackageSearchParams {
   /** Solr query string, e.g. `elbe` or `title:Haushalt`. */
-  q?: string;
+  q?: string | undefined;
   /** Filter queries, e.g. `["organization:allris"]`. All must match. */
-  fq?: string[];
+  fq?: string[] | undefined;
   /** Page size. CKAN caps it server-side (`ckan.search.rows_max`, 1000 by default). */
-  rows?: number;
+  rows?: number | undefined;
   /** Offset of the first result, for paging. */
-  start?: number;
+  start?: number | undefined;
   /** e.g. `"metadata_modified desc"`. */
-  sort?: string;
+  sort?: string | undefined;
   /**
    * Facet fields to count, e.g. `["organization", "res_format"]`. Counts come
    * back in `search_facets`.
    */
-  facet_field?: string[];
+  facet_field?: string[] | undefined;
   /** Maximum number of values returned per facet (CKAN's default is 50; -1 = all). */
-  facet_limit?: number;
+  facet_limit?: number | undefined;
 }
 
 /** An organization (a data publisher) or a group (a theme/category). */
@@ -80,20 +80,20 @@ export interface ListParams {
    * is refused: CKAN reads `limit=0` as "no limit", which the `all_fields` pager
    * would read as "no entries".
    */
-  limit?: number;
-  offset?: number;
+  limit?: number | undefined;
+  offset?: number | undefined;
 }
 
 /** Parameters for `organization_list` / `group_list`. */
 export interface GroupListParams extends ListParams {
   /** Return full objects instead of just names. */
-  all_fields?: boolean;
+  all_fields?: boolean | undefined;
 }
 
 /** Parameters for `tag_list`. */
 export interface TagListParams {
   /** Only tags containing this substring. */
-  query?: string;
+  query?: string | undefined;
 }
 
 /** A licence a portal offers (`license_list`). */

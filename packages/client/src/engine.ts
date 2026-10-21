@@ -34,35 +34,35 @@ export interface RawResponse {
 
 export interface EngineOptions {
   /** Base URL of the API. Defaults to https://suche.transparenz.hamburg.de (the Hamburg Transparenzportal) */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
-  transport?: Transport;
+  transport?: Transport | undefined;
   /**
    * Value of the User-Agent header. Must be sendable (see `assertHeaderValue`):
    * not blank, no control characters but tab, nothing above U+00FF.
    */
-  userAgent?: string;
+  userAgent?: string | undefined;
   /**
    * Per-request timeout in milliseconds, 0 to `MAX_TIMEOUT_MS` (2^31 - 1 ms); 0 disables.
    * It covers the whole response, body included, and the engine enforces it for every
    * transport (the request also gets an AbortSignal that fires at the deadline).
    */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
   /**
    * Number of automatic retries for transient (429/503) responses; a reset or other
    * network error is not retried. Each waits `retryDelayMs * attempt`, or the
    * response's `Retry-After` when that is longer (up to `MAX_RETRY_AFTER_MS`; a longer
    * one is not retried, and the CkanApiError says so). 0 to `MAX_RETRIES`; defaults to 2.
    */
-  maxRetries?: number;
+  maxRetries?: number | undefined;
   /**
    * Base backoff between retries in milliseconds (grows linearly), 0 to
    * `MAX_RETRY_AFTER_MS` (30 000); defaults to 200. It is also the floor under a
    * `Retry-After`: the header can lengthen a wait, never shorten it.
    */
-  retryDelayMs?: number;
+  retryDelayMs?: number | undefined;
   /** Number of HTTP redirects (301/302/303/307/308) to follow, 0 to `MAX_REDIRECTS`. Defaults to 5. */
-  maxRedirects?: number;
+  maxRedirects?: number | undefined;
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
    * from a hostile/buggy endpoint). Defaults to 100 MiB; set to 0 for no limit.
@@ -73,14 +73,14 @@ export interface EngineOptions {
    * the constructor throws CkanValidationError otherwise (a negative or NaN
    * timeout or cap would silently switch that guard off).
    */
-  maxResponseBytes?: number;
+  maxResponseBytes?: number | undefined;
   /** Injectable sleep, primarily for deterministic tests. */
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: ((ms: number) => Promise<void>) | undefined;
   /**
    * Called once per retry, right before the backoff sleep, for each retried 429/503
    * and reset connection; never when there is no retry. A throw is swallowed.
    */
-  onRetry?: (event: RetryEvent) => void;
+  onRetry?: ((event: RetryEvent) => void) | undefined;
 }
 
 /** What `EngineOptions.onRetry` is told about one retry. */
