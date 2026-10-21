@@ -191,6 +191,8 @@ export function action(
     warnOnCleartext(deps, global);
     const options = toEngineOptions(global);
     options.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));
+    // An answer delivered changed (invalid text replaced with U+FFFD) is never silent.
+    options.onWarning = (message) => logOf(deps).warn("api", message);
     const client = deps.createClient(options);
     await fn({ client, global, opts: command.opts() }, positionals);
   };

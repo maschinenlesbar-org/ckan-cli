@@ -61,6 +61,7 @@ new CkanClient({
   maxRetries: 3,              // 0..MAX_RETRIES (10); 429 / 503 are retried (linear backoff; a longer Retry-After up to 30 s)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",    // not blank; no control characters but tab; Latin-1 only
+  onWarning: (message) => console.warn(message), // an answer delivered changed (text replaced with U+FFFD)
   transport: customTransport, // inject your own HTTP transport
 });
 ```
@@ -91,6 +92,16 @@ redacted) `}`) is called once per retry right before the sleep, never when there
 a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
 `ckan.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
 seconds, ms under 1 s). Tests: `packages/client/test/retry-hook.test.ts`, `apps/cli/test/retry-log.test.ts`.
+
+Text in an answer is never changed silently (decision D2 of the 2026-10-21 fix plan): the
+engine decodes with a `fatal` TextDecoder and, on bytes that are not valid in the charset,
+decodes again with U+FFFD and counts what it replaced; a lone surrogate written as a JSON
+escape (`\ud800` without its pair, which `jq` refuses, and the whole output with it) becomes
+`\ufffd` too (`wellFormedEscapes`, one linear pass). The answer is delivered, never refused
+for one bad character, and the engine option `onWarning(message)` is told once per answer:
+`GET <url>: 2 characters of the answer were not valid text (invalid bytes or a lone
+surrogate) and replaced with U+FFFD.` A throw in it is swallowed. The CLI's `action()` logs
+it as a `WARN` record of `ckan.api`.
 
 `timeoutMs` and `maxResponseBytes` hold for every transport, not only the built-in
 one: the engine runs each transport call under the `timeoutMs` deadline (passing an
@@ -488,7 +499,7 @@ The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `c
   (`-o` integrity) is not copied: ckan has no `-o`. P27 (a big or odd answer is printed
   or refused in one clean record, within memory: 8 M numbers with `--compact` under a
   256 MB heap, 20 MB of DEL escaped under 512 MB, 90 MB of DEL an ERROR of `ckan.output`;
-  runs the built bin).
+  runs the built bin; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
@@ -597,7 +608,7 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 after one, unexpected errors), `api` (the portal's
 answers: an error status, CKAN's error envelope on HTTP 200, a `CkanActionError`, and a
 malformed answer, a `CkanParseError`: bad JSON, not JSON, a number it cannot carry exactly, not a CKAN envelope, the wrong
-result shape, an unknown charset), `http` (the connection, the cleartext warning) and `output` (a failed
+result shape, an unknown charset; and a WARN for replaced text), `http` (the connection, the cleartext warning) and `output` (a failed
 stdout write, an answer too deeply nested or too large to print). Code logs through
 `logOf(deps)` and never writes diagnostics with `io.err` directly. `run()` builds the
 logger from argv before commander parses it (`logFormatFromArgv`, which skips the value
