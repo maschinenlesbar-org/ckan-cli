@@ -451,7 +451,11 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   `run()`): an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly; an
   EPIPE on stderr is ignored, so a failed run keeps its exit code (`2>&1 | true` no
   longer turns a usage error into 0). Any other stdout write error (EBADF, EIO) is an
-  ERROR record of `ckan.output`, `Could not write to stdout: …`, and exits 1.
+  ERROR record of `ckan.output`, `Could not write to stdout: …`, and exits 1. When stdout
+  is a regular file (`> out.json`), every byte is written (`stdoutWriter`, `writeAll`): Node's
+  stream wrote it with one `writeSync` and ignored a short count, so a file-size limit or a
+  full disk cut the output short with exit 0; now the failure (EFBIG, ENOSPC) is stdout's
+  `error`, an ERROR record and exit 1 (decision D6).
 
 ## Testing
 
@@ -504,7 +508,8 @@ The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `c
   empty answer, is an error, never a changed value). Both adapters wrap `parity` into the
   kit's shape; P24's `USAGE_EXIT` is 1, ckan's usage exit (an ERROR record of `ckan.cli`),
   compared as it is. P26
-  (`-o` integrity) is not copied: ckan has no `-o`. P27 (a big or odd answer is printed
+  (`-o` integrity) is copied without its `-o` tests (ckan has no `-o`): stdout redirected to a
+  file under `ulimit -f` exits 1 with an ERROR record of `ckan.output`, never 0. P27 (a big or odd answer is printed
   or refused in one clean record, within memory: 8 M numbers with `--compact` under a
   256 MB heap, 20 MB of DEL escaped under 512 MB, 90 MB of DEL an ERROR of `ckan.output`;
   runs the built bin; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN).
