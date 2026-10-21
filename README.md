@@ -287,7 +287,8 @@ CKAN's error text is shown on stderr (in an `ERROR` record of `ckan.api`), e.g.
 > `1e400`, one too small, `1e-400`, or one below the normal double range that a double
 > would change, `3e-324`) is an error (exit 1, `the number … cannot be
 > represented exactly`), never a changed value; one the server wrote in a double's
-> shortest form (`1E23`) prints as written. CKAN metadata rarely holds such numbers; for
+> shortest form (`1E23`) prints as written. Solr's `_version_` (`--param fl=_version_`) is
+> always printed as a string with its exact digits, as Hamburg and GovData send it. CKAN metadata rarely holds such numbers; for
 > an exact copy of the raw answer, use `curl` on `<site>/api/3/action/<name>`.
 
 ## Global options

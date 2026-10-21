@@ -62,6 +62,7 @@ new CkanClient({
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",    // not blank; no control characters but tab; Latin-1 only
   onWarning: (message) => console.warn(message), // an answer delivered changed (text replaced with U+FFFD)
+  bigIntegerKeys: new Set(["serial"]), // members delivered as their exact literal, a string (`_version_` always)
   transport: customTransport, // inject your own HTTP transport
 });
 ```
@@ -345,7 +346,14 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   2.2250738585072014e-308, a decimal fraction keeps a double's precision;
   past 2^53 the number as written is compared with the number as printed, `String(value)`,
   so a double a server wrote in its shortest form, `1E23` or `1.7976931348623157E308`,
-  passes, while `12345678901234567890`, printed `12345678901234567000`, is refused);
+  passes, while `12345678901234567890`, printed `12345678901234567000`, is refused). A
+  member declared in `bigIntegerKeys` (decision D3) is exempt: its number is delivered as
+  its exact literal, a JSON string, whatever its size, so its type never depends on its
+  value (`scanNumbers` quotes it in the same linear pass, before `JSON.parse`; no reviver).
+  The CkanClient always declares Solr's `_version_`, which `package_search` returns for
+  `fl=_version_`: Hamburg and GovData send it as a string already (checked live
+  2026-10-22), and a portal that sends Solr's number (≈1.88e18) gets the same string
+  instead of a refused answer;
   a Solr syntax error is cut down to Solr's `[Reason: …]`; a redirect loop (Bonn and
   Bielefeld redirect every API URL to itself) ends with `stopped after 5 redirects`,
   and a 3xx with a missing or malformed `Location` with `redirect not followed (no

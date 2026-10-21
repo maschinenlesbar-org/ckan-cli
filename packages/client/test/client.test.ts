@@ -502,3 +502,19 @@ test("an error answer, a wrong shape and the pager's stop name the request: meth
   await assert.rejects(clientWith(endless).groupList({ all_fields: true }), (err: Error) =>
     err.message.startsWith(`GET https://suche.transparenz.hamburg.de${ACTION}/group_list?all_fields=true&limit=25&offset=399: group_list with all_fields: stopped after 400 pages`));
 });
+
+test("the client declares Solr's _version_ as a big integer: its exact literal as a string, as Hamburg and GovData send it (D3)", async () => {
+  // Hamburg and GovData answer package_search?fl=name,_version_ with "_version_" as a string; a
+  // portal that sends Solr's number (≈1.88e18, past 2^53) gets the same string, never a refusal.
+  const mt = makeMockTransport(() => ({
+    status: 200,
+    headers: { "content-type": "application/json" },
+    body: Buffer.from('{"help":"h","success":true,"result":{"count":2,"results":[{"name":"a","_version_":1879692734409736192},{"name":"b","_version_":"1879677114230243328"}]}}'),
+  }));
+  const res = await clientWith(mt).packageSearch({ rows: 2 });
+  assert.deepEqual(res.results.map((r) => r["_version_"]), ["1879692734409736192", "1879677114230243328"]);
+  // A caller's own declarations add to it.
+  const own = makeMockTransport(() => jsonResponse(ckan({ id: "x" })));
+  await new CkanClient({ transport: own.transport, bigIntegerKeys: new Set(["serial"]) }).status();
+  assert.throws(() => new CkanClient({ bigIntegerKeys: 5 as unknown as ReadonlySet<string> }), CkanValidationError);
+});

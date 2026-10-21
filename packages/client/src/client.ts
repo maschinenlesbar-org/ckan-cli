@@ -1,7 +1,7 @@
 // CkanClient — a typed client over the open (no-auth) read endpoints of any CKAN
 // Action API (`<site>/api/3/action`).
 
-import { DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, validateBaseUrl, type EngineOptions } from "./engine.js";
+import { bigIntegerKeysOption, DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, validateBaseUrl, type EngineOptions } from "./engine.js";
 import { CkanActionError, CkanParseError, CkanValidationError, cutForMessage, describeCkanError, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
 import {
@@ -31,6 +31,13 @@ import type {
 } from "./types.js";
 
 const ACTION = "/api/3/action";
+
+/**
+ * The members every CkanClient declares as big integers (`EngineOptions.bigIntegerKeys`): Solr's
+ * `_version_`, which `package_search` returns for `fl=_version_` (Hamburg and GovData send it as
+ * a string; a number would be past 2^53).
+ */
+const BIG_INTEGER_KEYS = ["_version_"] as const;
 
 /**
  * CKAN action names are always `[a-z0-9_]+`. Restricting to that allowlist closes
@@ -189,8 +196,14 @@ export class CkanClient {
 
   constructor(options: EngineOptions = {}) {
     this.#site = siteRoot(options.baseUrl ?? DEFAULT_BASE_URL);
-    // The engine checks every option, `sleep` included, before the client uses it.
-    this.#engine = new RequestEngine({ ...options, baseUrl: this.#site });
+    // The engine checks every option, `sleep` included, before the client uses it. Solr's
+    // `_version_` (≈1.88e18, past 2^53) is always declared a big integer: a portal that sends it
+    // as a number gets the string Hamburg and GovData send, never a refused answer.
+    this.#engine = new RequestEngine({
+      ...options,
+      baseUrl: this.#site,
+      bigIntegerKeys: new Set([...bigIntegerKeysOption(options.bigIntegerKeys), ...BIG_INTEGER_KEYS]),
+    });
     this.#sleep = options.sleep ?? realSleep;
   }
 
