@@ -264,20 +264,45 @@ test("a result of the wrong shape exits 1 with a clear message, not an Unexpecte
   assert.equal(generic.out.join("\n"), "null");
 });
 
-test("a response nested too deeply to pretty-print is a clear error, not a stack overflow", async () => {
+test("an answer nested too deeply is a clean error; it suggests --compact only where --compact prints it (D7)", async () => {
+  // A hostile or broken answer: JSON.parse reads it, the pretty printer's recursion can't. Whether
+  // the compact printer can depends on the Node version (iterative from Node 26) and the stack:
+  // probed here, never assumed.
   const depth = 200_000;
   const deep = `{"help":"h","success":true,"result":{"a":${"[".repeat(depth)}${"]".repeat(depth)}}}`;
+  let compactPrints = true;
+  try {
+    JSON.stringify((JSON.parse(deep) as { result: unknown }).result);
+  } catch {
+    compactPrints = false;
+  }
   const pretty = makeCli(() => rawResponse(deep, "application/json"));
   assert.equal(await run(["package", "x"], pretty.deps), 1);
-  assert.equal(untimed(pretty.err.join("\n")), "ERROR [ckan.cli] The response is nested too deeply to pretty-print; try --compact.");
-
+  assert.deepEqual(pretty.out, []);
+  assert.equal(
+    untimed(pretty.err.join("\n")),
+    `ERROR [ckan.output] The answer is nested too deeply to pretty-print${compactPrints ? "; try --compact" : ""}.`,
+  );
   const compact = makeCli(() => rawResponse(deep, "application/json"));
-  const code = await run(["--compact", "package", "x"], compact.deps);
-  // Compact output may fit the stack; if it does not, the message says so.
-  if (code !== 0) {
-    assert.equal(code, 1);
-    assert.equal(untimed(compact.err.join("\n")), "ERROR [ckan.cli] The response is nested too deeply to print.");
-  }
+  assert.equal(await run(["--compact", "package", "x"], compact.deps), compactPrints ? 0 : 1);
+  if (!compactPrints) assert.equal(untimed(compact.err.join("\n")), "ERROR [ckan.output] The answer is nested too deeply to print.");
+});
+
+test("an answer too large to print is called too large, not too deep; the hint only where --compact prints (D7)", (t) => {
+  const { deps } = makeCli(() => jsonResponse(ckan({})));
+  const real = JSON.stringify;
+  // V8's own error for a text past its longest string, stood in for: a real one needs 512 MB.
+  const tooLarge = (gap: unknown): boolean => gap === 2 || gap === "big";
+  t.mock.method(JSON, "stringify", (value: unknown, replacer: never, gap: unknown) => {
+    if (tooLarge(gap) || (gap === undefined && (value as { all?: boolean }).all === true)) throw new RangeError("Invalid string length");
+    return real(value, replacer, gap as number);
+  });
+  assert.throws(() => renderJson(deps, {}, { id: "a1" }), (err: Error) =>
+    /^The answer is too large \(more than \d+ characters of JSON\) to pretty-print; try --compact\.$/.test(err.message));
+  assert.throws(() => renderJson(deps, {}, { all: true }), (err: Error) =>
+    /^The answer is too large \(more than \d+ characters of JSON\) to pretty-print\.$/.test(err.message));
+  assert.throws(() => renderJson(deps, { compact: true }, { all: true }), (err: Error) =>
+    /^The answer is too large \(more than \d+ characters of JSON\) to print\.$/.test(err.message));
 });
 
 test("--compact takes the gap path only for an answer holding a huge string, the fast path otherwise", (t) => {
@@ -675,8 +700,8 @@ test("a malformed answer is an ERROR record of ckan.api: bad JSON, not JSON, not
     assert.equal(await run(["status"], cli.deps), 1);
     assert.match(untimed(cli.err.join("\n")), /^ERROR \[ckan\.api\] /, cli.err.join("\n"));
   }
-  // Printing an answer is not the answer's shape: a response nested too deeply stays cli
-  // ("a response nested too deeply to pretty-print is a clear error" checks that).
+  // Printing an answer is not the answer's shape: an answer nested too deeply is output
+  // ("an answer nested too deeply is a clean error" checks that).
 });
 
 test("a CKAN error answer on HTTP 200 (success:false) is an ERROR record of ckan.api (Bug 01-1)", async () => {

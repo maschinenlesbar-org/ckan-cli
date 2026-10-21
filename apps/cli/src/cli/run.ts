@@ -5,6 +5,7 @@
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
 import { logOf, type CliDeps } from "./io.js";
+import { OutputError } from "./output.js";
 import { createLogger, logFormatFromArgv, type Logger } from "./log.js";
 import {
   CkanActionError,
@@ -242,10 +243,11 @@ export function processLogger(argv: readonly string[], env: Record<string, strin
  * connection (`http`), a malformed answer (`api`: bad JSON, not JSON, not a CKAN
  * envelope, the wrong result shape, an unknown charset — the portal's answer as much as
  * an error status is), CKAN's own error answer on HTTP 200 (`api`: a `success: false`
- * envelope, `CkanActionError`), else `cli` (a response nested too deeply to print is
- * about printing the answer, not its shape).
+ * envelope, `CkanActionError`), `output` for an answer too deeply nested or too large to print
+ * (`OutputError`: printing it, not its shape), else `cli`.
  */
 function areaOf(err: CkanError): string {
+  if (err instanceof OutputError) return "output";
   if (err instanceof CkanNetworkError) return "http";
   if (err instanceof CkanParseError || err instanceof CkanActionError) return "api";
   return "cli";
