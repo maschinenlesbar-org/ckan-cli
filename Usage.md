@@ -76,7 +76,8 @@ ckan --compact search elbe --rows 100 --start 100 | jq '.results | length'
 ```bash
 ckan package bezirk-wandsbek-drucksache-22-3573-2
 ckan --compact package bezirk-wandsbek-drucksache-22-3573-2 | jq '.resources[] | {format, url}'
-ckan resource 4bb495c8-1180-434d-b1a5-10191a795a48
+# a resource by its id, taken from the record (a fixed id goes stale when the portal drops it)
+ckan resource "$(ckan --compact package bezirk-wandsbek-drucksache-22-3573-2 | jq -r '.resources[0].id')"
 ```
 
 ### 7. Publishers, themes and tags
