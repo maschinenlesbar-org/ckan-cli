@@ -222,8 +222,10 @@ Found by running the same commands against many portals:
 - **Solr syntax errors** come back as HTTP 409; `ckan` prints Solr's own reason,
   e.g. `Search Error: Cannot parse 'title:(': Encountered "<EOF>" …`.
 - **A site that is not (or no longer) a CKAN** answers with a 404, an HTML page or
-  a redirect loop; `ckan` says which, e.g.
-  `Expected JSON from … but got text/html`.
+  a redirect loop; `ckan` says which, naming the request, e.g.
+  `GET <url>: the answer is not valid JSON (expected JSON, got Content-Type "text/html").`
+  Every error about an answer starts with the request (`GET <url>: …`), CKAN's own error
+  answer sent with HTTP 200 too, so a run over many portals tells which one failed.
 
 ## Output & scripting
 

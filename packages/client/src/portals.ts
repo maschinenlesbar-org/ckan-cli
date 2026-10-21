@@ -105,10 +105,11 @@ function problemOf(err: unknown): string {
   }
   const message = err instanceof Error ? err.message : String(err);
   if (err instanceof CkanParseError) {
-    const got = /but got (.+)$/.exec(message);
+    // The engine's "GET <url>: the answer is not valid JSON (expected JSON, got Content-Type "<type>")."
+    const got = /\(expected JSON, got Content-Type "(.*)"\)\.$/.exec(message);
     if (got) return `not JSON (${got[1]})`;
-    if (/not a CKAN Action API response/.test(message)) return "not a CKAN Action API";
-    if (/^Unexpected response shape/.test(message)) return "unexpected response shape";
+    if (/: the answer is not a CKAN Action API response; /.test(message)) return "not a CKAN Action API";
+    if (/: unexpected response shape: /.test(message)) return "unexpected response shape";
     return "invalid JSON";
   }
   if (err instanceof CkanNetworkError) {

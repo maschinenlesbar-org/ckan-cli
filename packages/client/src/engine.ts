@@ -629,33 +629,45 @@ export class RequestEngine {
     }
   }
 
-  /** Perform a GET expecting JSON and parse it into `T`. */
+  /** Perform a GET expecting JSON and parse it into `T` (see {@link getAnswer}). */
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
+    return (await this.getAnswer<T>(path, query)).value;
+  }
+
+  /**
+   * Perform a GET expecting JSON: the parsed value, the URL that answered (after any redirects,
+   * userinfo redacted) and the request as an error message names it, `GET <url>` (cut at
+   * MAX_MESSAGE_VALUE_LENGTH). Every error about the answer starts with that request
+   * (`GET <url>: the answer is not valid JSON.`), so a log of a run over many portals tells which
+   * one failed; the client prefixes its own envelope and shape errors with it too.
+   */
+  async getAnswer<T>(path: string, query?: QueryParams): Promise<{ value: T; url: string; request: string }> {
     const res = await this.request("GET", path, { query, accept: "application/json" });
-    const text = decodeBody(res.data, res.contentType, res.url);
+    const url = redactUrl(res.url);
+    const request = `GET ${cutForMessage(url)}`;
+    const text = decodeBody(res.data, res.contentType, request);
+    if (text.trim() === "") {
+      // A broken answer, not "no results".
+      throw new CkanParseError(`${request}: empty response body.`);
+    }
     let parsed: T;
     try {
       parsed = JSON.parse(text) as T;
     } catch (cause) {
-      // Name the URL and what came back: a site that is not a CKAN (or not at this
-      // path) typically answers with an HTML page and HTTP 200.
-      // The Content-Type is server text (latin-1 decoded, so a 0x9B byte is the
-      // 8-bit CSI U+009B): sanitise it before it reaches stderr.
-      const mediaType = cutForMessage(sanitizeServerText(res.contentType.split(";")[0]!));
-      const message = /json/i.test(mediaType)
-        ? `Invalid JSON from ${cutForMessage(redactUrl(res.url))}`
-        : `Expected JSON from ${cutForMessage(redactUrl(res.url))} but got ${mediaType || "a body that is not JSON"}`;
-      throw new CkanParseError(message, { cause: this.scrubCause(cause) });
+      // A site that is not a CKAN (or not at this path) typically answers with an HTML page and
+      // HTTP 200: name its type. The Content-Type is server text (latin-1 decoded, so a 0x9B byte
+      // is the 8-bit CSI U+009B): sanitise it before it reaches stderr.
+      const type = cutForMessage(sanitizeServerText(res.contentType.split(";")[0]!));
+      const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${type}")` : "";
+      throw new CkanParseError(`${request}: the answer is not valid JSON${hint}.`, { cause: this.scrubCause(cause) });
     }
     // JSON.parse rounds and overflows numbers silently: refuse the answer rather than print a
     // changed value.
     const inexact = firstInexactNumber(text);
     if (inexact !== undefined) {
-      throw new CkanParseError(
-        `Unexpected response from ${cutForMessage(redactUrl(res.url))}: the number ${cutForMessage(inexact)} cannot be represented exactly.`,
-      );
+      throw new CkanParseError(`${request}: the number ${cutForMessage(inexact)} cannot be represented exactly.`);
     }
-    return parsed;
+    return { value: parsed, url, request };
   }
 
   private toApiError(
@@ -738,15 +750,13 @@ function originOf(url: string): string {
  * that by default, where Buffer#toString kept it and JSON.parse then failed. CKAN
  * sends UTF-8; this matters for proxies and mirrors that re-encode.
  */
-function decodeBody(body: Buffer, contentType: string, url: string): string {
+function decodeBody(body: Buffer, contentType: string, request: string): string {
   const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(charset);
   } catch {
-    throw new CkanParseError(
-      `Unsupported response charset "${cutForMessage(sanitizeServerText(charset))}" from ${cutForMessage(redactUrl(url))}.`,
-    );
+    throw new CkanParseError(`${request}: unsupported response charset "${cutForMessage(sanitizeServerText(charset))}".`);
   }
   return decoder.decode(body);
 }

@@ -288,13 +288,14 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   built-in list, or checks each portal at its own URL) work whatever the variable
   holds.
 - **Envelope.** The client unwraps CKAN's `{ help, success, result }` and raises
-  `CkanActionError` (a `CkanError` with `action` and CKAN's `__type` as `errorType`)
-  when `success` is false: CKAN can send its error envelope with HTTP 200, and the CLI
+  `CkanActionError` (a `CkanError` with `action`, CKAN's `__type` as `errorType` and the
+  `url` that answered; `GET <url>: CKAN action "<name>" failed: <CKAN's error>`) when
+  `success` is false: CKAN can send its error envelope with HTTP 200, and the CLI
   logs it under `api` like the same error on an error status. The typed methods also check the top-level
   shape of `result` (never a deep schema): an object for `status` and the `*_show`
   calls, `{ count, results[] }` for `packageSearch`, an array for the `*_list` calls
   (every `all_fields` page too). A missing `result` or a wrong shape raises
-  `CkanParseError` `Unexpected response shape from /api/3/action/<name>: expected …`.
+  `CkanParseError` `GET <url>: unexpected response shape: expected …`.
   The generic `action()` passes any `result` through, `null` included.
 - **Three CKAN error shapes**, all turned into one readable line: a message
   (`{"__type": "Not Found Error", "message": "Not found"}`, HTTP 404), a validation
@@ -314,17 +315,20 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   therefore asked again at the same offset as a full page before it ends the list.
   The pager is bounded: pages are `ALL_FIELDS_PAGE_DELAY_MS` (100 ms) apart, and after
   `MAX_ALL_FIELDS_PAGES` (400 pages, 10,000 entries at 25) without an end it throws
-  `CkanParseError` `<action> with all_fields: stopped after 400 pages
-  (MAX_ALL_FIELDS_PAGES) …`. A server whose pages keep returning new ids (or id-less
+  `CkanParseError` `GET <url of the last page>: <action> with all_fields: stopped after 400
+  pages (MAX_ALL_FIELDS_PAGES) …`. A server whose pages keep returning new ids (or id-less
   entries with a changing field, which defeat the duplicate check) once got ~6,000
   requests a second until the process was killed. Both constants are exported.
-- **Readable failures.** A non-JSON answer names the URL and the content type
-  (`Expected JSON from … but got text/html`); JSON that is not a CKAN envelope says so;
+- **Readable failures.** Every error about an answer names the request first, `GET <url>: …`
+  (the URL that answered, userinfo left out, cut at 500 characters; the engine's
+  `getAnswer` returns it for the client's own envelope and shape errors). A non-JSON answer
+  names the content type (`GET <url>: the answer is not valid JSON (expected JSON, got
+  Content-Type "text/html").`); an empty body says so (`empty response body.`); JSON that
+  is not a CKAN envelope says so;
   a number JSON.parse cannot carry exactly (out of a double's range, `1e400`; past 2^53 in
   any written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but
   too small, `1e-400`; a subnormal that does not print as written, `3e-324`, printed `5e-324`)
-  is a `CkanParseError` `Unexpected response from <url>: the number
-  <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a
+  is a `CkanParseError` `GET <url>: the number <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a
   linear scan that skips strings; below 2^53 and above the smallest normal double,
   2.2250738585072014e-308, a decimal fraction keeps a double's precision;
   past 2^53 the number as written is compared with the number as printed, `String(value)`,

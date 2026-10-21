@@ -77,7 +77,7 @@ test("a number the JSON cannot carry exactly is a parse error, never a changed v
     const e = new RequestEngine({ transport: makeMockTransport(() => rawResponse(body(n), "application/json")).transport });
     await assert.rejects(e.getJson("/items/a"), (err: unknown) => {
       assert.ok(err instanceof CkanParseError, n);
-      assert.equal(err.message, `Unexpected response from https://suche.transparenz.hamburg.de/items/a: the number ${n} cannot be represented exactly.`);
+      assert.equal(err.message, `GET https://suche.transparenz.hamburg.de/items/a: the number ${n} cannot be represented exactly.`);
       return true;
     });
   }
@@ -288,7 +288,7 @@ test("a non-JSON 2xx body names the full URL and the content type it got", async
     (err: unknown) =>
       err instanceof CkanParseError &&
       err.message ===
-        "Expected JSON from https://register.example.test/api/3/action/package_search?rows=0 but got text/html",
+        'GET https://register.example.test/api/3/action/package_search?rows=0: the answer is not valid JSON (expected JSON, got Content-Type "text/html").',
   );
 });
 
@@ -299,7 +299,7 @@ test("control characters in the Content-Type are stripped from the error message
     () => e.getJson("/x"),
     (err: unknown) => {
       assert.ok(err instanceof CkanParseError);
-      assert.equal(err.message, "Expected JSON from https://a.example/x but got text/31m[2Jhtml");
+      assert.equal(err.message, 'GET https://a.example/x: the answer is not valid JSON (expected JSON, got Content-Type "text/31m[2Jhtml").');
       return true;
     },
   );
@@ -310,7 +310,7 @@ test("broken JSON labelled as JSON is reported as invalid JSON, not as the wrong
   const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
   await assert.rejects(
     () => e.getJson("/x"),
-    (err: unknown) => err instanceof CkanParseError && err.message === "Invalid JSON from https://a.example/x",
+    (err: unknown) => err instanceof CkanParseError && err.message === "GET https://a.example/x: the answer is not valid JSON.",
   );
 });
 
@@ -456,7 +456,7 @@ test("an unknown response charset is a CkanParseError naming it", async () => {
     () => e.getJson("/x"),
     (err: unknown) =>
       err instanceof CkanParseError &&
-      err.message === 'Unsupported response charset "x-nope" from https://a.example/x.',
+      err.message === 'GET https://a.example/x: unsupported response charset "x-nope".',
   );
 });
 
@@ -569,7 +569,8 @@ test("a charset, a content type, a redirect target and an action name are quoted
   for (const answer of [jsonResponse({ success: false, error: { message: "denied" } }), jsonResponse({ hello: "world" })]) {
     const client = new CkanClient({ transport: async () => answer });
     await assert.rejects(client.action(name), (err: Error) => {
-      assert.ok(err.message.length < 800, `${err.message.length}`);
+      // The request (the URL holds the name) and the name: two values, each cut at 500.
+      assert.ok(err.message.length < 1300, `${err.message.length}`);
       assert.match(err.message, /a…/);
       return true;
     });
@@ -611,4 +612,22 @@ test("a header named __proto__ is an ordinary header, never the prototype of the
   const fetchLike = new Headers([["__proto__", "x"], ["content-type", "application/json"]]);
   const f = new RequestEngine({ transport: async () => ({ status: 200, headers: fetchLike as unknown as Record<string, string>, body: Buffer.from('{"a":1}') }) });
   assert.deepEqual(await f.getJson("/x"), { a: 1 });
+});
+
+test("an answer error names the request: method and URL, userinfo left out (D9)", async () => {
+  const answers: Array<[string, () => HttpResponse]> = [
+    ["the answer is not valid JSON (expected JSON, got Content-Type \"text/html\").", () => rawResponse("<html>", "text/html")],
+    ["the answer is not valid JSON.", () => rawResponse("{", "application/json")],
+    ["empty response body.", () => rawResponse(" ", "application/json")],
+    ["the number 1e400 cannot be represented exactly.", () => rawResponse('{"n":1e400}', "application/json")],
+    ['unsupported response charset "x-bogus".', () => rawResponse("{}", "application/json; charset=x-bogus")],
+  ];
+  for (const [what, respond] of answers) {
+    const e = new RequestEngine({ baseUrl: "https://alice:s3cret@ckan.example.test", transport: makeMockTransport(respond).transport });
+    await assert.rejects(e.getJson("/items", { q: "x" }), (err: unknown) => {
+      assert.ok(err instanceof CkanParseError, what);
+      assert.equal(err.message, `GET https://ckan.example.test/items?q=x: ${what}`);
+      return true;
+    });
+  }
 });

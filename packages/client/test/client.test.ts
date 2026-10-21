@@ -46,8 +46,8 @@ test("a success:false envelope on HTTP 200 is stripped of terminal escapes, bidi
     `str ${ESC}[31merr\nError: forged ${RLO}line`,
   ];
   const expected = [
-    'CKAN action "status_show" failed: X]0;PWNED[31mRED: evil [2J31m msg',
-    'CKAN action "status_show" failed: str [31merr Error: forged line',
+    'GET https://suche.transparenz.hamburg.de/api/3/action/status_show: CKAN action "status_show" failed: X]0;PWNED[31mRED: evil [2J31m msg',
+    'GET https://suche.transparenz.hamburg.de/api/3/action/status_show: CKAN action "status_show" failed: str [31merr Error: forged line',
   ];
   for (const [i, error] of errors.entries()) {
     const mt = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
@@ -70,7 +70,7 @@ test("a validation error (field map, no message) is spelled out per field", asyn
     () => clientWith(mt).action("package_show"),
     (err: unknown) =>
       err instanceof CkanError &&
-      err.message === 'CKAN action "package_show" failed: Validation Error: name_or_id: Missing value',
+      err.message === 'GET https://suche.transparenz.hamburg.de/api/3/action/package_show: CKAN action "package_show" failed: Validation Error: name_or_id: Missing value',
   );
 });
 
@@ -407,7 +407,7 @@ test("JSON that is not a CKAN envelope raises CkanParseError naming the site", a
       () => clientWith(mt, "https://api.example.test").status(),
       (err: unknown) =>
         err instanceof CkanParseError &&
-        err.message === 'The answer to "status_show" is not a CKAN Action API response; is https://api.example.test a CKAN site?',
+        err.message === 'GET https://api.example.test/api/3/action/status_show: the answer is not a CKAN Action API response; is https://api.example.test a CKAN site?',
       JSON.stringify(body),
     );
   }
@@ -460,7 +460,7 @@ test("a success:false envelope is a CkanActionError naming the action and CKAN's
     assert.equal(err.action, "package_show");
     assert.equal(err.errorType, "Not Found Error");
     assert.equal(err.isNotFound, true);
-    assert.equal(err.message, 'CKAN action "package_show" failed: Not Found Error: Not found');
+    assert.equal(err.message, 'GET https://suche.transparenz.hamburg.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: Not Found Error: Not found');
     return true;
   });
   // Without a __type (or with one that is no string) the type is undefined.
@@ -468,4 +468,37 @@ test("a success:false envelope is a CkanActionError naming the action and CKAN's
     const other = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
     await assert.rejects(clientWith(other).status(), (err: unknown) => err instanceof CkanActionError && err.errorType === undefined && !err.isNotFound);
   }
+});
+
+test("an error answer, a wrong shape and the pager's stop name the request: method and URL, userinfo left out (D9)", async () => {
+  const site = "https://alice:s3cret@ckan.example.test";
+  const cases: Array<[string, unknown, (c: CkanClient) => Promise<unknown>, string]> = [
+    ["error envelope", { help: "h", success: false, error: { __type: "Not Found Error", message: "Not found" } },
+      (c) => c.packageShow("x"), `GET https://ckan.example.test${ACTION}/package_show?id=x: CKAN action "package_show" failed: Not Found Error: Not found`],
+    ["wrong shape", ckan({ count: "many" }),
+      (c) => c.packageSearch({ q: "elbe" }), `GET https://ckan.example.test${ACTION}/package_search?q=elbe: unexpected response shape: expected an object with a numeric count and a results array.`],
+    ["no result", { help: "h", success: true },
+      (c) => c.status(), `GET https://ckan.example.test${ACTION}/status_show: unexpected response shape: expected a result in the envelope.`],
+    ["not an envelope", { hello: "world" },
+      (c) => c.status(), `GET https://ckan.example.test${ACTION}/status_show: the answer is not a CKAN Action API response; is https://***@ckan.example.test/ a CKAN site?`],
+  ];
+  for (const [label, answer, call, message] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(answer));
+    await assert.rejects(call(clientWith(mt, site)), (err: Error) => {
+      assert.ok(err instanceof CkanError, label);
+      assert.equal(err.message, message, label);
+      assert.ok(!err.message.includes("s3cret"), label);
+      return true;
+    });
+  }
+  // CKAN's error answer keeps its fields, and names the URL that answered.
+  const mt = makeMockTransport(() => jsonResponse({ help: "h", success: false, error: { __type: "Not Found Error", message: "Not found" } }));
+  await assert.rejects(clientWith(mt).packageShow("x"), (err: unknown) =>
+    err instanceof CkanActionError && err.isNotFound && err.action === "package_show" &&
+    err.url === `https://suche.transparenz.hamburg.de${ACTION}/package_show?id=x`);
+  // The pager's stop names the last page it asked for.
+  let n = 0;
+  const endless = makeMockTransport(() => jsonResponse(ckan([{ id: `e${n++}` }])));
+  await assert.rejects(clientWith(endless).groupList({ all_fields: true }), (err: Error) =>
+    err.message.startsWith(`GET https://suche.transparenz.hamburg.de${ACTION}/group_list?all_fields=true&limit=25&offset=399: group_list with all_fields: stopped after 400 pages`));
 });

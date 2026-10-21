@@ -246,17 +246,17 @@ test("a success:false envelope exits 1", async () => {
 
 test("a result of the wrong shape exits 1 with a clear message, not an Unexpected error", async () => {
   const cases: [string[], unknown, string][] = [
-    [["search", "elbe"], { help: "h", success: true }, "package_search: expected a result in the envelope."],
-    [["search", "elbe"], ckan({ results: [] }), "package_search: expected an object with a numeric count and a results array."],
-    [["organizations", "--all-fields"], ckan({ a: 1 }), "organization_list: expected an array."],
-    [["packages"], ckan(null), "package_list: expected an array."],
-    [["package", "x"], ckan(["x"]), "package_show: expected a JSON object."],
-    [["status"], ckan("up"), "status_show: expected a JSON object."],
+    [["search", "elbe"], { help: "h", success: true }, "package_search?q=elbe: unexpected response shape: expected a result in the envelope."],
+    [["search", "elbe"], ckan({ results: [] }), "package_search?q=elbe: unexpected response shape: expected an object with a numeric count and a results array."],
+    [["organizations", "--all-fields"], ckan({ a: 1 }), "organization_list?all_fields=true&limit=25: unexpected response shape: expected an array."],
+    [["packages"], ckan(null), "package_list: unexpected response shape: expected an array."],
+    [["package", "x"], ckan(["x"]), "package_show?id=x: unexpected response shape: expected a JSON object."],
+    [["status"], ckan("up"), "status_show: unexpected response shape: expected a JSON object."],
   ];
   for (const [argv, body, expected] of cases) {
     const cli = makeCli(() => jsonResponse(body));
     assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
-    assert.equal(untimed(cli.err.join("\n")), `ERROR [ckan.api] Unexpected response shape from ${ACTION}/${expected}`, argv.join(" "));
+    assert.equal(untimed(cli.err.join("\n")), `ERROR [ckan.api] GET https://suche.transparenz.hamburg.de${ACTION}/${expected}`, argv.join(" "));
   }
   // The generic action passes any result through, null included.
   const generic = makeCli(() => jsonResponse(ckan(null)));
@@ -368,7 +368,7 @@ test("a password in --base-url or CKAN_BASE_URL is redacted in errors and in --h
 
   const html = makeCli(() => rawResponse("<html></html>", "text/html"));
   assert.equal(await run(["--base-url", "http://user:s3cret@127.0.0.1:9/x", "status"], html.deps), 1);
-  assert.match(html.err.join("\n"), /Expected JSON from http:\/\/127\.0\.0\.1:9\/x\//);
+  assert.match(html.err.join("\n"), /GET http:\/\/127\.0\.0\.1:9\/x\/api\/3\/action\/status_show: the answer is not valid JSON/);
   assert.doesNotMatch(html.err.join("\n"), /s3cret/);
 
   const help = makeCli(() => jsonResponse(ckan({})), { CKAN_BASE_URL: "http://user:s3cret@127.0.0.1:9/ok" });
@@ -682,13 +682,13 @@ test("a malformed answer is an ERROR record of ckan.api: bad JSON, not JSON, not
 test("a CKAN error answer on HTTP 200 (success:false) is an ERROR record of ckan.api (Bug 01-1)", async () => {
   const cli = makeCli(() => jsonResponse({ success: false, error: { __type: "Authorization Error", message: "Access denied" } }));
   assert.equal(await run(["status"], cli.deps), 1);
-  assert.equal(untimed(cli.err.join("\n")), 'ERROR [ckan.api] CKAN action "status_show" failed: Authorization Error: Access denied');
+  assert.equal(untimed(cli.err.join("\n")), `ERROR [ckan.api] GET https://suche.transparenz.hamburg.de${ACTION}/status_show: CKAN action "status_show" failed: Authorization Error: Access denied`);
 });
 
 test("CKAN's Not Found Error sent with HTTP 200 exits 4, like the same error on a 404 (Bug 01-1)", async () => {
   const notFound = makeCli(() => jsonResponse({ success: false, error: { __type: "Not Found Error", message: "Not found" } }));
   assert.equal(await run(["package", "no-such-id"], notFound.deps), 4);
-  assert.equal(untimed(notFound.err.join("\n")), 'ERROR [ckan.api] CKAN action "package_show" failed: Not Found Error: Not found');
+  assert.equal(untimed(notFound.err.join("\n")), `ERROR [ckan.api] GET https://suche.transparenz.hamburg.de${ACTION}/package_show?id=no-such-id: CKAN action "package_show" failed: Not Found Error: Not found`);
   // Any other CKAN error on HTTP 200 stays 1.
   for (const error of [{ __type: "Authorization Error", message: "Access denied" }, { message: "Not found" }]) {
     const cli = makeCli(() => jsonResponse({ success: false, error }));

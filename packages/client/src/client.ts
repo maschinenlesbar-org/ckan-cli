@@ -140,9 +140,9 @@ function isSearchResult(value: unknown): boolean {
   return typeof count === "number" && Number.isSafeInteger(count) && count >= 0 && Array.isArray(value["results"]);
 }
 
-/** The error for a `result` that does not have the shape the caller relies on. */
-function shapeError(name: string, expected: string): CkanParseError {
-  return new CkanParseError(`Unexpected response shape from ${ACTION}/${name}: expected ${expected}.`);
+/** The error for a `result` that does not have the shape the caller relies on, naming the request (`GET <url>`). */
+function shapeError(request: string, expected: string): CkanParseError {
+  return new CkanParseError(`${request}: unexpected response shape: expected ${expected}.`);
 }
 
 /**
@@ -196,15 +196,24 @@ export class CkanClient {
 
   /** Call any CKAN action by name and return its unwrapped `result`. */
   async action<T = JsonValue>(name: string, params: QueryParams = {}): Promise<T> {
+    return (await this.call<T>(name, params)).result;
+  }
+
+  /**
+   * Call an action: its unwrapped `result` and the request as error messages name it
+   * (`GET <url>`, the URL that answered, userinfo redacted). Every error about the answer starts
+   * with that request.
+   */
+  private async call<T>(name: string, params: QueryParams): Promise<{ result: T; request: string }> {
     if (typeof name !== "string" || !ACTION_NAME.test(name)) {
       throw new CkanValidationError(`Invalid CKAN action name: "${cutForMessage(typeof name === "string" ? name : String(name))}"`);
     }
-    const env = await this.#engine.getJson<CkanEnvelope<T> | null>(`${ACTION}/${name}`, prune(params));
+    const { value: env, url, request } = await this.#engine.getAnswer<CkanEnvelope<T> | null>(`${ACTION}/${name}`, prune(params));
     // Another JSON API at the same path (or a proxy's JSON error page) is not an
     // envelope; say so rather than "failed: undefined".
     if (typeof env !== "object" || env === null || Array.isArray(env) || typeof env.success !== "boolean") {
       throw new CkanParseError(
-        `The answer to "${cutForMessage(name)}" is not a CKAN Action API response; is ${redactUrl(this.#site)} a CKAN site?`,
+        `${request}: the answer is not a CKAN Action API response; is ${cutForMessage(redactUrl(this.#site))} a CKAN site?`,
       );
     }
     if (!env.success) {
@@ -212,20 +221,20 @@ export class CkanClient {
       // engine's error-detail sanitising: strip terminal controls here too.
       const type = (env.error as { __type?: unknown } | null | undefined)?.__type;
       throw new CkanActionError(
-        `CKAN action "${cutForMessage(name)}" failed: ${cutForMessage(sanitizeServerText(this.#engine.scrub(describeCkanError(env.error))))}`,
-        { action: name, errorType: typeof type === "string" ? cutForMessage(sanitizeServerText(type)) : undefined },
+        `${request}: CKAN action "${cutForMessage(name)}" failed: ${cutForMessage(sanitizeServerText(this.#engine.scrub(describeCkanError(env.error))))}`,
+        { action: name, errorType: typeof type === "string" ? cutForMessage(sanitizeServerText(type)) : undefined, url },
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
     // would crash rendering `undefined`); CKAN always sends one, `null` included.
-    if (env.result === undefined) throw shapeError(name, "a result in the envelope");
-    return env.result as T;
+    if (env.result === undefined) throw shapeError(request, "a result in the envelope");
+    return { result: env.result as T, request };
   }
 
   /**
    * An action whose `result` must have a known top-level shape (never a deep
    * schema): a broken or foreign answer becomes a CkanParseError naming the
-   * action, not a TypeError further down (`page is not iterable`).
+   * request, not a TypeError further down (`page is not iterable`).
    */
   private async typed<T>(
     name: string,
@@ -233,9 +242,19 @@ export class CkanClient {
     ok: (value: unknown) => boolean,
     expected: string,
   ): Promise<T> {
-    const result = await this.action<unknown>(name, params);
-    if (!ok(result)) throw shapeError(name, expected);
-    return result as T;
+    return (await this.typedCall<T>(name, params, ok, expected)).result;
+  }
+
+  /** `typed`, with the request it made (for the `all_fields` pager's message). */
+  private async typedCall<T>(
+    name: string,
+    params: QueryParams,
+    ok: (value: unknown) => boolean,
+    expected: string,
+  ): Promise<{ result: T; request: string }> {
+    const { result, request } = await this.call<unknown>(name, params);
+    if (!ok(result)) throw shapeError(request, expected);
+    return { result: result as T, request };
   }
 
   /** Site title, CKAN version and enabled extensions of the portal. */
@@ -386,17 +405,19 @@ export class CkanClient {
     // Set after a short window came back empty (or with nothing new): from then on
     // every page is a full one.
     let fullPages = false;
+    /** The last page's request, which the stop message names. */
+    let request = "";
     while (out.length < wanted) {
       if (pages >= MAX_ALL_FIELDS_PAGES) {
         throw new CkanParseError(
-          `${action} with all_fields: stopped after ${MAX_ALL_FIELDS_PAGES} pages (MAX_ALL_FIELDS_PAGES) without ` +
+          `${request}: ${action} with all_fields: stopped after ${MAX_ALL_FIELDS_PAGES} pages (MAX_ALL_FIELDS_PAGES) without ` +
             `reaching the end of the list; the server keeps returning new entries, which no CKAN list has. ` +
             `Pass a limit (--limit) to fetch part of it.`,
         );
       }
       if (pages > 0) await this.#sleep(ALL_FIELDS_PAGE_DELAY_MS);
       const limit = fullPages ? ALL_FIELDS_PAGE : Math.min(ALL_FIELDS_PAGE, wanted - out.length);
-      const page = await this.typed<JsonValue[]>(
+      const answer = await this.typedCall<JsonValue[]>(
         action,
         {
           all_fields: true,
@@ -406,6 +427,8 @@ export class CkanClient {
         Array.isArray,
         "an array",
       );
+      const page = answer.result;
+      request = answer.request;
       pages += 1;
       let added = 0;
       for (const entry of page) {
