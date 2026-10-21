@@ -7,9 +7,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parity as ckanParity, rawResponse } from "./helpers.js";
 
 // ---- adapter (per repo) -------------------------------------------------------------
+/** `parity` as in P24, mapped from ckan's own helper below; `rawResponse(body, contentType)`. */
+import { parity as ckanParity, rawResponse } from "./helpers.js";
 import { CkanClient as Client } from "@maschinenlesbar.org/ckan-client/internal/client";
 import type { HttpRequest, HttpResponse, Transport } from "@maschinenlesbar.org/ckan-client/internal/http";
 /** CLI argv for a call whose answer carries a number, and the same call in the library. */
@@ -22,6 +23,8 @@ const fromCli = (out: string): unknown => (JSON.parse(out) as { n: unknown }).n;
 const fromLib = (value: unknown): unknown => (value as { n: unknown }).n;
 /** The log program, as in `ERROR [<bin>.api]`. */
 const BIN = "ckan";
+/** The exit code of a malformed answer in this repo (most repos use 1). */
+const PARSE_EXIT = 1;
 /** ckan's harness in the kit's shape: the responder as the third argument, the library's error as `{ name, message }`. */
 async function parity(args: string[], call: (transport: Transport) => unknown, responder: (req: HttpRequest) => HttpResponse) {
   const o = await ckanParity(args, async (t) => call(t), { responder });
@@ -46,7 +49,7 @@ const EXACT: Array<[string, number]> = [
 test("P25: a number the answer can't carry exactly is an error, never a changed value", async () => {
   for (const literal of INEXACT) {
     const o = await parity(argv, (t) => lib(new Client({ transport: t })), () => rawResponse(body(literal), "application/json"));
-    assert.equal(o.cli.code, 1, `${literal}: CLI exit ${o.cli.code}, out ${o.cli.out}`);
+    assert.equal(o.cli.code, PARSE_EXIT, `${literal}: CLI exit ${o.cli.code}, out ${o.cli.out}`);
     assert.equal(o.cli.out, "", literal);
     assert.match(o.cli.err, new RegExp(`^ERROR \\[${BIN}\\.api\\] .*the number ${literal.replace(/[.+]/g, "\\$&")} cannot be represented exactly`), literal);
     assert.equal(o.lib.ok, false, `${literal}: the library resolved`);
@@ -67,7 +70,7 @@ test("P25: a number a double carries is printed as the same value", async () => 
 test("P25: an empty answer is an error, never 'nothing found'", async () => {
   for (const raw of ["", "  \n\t"]) {
     const o = await parity(argv, (t) => lib(new Client({ transport: t })), () => rawResponse(raw, "application/json"));
-    assert.equal(o.cli.code, 1, JSON.stringify(raw));
+    assert.equal(o.cli.code, PARSE_EXIT, JSON.stringify(raw));
     assert.equal(o.cli.out, "", JSON.stringify(raw));
     assert.match(o.cli.err, new RegExp(`^ERROR \\[${BIN}\\.api\\] `), JSON.stringify(raw));
     assert.equal(o.lib.ok, false, JSON.stringify(raw));

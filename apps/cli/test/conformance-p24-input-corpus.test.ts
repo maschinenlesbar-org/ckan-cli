@@ -10,11 +10,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { HttpRequest, HttpResponse } from "@maschinenlesbar.org/ckan-client/internal/http";
-import { jsonResponse, parity as ckanParity } from "./helpers.js";
 
 // ---- adapter (per repo) -------------------------------------------------------------
+import { jsonResponse, parity as ckanParity } from "./helpers.js";
 import { CkanClient as Client } from "@maschinenlesbar.org/ckan-client/internal/client";
 import type { Transport } from "@maschinenlesbar.org/ckan-client/internal/http";
+/** The exit code of a usage error in this repo: ckan's is 1 (commander's default), an ERROR record of ckan.cli. */
+const USAGE_EXIT = 1;
+/**
+ * `parity(argv, call, responder)` in the kit's shape, on ckan's own helper: that one takes the
+ * responder in an options object and keeps the library's error as thrown; here it is
+ * `{ name, message }`.
+ */
+async function parity(argv: string[], call: (transport: Transport) => unknown, responder: (req: HttpRequest) => HttpResponse) {
+  const o = await ckanParity(argv, async (t) => call(t), { responder });
+  const e = o.lib.error;
+  return {
+    cli: o.cli,
+    lib: { ...o.lib, error: e === undefined ? undefined : e instanceof Error ? { name: e.constructor.name, message: e.message } : { name: typeof e, message: String(e) } },
+  };
+}
 interface Input {
   name: string;
   /** CLI argv that sends `value`. */
@@ -51,22 +66,6 @@ const respond = (req: HttpRequest): HttpResponse => {
   if (action === "package_search") return jsonResponse({ help: "h", success: true, result: { count: 0, results: [] } });
   return jsonResponse({ help: "h", success: true, result: action === "tag_list" ? [] : { id: action } });
 };
-/**
- * ckan's harness, in the kit's shape: the responder as the third argument, the library's error
- * as `{ name, message }`, and a usage error reported with the kit's exit 2. ckan's usage errors
- * exit 1 (commander's default; P4/P10/P23's USAGE_EXIT), as an ERROR record of ckan.cli; any
- * other failure is an ERROR of api, http or output and keeps its code.
- */
-const USAGE_EXIT = 1;
-async function parity(argv: string[], call: (transport: Transport) => unknown, responder: (req: HttpRequest) => HttpResponse) {
-  const o = await ckanParity(argv, async (t) => call(t), { responder });
-  const usage = o.cli.code === USAGE_EXIT && /^ERROR \[ckan\.cli\] /m.test(o.cli.err);
-  const e = o.lib.error;
-  return {
-    cli: { ...o.cli, code: usage ? 2 : o.cli.code },
-    lib: { ...o.lib, error: e === undefined ? undefined : e instanceof Error ? { name: e.constructor.name, message: e.message } : { name: typeof e, message: String(e) } },
-  };
-}
 // --------------------------------------------------------------------------------------
 
 const TEXT_CORPUS = [
@@ -79,7 +78,7 @@ type Outcome = Awaited<ReturnType<typeof parity>>;
 
 /** Both sides refused before any request, or both sent the same requests. Returns the one sent URL, if any. */
 function sameOutcome(o: Outcome, label: string): URL | undefined {
-  if (o.cli.code === 2) {
+  if (o.cli.code === USAGE_EXIT) {
     assert.deepEqual(o.cli.requests, [], `${label}: the CLI refused but sent a request`);
     assert.equal(o.lib.ok, false, `${label}: the CLI refused, the library resolved`);
     assert.deepEqual(o.lib.requests, [], `${label}: the library sent a request`);
