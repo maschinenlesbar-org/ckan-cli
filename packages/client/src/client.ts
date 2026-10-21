@@ -2,18 +2,24 @@
 // Action API (`<site>/api/3/action`).
 
 import { bigIntegerKeysOption, DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, validateBaseUrl, type EngineOptions } from "./engine.js";
-import { CkanActionError, CkanParseError, CkanValidationError, cutForMessage, describeCkanError, redactUrl } from "./errors.js";
+import { CkanActionError, CkanParseError, CkanValidationError, cutForMessage, describeCkanError, quoteValue, redactUrl } from "./errors.js";
 import type { QueryParams } from "./query.js";
 import {
   assertValid,
-  blankProblem,
   countProblem,
   facetLimitProblem,
+  fieldProblem,
+  idProblem,
+  listProblem,
   normalizeText,
+  normalizeToken,
   queryValueProblem,
-  textListProblem,
+  sortProblem,
   textProblem,
+  tokenProblem,
+  type Problem,
 } from "./validate.js";
+import type { QueryValue } from "./query.js";
 import type {
   CkanEnvelope,
   Group,
@@ -77,24 +83,38 @@ function entryKey(entry: JsonValue): string {
 }
 
 /**
- * Drop undefined values so only the parameters the caller actually set are sent,
- * and refuse a blank parameter name, a blank value or a list with a blank entry
- * (CkanValidationError). CKAN reads an empty parameter as "not given", so a blank
- * filter such as `tagList({ query: "" })` would silently return everything.
+ * Drop undefined values so only the parameters the caller actually set are sent, and send
+ * each name as a token (`normalizeToken`: trimmed, NFC) and each string value as text
+ * (`normalizeText`). A blank or invisible name, a blank value, a value with a control or
+ * format character, and two names that are the same once trimmed (`q` and ` q`) are refused
+ * (CkanValidationError): CKAN reads an empty parameter as "not given", so a blank filter such
+ * as `tagList({ query: "" })` would silently return everything.
  */
 function prune(params: QueryParams): QueryParams {
   assertParams(params);
   // A null-prototype object, so a `__proto__` key is kept as a parameter instead
   // of setting the prototype (and being lost).
   const out = Object.create(null) as QueryParams;
+  const given = new Map<string, string>();
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined) continue;
-    assertValid("parameter name", k, blankProblem);
+    const name = normalizeToken(assertValid("parameter name", k, tokenProblem));
+    const earlier = given.get(name);
+    if (earlier !== undefined) {
+      throw new CkanValidationError(`Invalid params: ${quoteValue(name)} is given twice (as ${quoteValue(earlier)} and ${quoteValue(k)}).`);
+    }
+    given.set(name, k);
     // A value the query string can't carry (an object, NaN, a function) is refused,
     // not sent as "[object Object]" or "NaN".
-    out[k] = assertValid(k, v, queryValueProblem);
+    out[name] = textValue(assertValid(k, v, queryValueProblem));
   }
   return out;
+}
+
+/** A query value with each string in it sent as text (`normalizeText`); other values as they are. */
+function textValue(value: QueryValue): QueryValue {
+  if (typeof value === "string") return normalizeText(value);
+  return Array.isArray(value) ? (value.map((v) => (typeof v === "string" ? normalizeText(v) : v)) as QueryValue) : value;
 }
 
 /**
@@ -118,7 +138,7 @@ function assertKeys(method: string, action: string, params: object, known: reado
   for (const key of Object.keys(params)) {
     if (!known.includes(key)) {
       throw new CkanValidationError(
-        `Invalid ${method} parameter ${JSON.stringify(cutForMessage(key))}: not a parameter of ${method}. ` +
+        `Invalid ${method} parameter ${quoteValue(key)}: not a parameter of ${method}. ` +
           `Known: ${known.join(", ")}. Use action("${action}", params) to send another CKAN parameter.`,
       );
     }
@@ -130,9 +150,18 @@ const PACKAGE_LIST_KEYS = ["limit", "offset"] as const;
 const GROUP_LIST_KEYS = ["limit", "offset", "all_fields"] as const;
 const TAG_LIST_KEYS = ["query"] as const;
 
-/** Check an optional text parameter (`q`, `sort`, a tag query): a non-blank string. */
-function assertText(name: string, value: unknown): void {
-  if (value !== undefined) assertValid(name, value, textProblem);
+/** Check an optional parameter with `problem`; `undefined` means "not given". */
+function assertOptional(name: string, value: string | undefined, problem: Problem<string>): void {
+  if (value !== undefined) assertValid(name, value, problem);
+}
+
+/**
+ * Check an optional list parameter (`fq`, `facet_field`): each entry with `itemProblem`, a blank
+ * entry refused, never dropped. An empty list means "not given", as before.
+ */
+function assertList(name: string, value: readonly string[] | undefined, itemProblem: Problem<string>): void {
+  if (value === undefined || (Array.isArray(value) && value.length === 0)) return;
+  assertValid(name, value, (v) => listProblem(v, itemProblem));
 }
 
 /** A JSON object (not null, not an array). */
@@ -219,7 +248,7 @@ export class CkanClient {
    */
   private async call<T>(name: string, params: QueryParams): Promise<{ result: T; request: string }> {
     if (typeof name !== "string" || !ACTION_NAME.test(name)) {
-      throw new CkanValidationError(`Invalid CKAN action name: "${cutForMessage(typeof name === "string" ? name : String(name))}"`);
+      throw new CkanValidationError(`Invalid CKAN action name: ${quoteValue(typeof name === "string" ? name : String(name))}`);
     }
     const { value: env, url, request } = await this.#engine.getAnswer<CkanEnvelope<T> | null>(`${ACTION}/${name}`, prune(params));
     // Another JSON API at the same path (or a proxy's JSON error page) is not an
@@ -284,28 +313,30 @@ export class CkanClient {
    * match). `fq_list` is only used for two or more, because CKAN splits a lone
    * `fq_list` value into characters. Facet fields go out as the JSON list CKAN
    * expects in `facet.field`. A blank `q`, `sort`, filter or facet field is
-   * refused (CkanValidationError), never sent or dropped. The search text `q` goes
-   * out trimmed and in NFC (`normalizeText`); filters, sort and facet fields as given.
+   * refused (CkanValidationError), never sent or dropped. The search text `q` and each
+   * filter go out as text, trimmed and in NFC (`normalizeText`, `textProblem`); the sort
+   * expression (`sortProblem`: `<field> asc|desc`, …) and each facet field (`fieldProblem`:
+   * a Solr field name) as tokens (`normalizeToken`).
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     assertParams(params);
     assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
-    assertText("q", params.q);
-    if (params.fq !== undefined) assertValid("fq", params.fq, textListProblem);
-    assertText("sort", params.sort);
-    if (params.facet_field !== undefined) assertValid("facet_field", params.facet_field, textListProblem);
+    assertOptional("q", params.q, textProblem);
+    assertList("fq", params.fq, textProblem);
+    assertOptional("sort", params.sort, sortProblem);
+    assertList("facet_field", params.facet_field, fieldProblem);
     assertCount("rows", params.rows);
     assertCount("start", params.start);
     if (params.facet_limit !== undefined) assertValid("facet_limit", params.facet_limit, facetLimitProblem);
-    const fq = params.fq ?? [];
-    const facetFields = params.facet_field ?? [];
+    const fq = (params.fq ?? []).map(normalizeText);
+    const facetFields = (params.facet_field ?? []).map(normalizeToken);
     return this.typed<PackageSearchResult>("package_search", {
       q: params.q === undefined ? undefined : normalizeText(params.q),
       fq: fq.length === 1 ? fq[0] : undefined,
       fq_list: fq.length > 1 ? fq : undefined,
       rows: params.rows,
       start: params.start,
-      sort: params.sort,
+      sort: params.sort === undefined ? undefined : normalizeToken(params.sort),
       "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
       "facet.limit": params.facet_limit,
     }, isSearchResult, "an object with a numeric count and a results array");
@@ -362,7 +393,7 @@ export class CkanClient {
   async tagList(params: TagListParams = {}): Promise<string[]> {
     assertParams(params);
     assertKeys("tagList", "tag_list", params, TAG_LIST_KEYS);
-    assertText("query", params.query);
+    assertOptional("query", params.query, textProblem);
     const query = params.query === undefined ? undefined : normalizeText(params.query);
     return this.typed<string[]>("tag_list", { query }, Array.isArray, "an array");
   }
@@ -466,11 +497,12 @@ export class CkanClient {
   }
 
   /**
-   * A `*_show` call. A blank id is rejected up front: `prune` would drop it and
-   * CKAN would answer with a 409 validation error instead.
+   * A `*_show` call. The id goes out as a token (`normalizeToken`: trimmed, NFC); a blank or
+   * invisible one, or one with a `/`, is refused up front (`idProblem`): `prune` would drop a
+   * blank one and CKAN would answer with a 409 validation error instead.
    */
   private async show<T>(action: string, id: string): Promise<T> {
-    if (typeof id !== "string" || id.trim() === "") throw new CkanValidationError(`${action} needs an id or name.`);
-    return this.typed<T>(action, { id }, isObject, "a JSON object");
+    assertValid("id", id, idProblem);
+    return this.typed<T>(action, { id: normalizeToken(id) }, isObject, "a JSON object");
   }
 }

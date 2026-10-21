@@ -5,9 +5,17 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
 import { cleartextProblem, DEFAULT_BASE_URL, type EngineOptions, type RetryEvent } from "@maschinenlesbar.org/ckan-client/internal/engine";
-import { cutForMessage, redactUrl } from "@maschinenlesbar.org/ckan-client/internal/errors";
+import { quoteValue, redactUrl } from "@maschinenlesbar.org/ckan-client/internal/errors";
 import { findPortal } from "@maschinenlesbar.org/ckan-client/internal/portals";
-import { baseUrlProblem, blankProblem, countProblem, headerValueProblem, intRangeProblem } from "@maschinenlesbar.org/ckan-client/internal/validate";
+import {
+  baseUrlProblem,
+  countProblem,
+  headerValueProblem,
+  idProblem,
+  intRangeProblem,
+  textProblem,
+  type Problem,
+} from "@maschinenlesbar.org/ckan-client/internal/validate";
 import { PORTALS } from "@maschinenlesbar.org/ckan-client/internal/portals-list";
 
 /** commander value-parser: a non-negative integer. */
@@ -27,14 +35,23 @@ export function parseIntArg(value: string): number {
 }
 
 /**
- * commander value-parser: a value that is not blank (the library's blankProblem
- * rule, reported as a usage error before the client is built).
+ * A commander value-parser for the library's `problem` rule (`textProblem`, `idProblem`, …),
+ * reported as a usage error before the client is built. The value goes on as typed: the
+ * library canonicalises it (`normalizeText`, `normalizeToken`).
  */
-export function parseNonEmpty(value: string): string {
-  const reason = blankProblem(value);
-  if (reason !== undefined) throw new InvalidArgumentError(reason);
-  return value;
+function parseWith(problem: Problem<string>): (value: string) => string {
+  return (value) => {
+    const reason = problem(value);
+    if (reason !== undefined) throw new InvalidArgumentError(reason);
+    return value;
+  };
 }
+
+/** commander value-parser for free text (the search text): the library's `textProblem`. */
+export const parseText = parseWith(textProblem);
+
+/** commander value-parser for the id or name of a dataset, resource, organization or group: the library's `idProblem`. */
+export const parseId = parseWith(idProblem);
 
 /**
  * commander value-parser for a value that ends up in an HTTP header (`--user-agent`):
@@ -48,20 +65,21 @@ export function parseHeaderValue(value: string): string {
 }
 
 /**
- * commander value-parser for a text option's value: not blank, and not another
- * long option. commander takes the next argument as the value of an option that
- * needs one, even when it is a flag, so a forgotten value (`search --fq --rows 5`)
- * silently shifted the rest into the query (`fq=--rows`, `q=5`) and still exited
- * 0. No CKAN filter, sort, facet field or tag query starts with `--`; a single `-`
- * (a negated Solr filter, `-organization:x`) stays allowed.
+ * A commander value-parser for an option's value: not another long option, then the library's
+ * `problem` rule (`textProblem` for a filter or tag query, `sortProblem`, `fieldProblem`).
+ * commander takes the next argument as the value of an option that needs one, even when it is
+ * a flag, so a forgotten value (`search --fq --rows 5`) silently shifted the rest into the
+ * query (`fq=--rows`, `q=5`) and still exited 0. No CKAN filter, sort, facet field or tag query
+ * starts with `--`; a single `-` (a negated Solr filter, `-organization:x`) stays allowed.
  */
-export function parseOptionValue(value: string): string {
-  if (value.startsWith("--")) {
-    throw new InvalidArgumentError(
-      "Expected a value, got another option. Give the option its value first.",
-    );
-  }
-  return parseNonEmpty(value);
+export function parseOptionValue(problem: Problem<string>): (value: string) => string {
+  const parse = parseWith(problem);
+  return (value) => {
+    if (value.startsWith("--")) {
+      throw new InvalidArgumentError("Expected a value, got another option. Give the option its value first.");
+    }
+    return parse(value);
+  };
 }
 
 /**
@@ -80,9 +98,10 @@ export function once<T>(parse: (value: string) => T): (value: string) => T {
   };
 }
 
-/** commander accumulator for a repeatable option whose values are checked by parseOptionValue. */
-export function collectNonEmpty(value: string, previous: string[] = []): string[] {
-  return previous.concat([parseOptionValue(value)]);
+/** commander accumulator for a repeatable option (`--fq`, `--facet`), each value checked by parseOptionValue(problem). */
+export function collectValues(problem: Problem<string>): (value: string, previous?: string[]) => string[] {
+  const parse = parseOptionValue(problem);
+  return (value, previous = []) => previous.concat([parse(value)]);
 }
 
 /** Build a commander value-parser for a non-negative integer within [min, max] (the library's intRangeProblem). */
@@ -112,7 +131,7 @@ export function parseBaseUrl(value: string): string {
 export function parsePortal(value: string): string {
   const portal = findPortal(value, PORTALS);
   if (!portal) {
-    throw new InvalidArgumentError(`Unknown portal "${cutForMessage(redactUrl(value))}". \`ckan portals\` lists the known ones.`);
+    throw new InvalidArgumentError(`Unknown portal ${quoteValue(redactUrl(value))}. \`ckan portals\` lists the known ones.`);
   }
   return portal.url;
 }

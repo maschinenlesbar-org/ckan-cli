@@ -7,19 +7,24 @@ import { action, toEngineOptions, type GlobalOptions } from "../shared.js";
 import { renderJson } from "../output.js";
 import { checkPortals } from "@maschinenlesbar.org/ckan-client/internal/portals";
 import { PORTALS } from "@maschinenlesbar.org/ckan-client/internal/portals-list";
-import { isBlank } from "@maschinenlesbar.org/ckan-client/internal/validate";
-import { cutForMessage, redactUrl } from "@maschinenlesbar.org/ckan-client/internal/errors";
+import { normalizeToken, textProblem, tokenProblem } from "@maschinenlesbar.org/ckan-client/internal/validate";
+import { quoteValue, redactUrl } from "@maschinenlesbar.org/ckan-client/internal/errors";
 
 /**
- * A typed value as a message quotes it: cut at MAX_MESSAGE_VALUE_LENGTH, after its
- * credentials are redacted (a cut could otherwise leave part of a password without the
- * "@" the argv redaction keys on).
+ * A typed value as a message quotes it: visibly (`quoteValue`: invisible and control characters
+ * escaped, cut at MAX_MESSAGE_VALUE_LENGTH), after its credentials are redacted (a cut could
+ * otherwise leave part of a password without the "@" the argv redaction keys on).
  */
 function shown(value: string): string {
-  return cutForMessage(redactUrl(value));
+  return quoteValue(redactUrl(value));
 }
 
-/** commander accumulator for repeatable `key=value` pairs into a record. */
+/**
+ * commander accumulator for repeatable `key=value` pairs into a record. The library's rules,
+ * as a usage error: the name is a token (`tokenProblem`; sent trimmed, so ` q` and `q` are the
+ * same name, and giving it twice is refused), the value is text (`textProblem`: not blank, no
+ * control or invisible character).
+ */
 function collectKeyValue(
   value: string,
   previous: Record<string, string> = {},
@@ -28,22 +33,21 @@ function collectKeyValue(
   // Throw commander's InvalidArgumentError (not a CkanError) so the failure is
   // formatted as a usage error with `error:` prefix and help, consistent with
   // other parse-time flag validation (e.g. `--rows abc`).
-  const key = value.slice(0, Math.max(eq, 0));
+  if (eq < 0) throw new InvalidArgumentError(`Invalid --param ${shown(value)}. Expected key=value.`);
+  const key = value.slice(0, eq);
   // A blank key (`=x`, ` =x`) names no parameter: the library refuses it too.
-  if (eq < 0 || isBlank(key)) {
-    throw new InvalidArgumentError(`Invalid --param "${shown(value)}". Expected key=value.`);
-  }
-  // Reject a duplicated key rather than silently overwriting the earlier value.
-  if (Object.prototype.hasOwnProperty.call(previous, key)) {
-    throw new InvalidArgumentError(`Duplicate --param key "${shown(key)}".`);
+  const keyProblem = tokenProblem(key);
+  if (keyProblem !== undefined) throw new InvalidArgumentError(`Invalid --param ${shown(value)}: the name: ${keyProblem}`);
+  // Reject a duplicated key (as it is sent, trimmed) rather than silently overwriting the earlier value.
+  const name = normalizeToken(key);
+  if (Object.keys(previous).some((k) => normalizeToken(k) === name)) {
+    throw new InvalidArgumentError(`Duplicate --param key ${shown(name)}.`);
   }
   // A blank value is refused by the library as well (CKAN reads an empty
-  // parameter as unset, so `--param q=` would run the action unfiltered); here it
-  // is a usage error that names the flag.
+  // parameter as unset, so `--param q=` would run the action unfiltered).
   const paramValue = value.slice(eq + 1);
-  if (isBlank(paramValue)) {
-    throw new InvalidArgumentError(`Invalid --param "${shown(value)}". The value must not be blank.`);
-  }
+  const valueProblem = textProblem(paramValue);
+  if (valueProblem !== undefined) throw new InvalidArgumentError(`Invalid --param ${shown(value)}: the value: ${valueProblem}`);
   // A computed key in a literal is an own data property, even for `__proto__`.
   return { ...previous, [key]: paramValue };
 }

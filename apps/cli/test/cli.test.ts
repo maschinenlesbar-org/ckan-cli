@@ -203,7 +203,7 @@ test("action refuses a blank --param value and keeps a __proto__ key", async () 
     const cli = makeCli(() => jsonResponse(ckan({})));
     assert.equal(await run(["action", "package_search", "--param", param], cli.deps), 1, param);
     assert.equal(cli.mt.calls.length, 0);
-    assert.match(cli.err.join("\n"), /The value must not be blank\./);
+    assert.match(cli.err.join("\n"), /the value: Expected a non-empty value\./);
   }
   const proto = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run(["action", "x", "--param", "__proto__=1", "--param", "constructor=2"], proto.deps), 0);
@@ -417,10 +417,11 @@ test("a password in --portal, an unparseable CKAN_BASE_URL or an id is never pri
     const text = [...env.out, ...env.err].join("\n");
     assert.doesNotMatch(text, /hunter2/, `argv ${JSON.stringify(argv)}: ${text}`);
   }
-  // A URL given as an id goes out percent-encoded; a 404 message echoes that form.
-  const id = makeCli(() => jsonResponse({ success: false, error: { message: "Not found" } }, 404));
-  assert.equal(await run(["package", `https://bob:${pw}@ckan.example.org`], id.deps), 4);
-  assert.doesNotMatch(id.err.join("\n"), /hunter2/);
+  // A URL given as an id is refused (a "/" is no id), and the refusal quotes it redacted.
+  const refused = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["package", `https://bob:${pw}@ckan.example.org`], refused.deps), 1);
+  assert.equal(refused.mt.calls.length, 0);
+  assert.doesNotMatch(refused.err.join("\n"), /hunter2/);
 });
 
 test("--user-agent refuses a blank value, control characters and non-Latin-1 before any request", async () => {
@@ -624,7 +625,8 @@ test("the CLI's own usage errors quote a typed value at most 500 characters long
     const record = cli.err[0] ?? "";
     // ckan's own quote is cut; commander's echo of a rejected option value
     // (`argument '…' is invalid.`) is bounded by the record cap only.
-    assert.match(record, /["']x{500}…["']/, record.slice(0, 200));
+    // quoteValue puts the "…" after the closing quote ("xxx"…), so it never reads as part of the value.
+    assert.match(record, /"x{500}"…|'x{500}…'/, record.slice(0, 200));
     if (argv[0] === long) assert.ok(record.length < 700, `${record.length}`);
   }
 });

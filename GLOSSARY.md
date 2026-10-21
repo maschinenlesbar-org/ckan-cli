@@ -115,24 +115,26 @@ CKAN search runs on **Apache Solr**, so its parameters use Solr syntax.
 
 **`q` (query).** The full-text query, e.g. `elbe` or `title:haushalt`. CLI: `search
 [query]`. Sent trimmed and in composed Unicode (NFC), so a decomposed umlaut pasted from a
-file name matches; the Solr syntax in it is left as written.
+file name matches; the Solr syntax in it is left as written. A control or invisible
+character in it (a zero-width space) is refused.
 
 **`fq` (filter query).** A filter that narrows the results without changing their order,
-e.g. `organization:allris`. CLI: `--fq`, repeatable; every filter must match. Sent exactly
-as written (its values are mostly exact-match codes). CKAN answers a
+e.g. `organization:allris`. CLI: `--fq`, repeatable; every filter must match. Sent trimmed
+and in composed Unicode (NFC), like `q`. CKAN answers a
 repeated `fq` key with HTTP 409, so one filter is sent as `fq` and several as `fq_list`.
 
 **`rows` / `start`.** Page size and zero-based offset, each a non-negative integer (the CLI
 and the library refuse anything else). CKAN caps `rows` (1000 by default), silently; page on
 with `--start`.
 
-**`sort`.** A sort expression, e.g. `metadata_modified desc`. An unknown sort field is
-ignored, not refused.
+**`sort`.** A sort expression, e.g. `metadata_modified desc`: one or more `<field>
+asc|desc`, separated by commas; anything else is refused before any request. An unknown
+sort field is ignored by CKAN, not refused.
 
 **Facet (`facet.field`, `facet.limit`).** Value counts over a search result, e.g. per
 publisher or format. CLI: `--facet <field>` (repeatable) and `--facet-limit <n>`; the default
 limit is 50 and cuts the list off silently, `-1` returns every value; any other negative is
-refused. Counts are
+refused. A field is a Solr field name (letters, digits, `_ . -`), sent trimmed. Counts are
 **datasets**, not files.
 
 **`res_format`.** A resource format, usable in `fq` and as a facet. Spelled differently per
@@ -148,7 +150,8 @@ compared as text and returns nonsense.
 ## Identifiers & pagination
 
 **id / name.** Datasets, organizations and groups are addressed by id (UUID) or name
-(slug); resources by id only.
+(slug); resources by id only. Sent trimmed; one with a `/` or an invisible character is
+refused.
 
 **`limit` / `offset`.** Paging for the `*_list` actions (`packages`, `organizations`,
 `groups`), distinct from search's `rows` / `start`. `--limit` is 1 or more: CKAN reads
@@ -162,7 +165,7 @@ between pages, and gives up with an error after 400 pages (10,000 entries,
 pages never end reaches it. `--limit` fetches part of a list.
 
 **Blank value.** An empty or whitespace-only filter, query, sort, facet field, parameter or id
-is refused before any request, never a silently unfiltered search: a usage error in the CLI,
+(or one of only invisible characters, a zero-width space) is refused before any request, never a silently unfiltered search: a usage error in the CLI,
 a `CkanValidationError` in the library.
 
 ---

@@ -155,8 +155,14 @@ action <name> [--param key=value …]    call any CKAN action (generic)
 > **Several `--fq` filters** are sent as CKAN's `fq_list`, never as a repeated
 > `fq` key, which CKAN answers with HTTP 409.
 
-> **Blank values are refused.** `ckan search ""`, `--fq ""`, `tags --query ""` or
-> `action … --param q=` exit 1 before any request, instead of silently running an unfiltered search.
+> **Values go out canonical, or are refused.** The search text, `--fq`, `tags --query`
+> and `--param` values are sent trimmed and in composed Unicode (NFC); ids, `--sort`,
+> `--facet` and `--param` names trimmed. A blank value (`ckan search ""`, `--fq ""`,
+> `tags --query ""`, `action … --param q=`, or one of only invisible characters) exits 1
+> before any request, instead of silently running an unfiltered search; so does a value
+> with a control or invisible character (a zero-width space pasted from a web page), shown
+> escaped (`"el\u200bbe"`), a `--sort` that is not `<field> asc|desc[, …]`, a `--facet`
+> that is not a field name, and an id with a `/`.
 > So does a forgotten value (`--fq --rows 5`): a value of `--fq`, `--facet`,
 > `--sort` or `tags --query` cannot start with `--`. And so does a single-value
 > option given twice (`--rows 5 --rows 50`, a second `--base-url`): only `--fq`,

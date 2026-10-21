@@ -138,7 +138,10 @@ call still be handed a header Node cannot send, the default transport rejects wi
 `status`, `packageSearch`, `packageShow`, `packageList`, `resourceShow`,
 `organizationList`, `organizationShow`, `groupList`, `groupShow`, `tagList`,
 `licenseList`, and the generic `action(name, params)`. `siteRoot(url)` exposes
-the base-URL normalisation, `validateBaseUrl(url)` the base-URL check.
+the base-URL normalisation, `validateBaseUrl(url)` the base-URL check. The input rules are
+exported too (`textProblem`, `tokenProblem`, `idProblem`, `sortProblem`, `fieldProblem`,
+`listProblem`, with `normalizeText`/`normalizeToken` and `quoteValue`), so a caller can check a
+value before it builds a request.
 
 The known portals are exported too: `PORTALS` (the built-in list),
 `findPortal(idOrUrl, PORTALS)`, `portalKey(url)`, `checkPortal(client)` (the short
@@ -245,7 +248,8 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   and throw (a promise-returning method rejects with) `CkanValidationError`, a
   `CkanError`, with the message `Invalid <name>: <reason>`. The CLI's value
   parsers call the same functions, so the CLI and the library refuse the same
-  inputs, and `run.ts` reports a `CkanValidationError` as a usage error (exit 1).
+  inputs, and `run.ts` reports a `CkanValidationError` as a usage error (exit 1). A
+  refused value is quoted with `quoteValue` (escaped, cut at 500 characters).
   A wrong-typed input from JavaScript is refused the same way, never as a raw
   `TypeError`: a non-string id, query, sort, tag query or base URL, a non-list
   `fq`/`facet_field`, a non-boolean `all_fields`, a `params` that is not an object,
@@ -377,24 +381,36 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   Solr (HTTP 409), and splits a lone `fq_list` value into characters. So one
   filter goes out as `fq`, two or more as `fq_list`. Facet fields go out as the
   JSON list `facet.field` expects.
-- **Blank input.** The client refuses a blank (empty or whitespace-only) value
-  before any request: a blank id (`*_show`), a blank `q`, `sort`, `fq` entry or
-  `facet_field` entry (`packageSearch`), a blank tag query (`tagList`), and in
-  `action()` a blank parameter name or value (or list entry). The rule is
-  `blankProblem` (`CkanValidationError` `Invalid <name>: Expected a non-empty
-  value.`); `undefined` still means "not given". CKAN would otherwise drop the
-  value and answer with an unfiltered result. The CLI's value parsers
-  (`parseNonEmpty`, `collectNonEmpty`, `--param`) apply the same rule as a usage
-  error.
-- **Free text goes out canonical.** The search text (`q`, `ckan search <query>`) and the
-  tag query (`tagList({ query })`, `ckan tags --query`) are sent trimmed and in composed
-  Unicode, NFC (`normalizeText`, exported): a decomposed "Gewässer" pasted from a macOS
-  file name, or a trailing space, matched nothing. Inner whitespace is kept, and NFC
-  changes no character of Solr's query syntax (all ASCII), so a `q` such as
-  `title:Haushalt AND -type:x` keeps its meaning. Solr filters (`fq`), the sort
-  expression, facet fields, ids and `action()` parameters go out exactly as given: they
-  are query syntax over exact-match fields, field names or codes, where only the stored
-  form decides what matches. The CLI passes the values on as typed.
+- **Every value goes out canonical, or is refused** (decision D8 of the 2026-10-21 fix
+  plan). Each value that goes into a request passes one library rule for its kind, before
+  any request, on both sides (the CLI's value parsers, `parseText`, `parseId`,
+  `parseOptionValue(problem)`, `collectValues(problem)` and `--param`, call the same rules):
+  - **Text** (`textProblem`, sent with `normalizeText`: trimmed and in NFC): the search text
+    (`q`), each Solr filter (`fq`), the tag query and every string value of an `action()`
+    parameter. A decomposed "Gewässer" pasted from a macOS file name, or a trailing space,
+    matched nothing. Inner whitespace is kept, and NFC changes no character of Solr's query
+    syntax (all ASCII), so `title:Haushalt AND -type:x` keeps its meaning. Refused: a lone
+    surrogate, a control character other than TAB, LF and CR, a format character other
+    than ZWNJ/ZWJ (a zero-width space split `el\u200bbe` into two Solr tokens: 9,965 hits
+    instead of 3,684 live on Hamburg).
+  - **Tokens** (`tokenProblem`, sent with `normalizeToken`: trimmed, NFC): the ids of the
+    `*_show` calls (`idProblem`: also no `/`, not `.` or `..`; CKAN ids are UUIDs, names
+    slugs), the sort expression (`sortProblem`: `<field> asc|desc[, …]` at the top level,
+    so `metadata_modified sideways` is a usage error, not CKAN's HTTP 400), each facet
+    field (`fieldProblem`: ASCII letters, digits, `_ . -`; `" res_format "` returned an
+    empty facet with exit 0) and every `action()` parameter name (two names that are the
+    same once trimmed, `q` and ` q`, are refused). Refused: every control and format
+    character, a lone surrogate.
+  - **Blank** (`isBlank`): nothing left once whitespace, control and format characters and
+    combining marks are taken out; `CkanValidationError` `Invalid <name>: Expected a
+    non-empty value.`, `undefined` still means "not given". CKAN would otherwise drop the
+    value and answer with an unfiltered result.
+  - A list (`fq`, `facet_field`, an `action()` list value) is checked item by item
+    (`listProblem`, `item 2 of 3: …`); an empty list means "not given".
+  - A refusal quotes the value visibly (`quoteValue`: control, format and bidi characters
+    escaped, `"el\u200bbe"`, cut at 500 characters; D10), and the CLI escapes commander's
+    own echo of a rejected value the same way (`escapeTerminalText`).
+  The action name keeps its own rule, `^[a-z0-9_]+$`, never trimmed.
 - **Known parameters only.** `packageSearch` (q, fq, rows, start, sort,
   facet_field, facet_limit), `packageList` (limit, offset), `organizationList` /
   `groupList` (plus all_fields) and `tagList` (query) throw `CkanValidationError` for

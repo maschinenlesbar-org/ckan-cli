@@ -147,37 +147,74 @@ test("packageSearch sends several filters as fq_list, never a repeated fq (HTTP 
   assert.deepEqual(url.searchParams.getAll("fq_list"), ["type:document", "organization:allris"]);
 });
 
-test("the search text and the tag query go out trimmed and composed (NFC); Solr filters, sort and facets as given", async () => {
+test("every value goes out canonical: text trimmed and composed (NFC), tokens trimmed (D8)", async () => {
   // A decomposed "Gewässer" (a plus U+0308, as pasted from a macOS file name) and a trailing
-  // space matched nothing the composed form matches. fq, sort and facet fields are Solr syntax
-  // over exact-match fields and field names: sent exactly as written.
+  // space matched nothing the composed form matches. Text (q, a filter, the tag query, an
+  // action() parameter value) goes out trimmed and in NFC; a sort expression, a facet field,
+  // an id and a parameter name are tokens: trimmed and in NFC too.
   const nfd = "Gewa\u0308sser";
   const mt = makeMockTransport((req) =>
-    jsonResponse(ckan(req.url.includes("tag_list") ? [] : { count: 0, results: [] })),
+    jsonResponse(ckan(req.url.includes("tag_list") ? [] : req.url.includes("_show") ? { id: "x" } : { count: 0, results: [] })),
   );
   const client = clientWith(mt);
-  await client.packageSearch({ q: `  title:${nfd}  `, fq: [` tags:${nfd}`], sort: "score desc", facet_field: ["tags"] });
+  await client.packageSearch({ q: `  title:${nfd}  `, fq: [` tags:${nfd}`], sort: " score desc ", facet_field: [" tags "] });
   const search = new URL(mt.last().url).searchParams;
   assert.equal(search.get("q"), "title:Gew\u00e4sser");
-  assert.equal(search.get("fq"), ` tags:${nfd}`);
+  assert.equal(search.get("fq"), "tags:Gew\u00e4sser");
   assert.equal(search.get("sort"), "score desc");
+  assert.equal(search.get("facet.field"), '["tags"]');
   await client.tagList({ query: `\u00a0${nfd} ` });
   assert.equal(new URL(mt.last().url).searchParams.get("query"), "Gew\u00e4sser");
   // Inner whitespace and Solr syntax stay as written.
-  await client.packageSearch({ q: ' "Elbe  Hafen" AND -type:x ' });
+  await client.packageSearch({ q: ' "Elbe  Hafen" AND -type:x ', fq: ["a:1", ` b:${nfd} `] });
   assert.equal(new URL(mt.last().url).searchParams.get("q"), '"Elbe  Hafen" AND -type:x');
+  assert.deepEqual(new URL(mt.last().url).searchParams.getAll("fq_list"), ["a:1", "b:Gew\u00e4sser"]);
+  await client.packageShow(" abc ");
+  assert.equal(new URL(mt.last().url).searchParams.get("id"), "abc");
+  await client.action("package_autocomplete", { " q ": ` ${nfd} `, limit: 3 });
+  assert.equal(new URL(mt.last().url).search, "?q=Gew%C3%A4sser&limit=3");
+});
+
+test("an invisible or control character, a lone surrogate, a bad sort or field name is refused, shown escaped (D8, D10)", async () => {
+  const ZWSP = "\u200b";
+  const cases: [string, (c: CkanClient) => Promise<unknown>][] = [
+    ['Invalid q: "el\\u200bbe" contains an invisible character (U+200B).', (c) => c.packageSearch({ q: `el${ZWSP}be` })],
+    ["Invalid q: Expected a non-empty value.", (c) => c.packageSearch({ q: ZWSP })],
+    ["Invalid q: Expected a non-empty value.", (c) => c.packageSearch({ q: "\u0301" })],
+    ['Invalid q: "a\\ud800" contains half of a character (a lone surrogate).', (c) => c.packageSearch({ q: "a\ud800" })],
+    ['Invalid fq: item 2 of 2: "b\\u00adc" contains an invisible character (U+00AD).', (c) => c.packageSearch({ fq: ["a:1", "b\u00adc"] })],
+    ['Invalid sort: "metadata_modified sideways" is not a sort expression: expected "<field> asc|desc[, <field> asc|desc]", e.g. "metadata_modified desc".',
+      (c) => c.packageSearch({ sort: "metadata_modified sideways" })],
+    ['Invalid sort: "score desc, name" is not a sort expression: expected "<field> asc|desc[, <field> asc|desc]", e.g. "metadata_modified desc".',
+      (c) => c.packageSearch({ sort: "score desc, name" })],
+    ['Invalid facet_field: "res format" is not a Solr field name (letters, digits, _ . -), e.g. res_format.', (c) => c.packageSearch({ facet_field: ["res format"] })],
+    ['Invalid id: "a\\u200d" contains an invisible or control character (U+200D).', (c) => c.packageShow("a\u200d")],
+    ['Invalid id: "a/b" is not an id or name: it contains "/".', (c) => c.groupShow("a/b")],
+    ['Invalid parameter name: "\\u200bq" contains an invisible or control character (U+200B).', (c) => c.action("x", { [`${ZWSP}q`]: "a" })],
+    ['Invalid params: "q" is given twice (as "q" and " q").', (c) => c.action("x", { q: "a", " q": "b" })],
+    ['Invalid CKAN action name: "status\\u200bshow"', (c) => c.action(`status${ZWSP}show`)],
+  ];
+  for (const [message, call] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+    await assert.rejects(call(clientWith(mt)), (err: unknown) => err instanceof CkanValidationError && err.message === message, message);
+    assert.equal(mt.calls.length, 0, message);
+  }
+  // A function sort (commas inside parentheses) and several criteria pass.
+  const ok = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+  await clientWith(ok).packageSearch({ sort: "div(a,b) desc, metadata_modified ASC" });
+  assert.equal(new URL(ok.last().url).searchParams.get("sort"), "div(a,b) desc, metadata_modified ASC");
 });
 
 test("blank search values, filters, tag queries and params are refused before any request", async () => {
   const cases: [string, (c: CkanClient) => Promise<unknown>][] = [
     ["Invalid q: Expected a non-empty value.", (c) => c.packageSearch({ q: " " })],
     ["Invalid fq: Expected a non-empty value.", (c) => c.packageSearch({ fq: [""] })],
-    ["Invalid fq: Expected a non-empty value.", (c) => c.packageSearch({ fq: ["", "organization:allris", ""] })],
+    ["Invalid fq: item 1 of 3: Expected a non-empty value.", (c) => c.packageSearch({ fq: ["", "organization:allris", ""] })],
     ["Invalid sort: Expected a non-empty value.", (c) => c.packageSearch({ sort: "" })],
-    ["Invalid facet_field: Expected a non-empty value.", (c) => c.packageSearch({ facet_field: ["tags", ""] })],
+    ["Invalid facet_field: item 2 of 2: Expected a non-empty value.", (c) => c.packageSearch({ facet_field: ["tags", ""] })],
     ["Invalid query: Expected a non-empty value.", (c) => c.tagList({ query: "" })],
     ["Invalid q: Expected a non-empty value.", (c) => c.action("package_search", { q: "" })],
-    ["Invalid fq: Expected a non-empty value.", (c) => c.action("package_search", { fq: ["a", " "] })],
+    ["Invalid fq: item 2 of 2: Expected a non-empty value.", (c) => c.action("package_search", { fq: ["a", " "] })],
     ["Invalid parameter name: Expected a non-empty value.", (c) => c.action("package_search", { "": "x" })],
   ];
   for (const [message, call] of cases) {

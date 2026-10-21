@@ -3,15 +3,16 @@
 
 import { InvalidArgumentError, type Command } from "commander";
 import type { CliDeps } from "../io.js";
-import { facetLimitProblem } from "@maschinenlesbar.org/ckan-client/internal/validate";
+import { facetLimitProblem, fieldProblem, sortProblem, textProblem } from "@maschinenlesbar.org/ckan-client/internal/validate";
 import {
   action,
-  collectNonEmpty,
+  collectValues,
   once,
   parseBoundedInt,
+  parseId,
   parseIntArg,
-  parseNonEmpty,
   parseOptionValue,
+  parseText,
 } from "../shared.js";
 import { renderJson } from "../output.js";
 
@@ -36,12 +37,12 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("search")
     .description("Search datasets (Solr query syntax)")
-    .argument("[query]", "full-text query, e.g. elbe or title:haushalt", parseNonEmpty)
+    .argument("[query]", "full-text query, e.g. elbe or title:haushalt", parseText)
     .option("--rows <n>", "max results (servers cap this, usually at 1000)", once(parseIntArg))
     .option("--start <n>", "offset for paging", once(parseIntArg))
-    .option("--sort <expr>", 'e.g. "metadata_modified desc"', once(parseOptionValue))
-    .option("--fq <filter>", "filter query, e.g. organization:allris (repeatable; all must match)", collectNonEmpty)
-    .option("--facet <field>", "count values of a field, e.g. res_format (repeatable)", collectNonEmpty)
+    .option("--sort <expr>", 'e.g. "metadata_modified desc"', once(parseOptionValue(sortProblem)))
+    .option("--fq <filter>", "filter query, e.g. organization:allris (repeatable; all must match)", collectValues(textProblem))
+    .option("--facet <field>", "count values of a field, e.g. res_format (repeatable)", collectValues(fieldProblem))
     .option("--facet-limit <n>", "max values per facet (default 50; -1 = all)", once(parseFacetLimit))
     .action(
       action(deps, async ({ client, global, opts }, [query]) => {
@@ -64,7 +65,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("package")
     .description("Show one dataset by id or name")
-    .argument("<id>", "id or name", parseNonEmpty)
+    .argument("<id>", "id or name", parseId)
     .action(
       action(deps, async ({ client, global }, [id]) => {
         renderJson(deps, global, await client.packageShow(id!));
@@ -74,7 +75,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("resource")
     .description("Show one resource (distribution) by id")
-    .argument("<id>", "resource id", parseNonEmpty)
+    .argument("<id>", "resource id", parseId)
     .action(
       action(deps, async ({ client, global }, [id]) => {
         renderJson(deps, global, await client.resourceShow(id!));
@@ -84,7 +85,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("organization")
     .description("Show one organization (publisher) by id or name")
-    .argument("<id>", "id or name", parseNonEmpty)
+    .argument("<id>", "id or name", parseId)
     .action(
       action(deps, async ({ client, global }, [id]) => {
         renderJson(deps, global, await client.organizationShow(id!));
@@ -94,7 +95,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("group")
     .description("Show one group (theme/category) by id or name")
-    .argument("<id>", "id or name", parseNonEmpty)
+    .argument("<id>", "id or name", parseId)
     .action(
       action(deps, async ({ client, global }, [id]) => {
         renderJson(deps, global, await client.groupShow(id!));
@@ -162,7 +163,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("tags")
     .description("List tags")
-    .option("--query <substring>", "only tags containing this substring", once(parseOptionValue))
+    .option("--query <substring>", "only tags containing this substring", once(parseOptionValue(textProblem)))
     .action(
       action(deps, async ({ client, global, opts }) => {
         renderJson(deps, global, await client.tagList({ query: opts["query"] as string | undefined }));

@@ -21,6 +21,9 @@ import {
 } from "./errors.js";
 import { assertValid, baseUrlProblem, headerValueProblem, intRangeProblem } from "./validate.js";
 
+// quoteValue lives with the other message helpers (validate.ts quotes refused values with it).
+export { quoteValue } from "./errors.js";
+
 export const DEFAULT_BASE_URL = "https://suche.transparenz.hamburg.de";
 const DEFAULT_USER_AGENT = "ckan-cli";
 

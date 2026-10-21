@@ -29,10 +29,21 @@ export {
   credentialsIn,
   redactCredentials,
   cutForMessage,
+  quoteValue,
   MAX_MESSAGE_VALUE_LENGTH,
 } from "./errors.js";
 
-export { assertValid, normalizeText } from "./validate.js";
+export {
+  assertValid,
+  fieldProblem,
+  idProblem,
+  listProblem,
+  normalizeText,
+  normalizeToken,
+  sortProblem,
+  textProblem,
+  tokenProblem,
+} from "./validate.js";
 export type { Problem } from "./validate.js";
 
 export { PORTALS } from "./portals-list.js";

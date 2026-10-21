@@ -126,11 +126,12 @@ Die CKAN-Suche läuft auf **Apache Solr**, die Parameter folgen daher der Solr-S
 **`q` (Query).** Die Volltextsuche, z. B. `elbe` oder `title:haushalt`. CLI: `search
 [query]`. Wird ohne umgebende Leerzeichen und in zusammengesetztem Unicode (NFC) gesendet,
 sodass ein zerlegter Umlaut aus einem Dateinamen trifft; die Solr-Syntax darin bleibt, wie
-sie geschrieben ist.
+sie geschrieben ist. Ein Steuer- oder unsichtbares Zeichen darin (ein Leerzeichen der Breite
+null) wird abgelehnt.
 
 **`fq` (Filter-Query).** Ein Filter, der die Treffer einschränkt, ohne ihre Reihenfolge zu
 ändern, z. B. `organization:allris`. CLI: `--fq`, wiederholbar; jeder Filter muss zutreffen.
-Wird genau so gesendet, wie er geschrieben ist (seine Werte sind meist exakt verglichene Codes).
+Wird ohne umgebende Leerzeichen und in zusammengesetztem Unicode (NFC) gesendet, wie `q`.
 CKAN beantwortet einen wiederholten `fq`-Schlüssel mit HTTP 409, deshalb wird ein Filter als
 `fq` und mehrere als `fq_list` gesendet.
 
@@ -138,13 +139,15 @@ CKAN beantwortet einen wiederholten `fq`-Schlüssel mit HTTP 409, deshalb wird e
 (CLI und Bibliothek lehnen alles andere ab). CKAN begrenzt `rows` (standardmäßig auf 1000),
 ohne es zu melden; mit `--start` weiterblättern.
 
-**`sort`.** Ein Sortierausdruck, z. B. `metadata_modified desc`. Ein unbekanntes Sortierfeld
-wird ignoriert, nicht abgewiesen.
+**`sort`.** Ein Sortierausdruck, z. B. `metadata_modified desc`: ein oder mehrere `<Feld>
+asc|desc`, durch Kommas getrennt; alles andere wird vor jeder Anfrage abgelehnt. Ein
+unbekanntes Sortierfeld ignoriert CKAN, statt es abzuweisen.
 
 **Facette (`facet.field`, `facet.limit`).** Wertezählungen über ein Suchergebnis, z. B. je
 Herausgeber oder Format. CLI: `--facet <Feld>` (wiederholbar) und `--facet-limit <n>`; die
 Standardgrenze ist 50 und schneidet die Liste stillschweigend ab, `-1` liefert alle Werte;
-jeder andere negative Wert wird abgelehnt.
+jeder andere negative Wert wird abgelehnt. Ein Feld ist ein Solr-Feldname (Buchstaben,
+Ziffern, `_ . -`) und wird ohne umgebende Leerzeichen gesendet.
 Gezählt werden **Datensätze**, nicht Dateien.
 
 **`res_format`.** Das Format einer Ressource, als Filter in `fq` und als Facette nutzbar. Je
@@ -161,7 +164,8 @@ zuletzt geändert wurde; echte Datumsfelder, Zeiträume funktionieren also:
 ## Kennungen und Seitenweise Abfrage
 
 **ID / Name.** Datensätze, Organisationen und Gruppen sind über die ID (UUID) oder den Namen
-(Slug) ansprechbar, Ressourcen nur über die ID.
+(Slug) ansprechbar, Ressourcen nur über die ID. Wird ohne umgebende Leerzeichen gesendet;
+eine mit `/` oder einem unsichtbaren Zeichen wird abgelehnt.
 
 **`limit` / `offset`.** Seitenweise Abfrage für die `*_list`-Aktionen (`packages`,
 `organizations`, `groups`), getrennt von `rows` / `start` der Suche. `--limit` ist 1 oder
@@ -175,8 +179,9 @@ Einträge, `MAX_ALL_FIELDS_PAGES`) mit einem Fehler ab — weit mehr, als ein CK
 listet; das erreicht nur ein fehlerhafter Server, dessen Seiten nie enden. `--limit` holt
 einen Teil der Liste.
 
-**Leerer Wert.** Ein leerer oder nur aus Leerzeichen bestehender Filter, Suchbegriff,
-Sortierausdruck, Facettenname, Parameter oder eine leere ID wird vor jeder Anfrage abgelehnt,
+**Leerer Wert.** Ein leerer oder nur aus Leerzeichen (oder unsichtbaren Zeichen) bestehender
+Filter, Suchbegriff, Sortierausdruck, Facettenname, Parameter oder eine leere ID wird vor jeder
+Anfrage abgelehnt,
 nie eine stillschweigend ungefilterte Suche: in der CLI ein Bedienfehler, in der Bibliothek ein
 `CkanValidationError`.
 
