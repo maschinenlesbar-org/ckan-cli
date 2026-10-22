@@ -288,11 +288,15 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   with `***` in everything it prints — commander's usage errors, which echo a rejected
   `--base-url` or `--portal` value or a URL typed where the command goes, the
   client's own messages and the help's defaults — so a password with spaces,
-  quotes, `#`, `?` or `/` is caught as well as an ordinary one. Only a value that
-  starts with a scheme counts (a bare `a:b@c` is a dataset id, a search text or a
-  User-Agent as often as a credential), except as the `--base-url` or `--portal` value
-  and in `CKAN_BASE_URL`, where a `user:password@host` without its scheme is still a
-  credential. The log replaces it
+  quotes, `#`, `?` or `/` is caught as well as an ordinary one. Only a URL with a scheme
+  counts (a bare `a:b@c` is a dataset id, a search text or a User-Agent as often as a
+  credential), except as the `--base-url` or `--portal` value and in `CKAN_BASE_URL`, where
+  a `user:password@host` without its scheme is still a credential. A URL is found anywhere
+  in an argument (`urlsWithin`: each `://` found with indexOf and its scheme by walking back,
+  so the search is linear; at most 64 per argument), not only at its start: the library sends
+  a text trimmed, so a padded `search " https://u:pw@h"`, `--fq organization:https://…`, a
+  `tags --query` or `--param` value inside a phrase reached the request URL of an error
+  record percent-encoded, and a refusal or commander's echo raw. The log replaces it
   in each record's *message*, before the record is cut and escaped, and writes it to
   the raw stderr: the frame (time, level, topic) is never touched, and a password with
   DEL, C1 or bidi characters is matched in its raw form. The forms a server echoes a

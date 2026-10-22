@@ -161,6 +161,33 @@ export interface Redaction {
   err(text: string): string;
 }
 
+/** The most URLs `urlsWithin` reads inside one argument, after the one it may start with. */
+const MAX_URLS_WITHIN = 64;
+
+/** A character a URL scheme may hold after its first letter. */
+const SCHEME_CHAR = /[A-Za-z0-9+.-]/;
+
+/**
+ * `value` and the rest of it from each place a URL starts inside it (`<scheme>://`, the scheme
+ * starting with a letter), for `credentialsIn`, which reads a URL at the start of its input only.
+ * The library sends a text trimmed, so a padded `" https://user:pw@host"`, one after a dash or
+ * inside a phrase (`search "elbe https://…"`, `--fq organization:https://…`) reaches the request
+ * URL of an error record, a refusal and commander's echo. Each `://` is found with indexOf and its
+ * scheme by walking back, never by a pattern retried at every position (quadratic: 40 000 scheme
+ * characters took ~3 s); at most MAX_URLS_WITHIN are read from one argument, since each is parsed
+ * whole.
+ */
+function urlsWithin(value: string): string[] {
+  const found = [value];
+  for (let at = value.indexOf("://"); at !== -1 && found.length <= MAX_URLS_WITHIN; at = value.indexOf("://", at + 3)) {
+    let start = at;
+    while (start > 0 && SCHEME_CHAR.test(value[start - 1] as string)) start--;
+    while (start < at && !/[A-Za-z]/.test(value[start] as string)) start++;
+    if (start > 0 && start < at) found.push(value.slice(start));
+  }
+  return found;
+}
+
 /**
  * The secrets of the run in `argv` and CKAN_BASE_URL. Commander echoes rejected values in
  * its errors (`--base-url`, `--portal`, a URL typed where the command goes), the client's
@@ -183,7 +210,7 @@ export function redactionFor(argv: readonly string[], env: Record<string, string
   const baseUrls = [...flagValues(argv, BASE_URL_FLAGS), env["CKAN_BASE_URL"] ?? ""].map((value) =>
     value === "" || /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) ? value : `http://${value}`,
   );
-  const sources = [...values, ...baseUrls];
+  const sources = [...values.flatMap(urlsWithin), ...baseUrls];
   const secrets = new Set<string>();
   const encoded = new Set<string>();
   const echoed = new Set<string>();

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { run } from "../src/cli/run.js";
+import { redactionFor, run } from "../src/cli/run.js";
 import { renderJson } from "../src/cli/output.js";
 import { CkanClient } from "@maschinenlesbar.org/ckan-client/internal/client";
 import type { CliDeps } from "../src/cli/io.js";
@@ -748,4 +748,66 @@ test("terminal controls are escaped in chunks: the same text as one pass, across
     (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
   assert.equal(out[0], expected);
   assert.deepEqual(JSON.parse(out[0]!), { text });
+});
+
+// T15 of the 2026-10-21 fix round (jobsuche-cli 28be809, ladesaeulenregister-cli 001c48d): a URL
+// with a password anywhere in an argument — padded, after a dash, inside a phrase — must never
+// reach stderr, neither raw in a refusal, a note or commander's echo nor percent-encoded in the
+// request URL of an error record.
+test("a password in a URL inside any argument is redacted on stderr, raw or percent-encoded (T15)", async () => {
+  const url = "https://bob:s3cretpw@host.example/x";
+  const argvs = [
+    ["search", ` ${url}`],
+    ["search", `elbe ${url}`],
+    ["search", `-${url}`],
+    ["search", "--fq", `organization:${url}`],
+    ["search", "--fq", ` ${url}`],
+    ["search", "--sort", `${url} desc`],
+    ["search", "--facet", ` ${url}`],
+    ["search", "--rows", `5 ${url}`],
+    ["tags", "--query", ` ${url}`],
+    ["tags", `--query=x ${url}`],
+    ["package", ` ${url}`],
+    ["package", `abc ${url}`],
+    ["organizations", "--limit", `-${url}`],
+    ["action", `package_show ${url}`],
+    ["action", "package_show", "--param", `id= ${url}`],
+    ["action", "package_show", "--param", `q=elbe ${url}`],
+    ["action", "package_show", "--param", ` ${url}=x`],
+    ["--portal", ` ${url}`, "status"],
+    ["--user-agent", `agent ${url}\u0001`, "status"],
+    ["--base-url", ` ${url}`, "status"],
+    ["--base-url", url, "status"],
+    [` ${url}`],
+    ["status", ` ${url}`],
+    ["status", `--bogus= ${url}`],
+    ["search", "elbe", "--bogus", ` ${url}`],
+  ];
+  const answers = [
+    () => jsonResponse(ckan({ count: 0, results: [] })),
+    () => jsonResponse({ success: false, error: { __type: "Not Found Error", message: "Not found" } }, 404),
+    () => rawResponse("busy", "text/plain", 503),
+  ];
+  for (const argv of argvs) {
+    for (const answer of answers) {
+      const cli = makeCli(answer);
+      await run(["--max-retries", "0", ...argv], cli.deps);
+      const err = cli.err.join("\n");
+      assert.doesNotMatch(err, /s3cretpw|bob%3As3|s3cretpw%40/, `${JSON.stringify(argv)}: ${err}`);
+    }
+  }
+});
+
+test("the search for URLs inside an argument is linear: a 1 MB argument is read at once (T15)", async () => {
+  // A pattern retried at every position took ~3 s for 40 000 scheme characters without "://".
+  for (const big of ["a".repeat(1 << 20), "a://".repeat(1 << 18), `${"a".repeat(1 << 20)}://bob:s3cretpw@h/`, `q=${"a".repeat(1 << 20)}`]) {
+    const started = performance.now();
+    const redaction = redactionFor(["search", big], {});
+    redaction.err(`x ${big.slice(-40)}`);
+    assert.ok(performance.now() - started < 1000, `${big.slice(0, 8)}…: ${Math.round(performance.now() - started)} ms`);
+  }
+  // At most 64 URLs inside one argument are read; the first ones are redacted.
+  const many = Array.from({ length: 100 }, (_, i) => ` https://u${i}:pw${i}xyz@h/`).join("");
+  const err = redactionFor(["search", many], {}).err(many);
+  assert.ok(!err.includes("pw0xyz") && !err.includes("pw63xyz"), err.slice(0, 200));
 });
