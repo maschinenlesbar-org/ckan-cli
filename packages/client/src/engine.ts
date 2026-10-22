@@ -2,6 +2,7 @@
 // requests via a Transport, applies retry/backoff for transient statuses
 // (429, 503), and decodes responses.
 
+import { constants } from "node:buffer";
 import { TextDecoder } from "node:util";
 import { MAX_TIMEOUT_MS, nodeHttpTransport, sizeLimitMessage, type HttpRequest, type HttpResponse, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
@@ -25,6 +26,8 @@ import { assertValid, baseUrlProblem, headerValueProblem, intRangeProblem } from
 export { quoteValue } from "./errors.js";
 
 export const DEFAULT_BASE_URL = "https://suche.transparenz.hamburg.de";
+/** V8's longest string (2^29 − 24 characters on 64-bit). */
+const MAX_STRING_LENGTH = constants.MAX_STRING_LENGTH;
 const DEFAULT_USER_AGENT = "ckan-cli";
 
 export interface RawResponse {
@@ -672,7 +675,7 @@ export class RequestEngine {
               : location
                 ? `redirect to ${cutForMessage(sanitizeServerText(location))} not followed`
                 : "redirect not followed (no Location header)";
-          throw new CkanApiError({ status, url, method, body: this.scrub(body.toString("utf8")), detail });
+          throw new CkanApiError({ status, url, method, body: this.scrub(errorBodyText(body)), detail });
         }
         throw this.toApiError(method, url, status, body, status === 401 || status === 403 ? dropped : undefined, {
           retries: attempt,
@@ -747,7 +750,7 @@ export class RequestEngine {
     hint: string | undefined,
     retry: { retries: number; retryAfterMs?: number },
   ): CkanApiError {
-    const text = this.scrub(body.toString("utf8"));
+    const text = this.scrub(errorBodyText(body));
     let detail: string | undefined;
     try {
       const parsed: unknown = JSON.parse(text);
@@ -832,11 +835,46 @@ function decodeBody(body: Buffer, contentType: string, request: string): { text:
   }
   try {
     return { text: decoder.decode(body), replaced: 0 };
-  } catch {
+  } catch (err) {
+    if (isStringTooLong(err)) throw tooLargeForText(request, body);
     // Not valid in the charset: decode with replacement, and count what was replaced.
-    const text = new TextDecoder(decoder.encoding).decode(body);
+    let text: string;
+    try {
+      text = new TextDecoder(decoder.encoding).decode(body);
+    } catch (again) {
+      if (isStringTooLong(again)) throw tooLargeForText(request, body);
+      throw again;
+    }
     const sent = decoder.encoding === "utf-8" ? countBytes(body, REPLACEMENT_UTF8) : 0;
     return { text, replaced: countChar(text, 0xfffd) - sent };
+  }
+}
+
+/**
+ * True for V8's error for a string past its longest one (2^29 − 24 characters on 64-bit): a body
+ * of 512 MB and more, possible once `maxResponseBytes` is lifted, can't be decoded into one.
+ */
+function isStringTooLong(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === "ERR_STRING_TOO_LONG";
+}
+
+/** The parse error for a body too large to decode: it used to escape as a plain Error ("Unexpected error"). */
+function tooLargeForText(request: string, body: Buffer): CkanParseError {
+  return new CkanParseError(
+    `${request}: the answer is too large to read as text (${body.byteLength} bytes; the longest string is ${MAX_STRING_LENGTH} characters).`,
+  );
+}
+
+/**
+ * The body of an error answer as text, kept on the error (`body`). One too large to be a string
+ * (maxResponseBytes lifted) is left out: the status is the error.
+ */
+function errorBodyText(body: Buffer): string {
+  try {
+    return body.toString("utf8");
+  } catch (err) {
+    if (!isStringTooLong(err)) throw err;
+    return "";
   }
 }
 

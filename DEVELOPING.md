@@ -102,7 +102,12 @@ escape (`\ud800` without its pair, which `jq` refuses, and the whole output with
 for one bad character, and the engine option `onWarning(message)` is told once per answer:
 `GET <url>: 2 characters of the answer were not valid text (invalid bytes or a lone
 surrogate) and replaced with U+FFFD.` A throw in it is swallowed. The CLI's `action()` logs
-it as a `WARN` record of `ckan.api`.
+it as a `WARN` record of `ckan.api`. A body too large to become one string (512 MB and more,
+possible only with `maxResponseBytes: 0` or `--max-response-bytes 0`) is a `CkanParseError`,
+`GET <url>: the answer is too large to read as text (N bytes; the longest string is 536870888
+characters).`, from either decode, not a plain `Error` ("Unexpected error" in the CLI); an
+error status or an unfollowed redirect with such a body keeps its `CkanApiError`, without the
+body.
 
 `timeoutMs` and `maxResponseBytes` hold for every transport, not only the built-in
 one: the engine runs each transport call under the `timeoutMs` deadline (passing an

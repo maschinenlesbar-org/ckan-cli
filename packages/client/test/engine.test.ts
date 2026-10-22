@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { TextDecoder } from "node:util";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/engine.js";
 import {
   CkanApiError,
@@ -701,4 +702,48 @@ test("bigIntegerKeys: a declared member's number is its exact literal as a strin
   // Without declarations the scan is the plain number check.
   assert.equal(firstInexactNumber('{"a":"1e400","b":3e-324}'), "3e-324");
   assert.deepEqual(scanNumbers('{"a":1}'), { json: '{"a":1}', inexact: undefined });
+});
+
+test("an answer longer than V8's longest string is a CkanParseError naming the request, not a plain Error (T14)", async (t) => {
+  // A real one needs a body of 512 MB and more (possible with maxResponseBytes 0): V8's own
+  // error is stood in for, for the body marked by its length. `fatalToo` false: the strict
+  // decode fails as for an invalid byte, and only the replacing one after it is too long.
+  const huge = Buffer.from('{"success":true,"result":[]}  ');
+  const tooLong = (): Error => Object.assign(new Error("Cannot create a string longer than 0x1fffffe8 characters"), { code: "ERR_STRING_TOO_LONG" });
+  let fatalToo = true;
+  const decode = TextDecoder.prototype.decode;
+  t.mock.method(TextDecoder.prototype, "decode", function (this: InstanceType<typeof TextDecoder>, input?: Uint8Array, options?: { stream?: boolean }) {
+    if (input !== undefined && input.byteLength === huge.length) {
+      if (this.fatal && !fatalToo) throw Object.assign(new TypeError("The encoded data was not valid"), { code: "ERR_ENCODING_INVALID_ENCODED_DATA" });
+      throw tooLong();
+    }
+    return decode.call(this, input, options);
+  });
+  const toString = Buffer.prototype.toString;
+  t.mock.method(Buffer.prototype, "toString", function (this: Buffer, ...args: Parameters<Buffer["toString"]>) {
+    if (this.length === huge.length && args[0] === "utf8") throw tooLong();
+    return toString.apply(this, args);
+  });
+  for (const strictToo of [true, false]) {
+    fatalToo = strictToo;
+    const e = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "application/json")).transport });
+    await assert.rejects(e.getJson("/api/3/action/package_list", { q: "x" }), (err: unknown) => {
+      assert.ok(err instanceof CkanParseError, `${strictToo}: ${String(err)}`);
+      assert.equal(
+        err.message,
+        `GET https://suche.transparenz.hamburg.de/api/3/action/package_list?q=x: the answer is too large to read as text (${huge.length} bytes; the longest string is 536870888 characters).`,
+      );
+      return true;
+    });
+  }
+  // An error status with such a body is still the API error, without the unreadable body.
+  const failing = new RequestEngine({ maxResponseBytes: 0, maxRetries: 0, transport: makeMockTransport(() => rawResponse(huge, "application/json", 500)).transport });
+  await assert.rejects(failing.getJson("/x"), (err: unknown) => err instanceof CkanApiError && err.status === 500 && err.body === "");
+  // So is a redirect that is not followed.
+  const moved = new RequestEngine({
+    maxResponseBytes: 0,
+    maxRedirects: 0,
+    transport: makeMockTransport(() => ({ status: 301, headers: { location: "https://elsewhere.example/x" }, body: huge })).transport,
+  });
+  await assert.rejects(moved.getJson("/x"), (err: unknown) => err instanceof CkanApiError && err.status === 301 && err.body === "");
 });
