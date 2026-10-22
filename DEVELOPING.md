@@ -415,7 +415,11 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
     non-empty value.`, `undefined` still means "not given". CKAN would otherwise drop the
     value and answer with an unfiltered result.
   - A list (`fq`, `facet_field`, an `action()` list value) is checked item by item
-    (`listProblem`, `item 2 of 3: …`); an empty list means "not given".
+    (`listProblem`, `item 2 of 3: …`); an empty `fq` or `facet_field` means "not given". An
+    `action()` list value must hold at least one value and no `null`/`undefined` entry
+    (`queryValueProblem`): the query builder drops those, so `{ q: [null] }` ran the action
+    with no `q` at all, over the whole catalogue; `null` or `undefined` alone still mean
+    "not given".
   - A refusal quotes the value visibly (`quoteValue`: control, format and bidi characters
     escaped, `"el\u200bbe"`, cut at 500 characters; D10), and the CLI escapes commander's
     own echo of a rejected value the same way (`escapeTerminalText`).

@@ -555,3 +555,27 @@ test("the client declares Solr's _version_ as a big integer: its exact literal a
   await new CkanClient({ transport: own.transport, bigIntegerKeys: new Set(["serial"]) }).status();
   assert.throws(() => new CkanClient({ bigIntegerKeys: 5 as unknown as ReadonlySet<string> }), CkanValidationError);
 });
+
+test("action() refuses a list with no value or a missing entry, never sends it unfiltered (govdata-cli ec15a1b)", async () => {
+  const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+  const client = clientWith(mt);
+  const cases: Array<[unknown, string]> = [
+    [[null], "Invalid q: item 1 of 1 is null; a list holds values only (leave the parameter out instead)."],
+    [[undefined], "Invalid q: item 1 of 1 is undefined; a list holds values only (leave the parameter out instead)."],
+    [["a", null], "Invalid q: item 2 of 2 is null; a list holds values only (leave the parameter out instead)."],
+    [[], "Invalid q: Expected at least one value; leave the parameter out instead."],
+  ];
+  for (const [q, message] of cases) {
+    await assert.rejects(
+      client.action("package_search", { q } as never),
+      (err: unknown) => err instanceof CkanValidationError && err.message === message,
+      JSON.stringify(q),
+    );
+  }
+  assert.equal(mt.calls.length, 0);
+  // A parameter given as null or undefined alone means not given; a full list goes out.
+  await client.action("package_search", { q: null, fq: undefined } as never);
+  assert.equal(new URL(mt.last().url).search, "");
+  await client.action("package_search", { fq: ["a", 1] } as never);
+  assert.equal(new URL(mt.last().url).searchParams.getAll("fq").join(","), "a,1");
+});

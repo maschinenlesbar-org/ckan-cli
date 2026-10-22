@@ -196,11 +196,20 @@ export function listProblem(items: readonly string[], itemProblem: Problem<strin
 
 /**
  * A value the query-string builder can send: a string, a finite number, a boolean
- * or a Date, or a list of them (`null`/`undefined` mean "not given"). An object, a
- * function or `NaN` would go out as `[object Object]` or `NaN`. A string (or a list entry)
- * must pass {@link textProblem}: it is sent as text (`normalizeText`).
+ * or a Date, or a non-empty list of them (`null`/`undefined` alone mean "not given"). An
+ * object, a function or `NaN` would go out as `[object Object]` or `NaN`. A list must hold at
+ * least one value and no `null`/`undefined` entry: the query builder drops those, so
+ * `{ q: [null] }` ran the action with no `q` at all, over the whole catalogue. A string (or a
+ * list entry) must pass {@link textProblem}: it is sent as text (`normalizeText`).
  */
 export function queryValueProblem(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "Expected at least one value; leave the parameter out instead.";
+    const missing = value.findIndex((v) => v === null || v === undefined);
+    if (missing >= 0) {
+      return `item ${missing + 1} of ${value.length} is ${String(value[missing])}; a list holds values only (leave the parameter out instead).`;
+    }
+  }
   const ok = (v: unknown): boolean =>
     v === null ||
     v === undefined ||
