@@ -387,7 +387,20 @@ export function describeCkanError(error: unknown): string {
  * quotes and newlines escaped several levels deep.
  */
 function solrReason(message: string): string | undefined {
-  const match = /\[Reason: (?:[\w.$]+(?:Exception|Error): )?([\s\S]*?)(?:\\+n|\n|\])/.exec(message);
+  // Only a window after the first "[Reason: " is read: the pattern's lazy group, tried against
+  // `\\+n` at every step, is quadratic on a run of backslashes, and the message is uncut server
+  // text (80 KB took 2.4 s, past --timeout, and it grows with the square). The window is twice what a
+  // message shows; a reason that runs past it ends at the window's end.
+  const at = message.indexOf(REASON);
+  if (at === -1) return undefined;
+  const end = at + REASON.length + 2 * MAX_MESSAGE_VALUE_LENGTH;
+  const window = message.slice(at, end);
+  const pattern = end < message.length ? SOLR_REASON_IN_CUT_WINDOW : SOLR_REASON;
+  const match = pattern.exec(window);
   if (!match?.[1]) return undefined;
   return match[1].replace(/\\+(['"])/g, "$1").trim();
 }
+
+const REASON = "[Reason: ";
+const SOLR_REASON = /^\[Reason: (?:[\w.$]+(?:Exception|Error): )?([\s\S]*?)(?:\\+n|\n|\])/;
+const SOLR_REASON_IN_CUT_WINDOW = /^\[Reason: (?:[\w.$]+(?:Exception|Error): )?([\s\S]*?)(?:\\+n|\n|\]|$)/;

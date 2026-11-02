@@ -370,7 +370,8 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   `fl=_version_`: Hamburg and GovData send it as a string already (checked live
   2026-10-22), and a portal that sends Solr's number (≈1.88e18) gets the same string
   instead of a refused answer;
-  a Solr syntax error is cut down to Solr's `[Reason: …]`; a redirect loop (Bonn and
+  a Solr syntax error is cut down to Solr's `[Reason: …]` (read in a window of 1000
+  characters after the first `[Reason: `, so the pattern stays linear on any server text); a redirect loop (Bonn and
   Bielefeld redirect every API URL to itself) ends with `stopped after 5 redirects`,
   and a 3xx with a missing or malformed `Location` with `redirect not followed (no
   Location header)` / `redirect to <location> not followed`. An answer that cannot be

@@ -778,3 +778,24 @@ test("a TextBuilder joins its pieces in order across batches", async () => {
   assert.equal(b.toString(), expected.join(""));
   assert.equal(new TextBuilder().toString(), "");
 });
+
+test("Solr's reason is found in linear time, however long the server's message", async () => {
+  const { describeCkanError, MAX_MESSAGE_VALUE_LENGTH } = await import("../src/errors.js");
+  // A lazy group tried against `\\+n` at every step was quadratic on a run of backslashes:
+  // 16 000 took ~0.4 s, a few MB would hold the process for hours, past --timeout.
+  for (const tail of ["\\".repeat(1_000_000), "\\'".repeat(500_000), "x".repeat(1_000_000)]) {
+    const started = performance.now();
+    describeCkanError({ __type: "Search Error", message: `[Reason: ${tail}` });
+    describeCkanError({ __type: "Search Error", message: `Search error: [Reason: java.lang.Error: ${tail}]` });
+    const ms = performance.now() - started;
+    assert.ok(ms < 500, `${tail.slice(0, 2)}…: ${Math.round(ms)} ms`);
+  }
+  // A reason that ends within reach is cut out as before; an unterminated one leaves the message.
+  assert.equal(describeCkanError({ __type: "Search Error", message: "x [Reason: a.b.FooException: bad \\\\'q\\\\'\\\\nmore]" }), "Search Error: bad 'q'");
+  assert.equal(describeCkanError({ __type: "Search Error", message: "x [Reason: bad" }), "Search Error: x [Reason: bad");
+  assert.equal(describeCkanError({ __type: "Search Error", message: "x [Reason: ]" }), "Search Error: x [Reason: ]");
+  // A reason longer than the window is shown from its start (the message cuts it at 500 anyway).
+  const long = "r".repeat(3 * MAX_MESSAGE_VALUE_LENGTH);
+  const shown = describeCkanError({ __type: "Search Error", message: `q [Reason: ${long}]` });
+  assert.ok(shown.startsWith(`Search Error: ${"r".repeat(MAX_MESSAGE_VALUE_LENGTH)}`), shown.slice(0, 40));
+});
