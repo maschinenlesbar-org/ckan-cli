@@ -799,3 +799,53 @@ test("Solr's reason is found in linear time, however long the server's message",
   const shown = describeCkanError({ __type: "Search Error", message: `q [Reason: ${long}]` });
   assert.ok(shown.startsWith(`Search Error: ${"r".repeat(MAX_MESSAGE_VALUE_LENGTH)}`), shown.slice(0, 40));
 });
+
+test("a base URL the URL parser and a text reading could see as two hosts is refused, never echoing the password", async () => {
+  const { CkanValidationError, credentialsIn } = await import("../src/errors.js");
+  const { validateBaseUrl } = await import("../src/engine.js");
+  const pw = "s3cret-Pw";
+  // WHATWG ends an http(s) host at "\" and skips any slashes after "http:"; the text reading
+  // ended the authority only at "/", "?" or "#" and needed "//".
+  for (const base of [
+    `http://alice:${pw}@trusted.example\\@127.0.0.1:9`,
+    `https://alice:${pw}@portal.example\\@attacker.example`,
+    "https://api.example\\evil",
+    `http:alice:${pw}@127.0.0.1:9`,
+    `http:/alice:${pw}@127.0.0.1:9`,
+    `http:///alice:${pw}@127.0.0.1:9`,
+    `https:\\\\alice:${pw}@127.0.0.1:9`,
+  ]) {
+    for (const build of [() => new CkanClient({ baseUrl: base }), () => new RequestEngine({ baseUrl: base }), () => validateBaseUrl(base)]) {
+      assert.throws(
+        build,
+        (err: unknown) => err instanceof CkanValidationError && /^Invalid base URL: /.test(err.message) && !err.message.includes(pw),
+        base,
+      );
+    }
+  }
+  // The userinfo a URL carries ends where WHATWG ends the authority, at a backslash too.
+  assert.deepEqual(credentialsIn(`https://alice:pw@api.example\\@evil.example/x`), ["alice:pw"]);
+  assert.deepEqual(credentialsIn("http://alice:pw@h.example\\x"), ["alice:pw"]);
+  assert.deepEqual(credentialsIn("foo://u:p@a.example\\@b.example/x"), ["u:p@a.example\\"]);
+  assert.deepEqual(credentialsIn("https://alice:pw@api.example/v1/@x"), ["alice:pw"]);
+  // After a special scheme WHATWG skips any slashes and backslashes; so does the userinfo.
+  for (const base of ["http:alice:pw@h.example", "http:/alice:pw@h.example", "http:///alice:pw@h.example/x", "HTTPS:\\\\alice:pw@h.example"]) {
+    assert.deepEqual(credentialsIn(base), ["alice:pw"], base);
+    assert.equal(new URL(base).password, "pw", base);
+  }
+});
+
+test("requests go to the host of the parsed base URL, spelled as it parses, with the userinfo only in the Authorization header", async () => {
+  for (const base of ["https://alice:pw@api.example/v1/@evil.example", "https://API.Example:443/v1", "https://bob:p%40ss@h.example:8443/ckan/"]) {
+    const parsed = new URL(base);
+    const mt = makeMockTransport(() => jsonResponse({ help: "h", success: true, result: {} }));
+    await new RequestEngine({ transport: mt.transport, baseUrl: base }).getJson("/api/3/action/status_show");
+    const sent = mt.last();
+    assert.equal(new URL(sent.url).origin, parsed.origin, `${base}: ${sent.url}`);
+    // The URL as sent names that host in the text too, without the userinfo, so a transport
+    // that reads the string (not the parsed URL) reaches the same host and sends no credential.
+    assert.equal(sent.url.slice(sent.url.indexOf("//") + 2).split("/")[0], parsed.host, `${base}: ${sent.url}`);
+    const pair = parsed.username === "" ? undefined : `${decodeURIComponent(parsed.username)}:${decodeURIComponent(parsed.password)}`;
+    assert.equal(sent.headers?.["Authorization"], pair === undefined ? undefined : `Basic ${Buffer.from(pair).toString("base64")}`);
+  }
+});

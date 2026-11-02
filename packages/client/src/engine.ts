@@ -370,6 +370,8 @@ export class RequestEngine {
   // JSON.stringify of a client never show it, so a password in the base URL can't be
   // logged by accident. Messages use redactUrl.
   readonly #baseUrl: string;
+  /** `#baseUrl` without its userinfo: what every request URL starts with. */
+  readonly #requestBase: string;
   /** The base URL's userinfo, raw and percent-decoded, for scrubbing server and transport text. */
   readonly #credentials: string[];
   /**
@@ -397,16 +399,25 @@ export class RequestEngine {
     // consumer that injects a custom transport would otherwise get no gating at
     // all, and could be steered to a non-http(s) scheme. Only undefined selects
     // the default.
-    this.#baseUrl = validateBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
-    this.#credentials = credentialsIn(this.#baseUrl).flatMap((raw) => {
+    const baseUrl = validateBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+    // Requests go to the base URL as WHATWG parses it, the reading every check of it makes (the
+    // host, the cleartext warning, the Authorization header), never to a text-based reading of
+    // the string: a transport that reads the URL as text reaches the same host.
+    const parsed = new URL(baseUrl);
+    this.#baseUrl = parsed.href.replace(/\/+$/, "");
+    parsed.username = "";
+    parsed.password = "";
+    this.#requestBase = parsed.href.replace(/\/+$/, "");
+    // The userinfo as typed and as sent (WHATWG percent-encodes some of its characters).
+    const userinfos = [...new Set([...credentialsIn(baseUrl), ...credentialsIn(this.#baseUrl)])];
+    this.#credentials = userinfos.flatMap((raw) => {
       try {
         return [raw, decodeURIComponent(raw)];
       } catch {
         return [raw];
       }
     });
-    this.#echoed = credentialsIn(this.#baseUrl)
-      .flatMap(echoedCredentialForms)
+    this.#echoed = [...new Set(userinfos.flatMap(echoedCredentialForms))]
       .sort((a, b) => b.length - a.length);
     this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only undefined selects the default; a blank or unsendable value is refused.
@@ -499,7 +510,7 @@ export class RequestEngine {
   private composeUrl(path: string, query: QueryParams | undefined, withUserinfo: boolean): string {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const qs = query ? buildQueryString(query) : "";
-    const base = withUserinfo ? this.#baseUrl : withoutUserinfo(this.#baseUrl);
+    const base = withUserinfo ? this.#baseUrl : this.#requestBase;
     return `${base}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }
 
@@ -787,12 +798,6 @@ export class RequestEngine {
       ...(retry.retryAfterMs === undefined ? {} : { retryAfterMs: retry.retryAfterMs, maxRetryAfterMs: MAX_RETRY_AFTER_MS }),
     });
   }
-}
-
-/** `url` without its userinfo (`https://user:pw@host/x` → `https://host/x`), as written otherwise. */
-function withoutUserinfo(url: string): string {
-  const [userinfo] = credentialsIn(url);
-  return userinfo === undefined ? url : url.replace(`://${userinfo}@`, "://");
 }
 
 /**

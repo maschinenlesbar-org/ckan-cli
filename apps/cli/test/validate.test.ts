@@ -130,7 +130,13 @@ test("baseUrlProblem: an absolute http(s) URL without a query string or fragment
   for (const value of ["https://h.example?x=1", "https://h.example/?", "https://h.example#f"]) {
     assert.equal(baseUrlProblem(value), "Expected a site URL without a query string or fragment.", value);
   }
-  for (const value of ["https://h.example", "http://127.0.0.1:9/ckan/", "http://user:pw@h.example"]) {
+  for (const value of ["https://h.example", "http://127.0.0.1:9/ckan/", "http://user:pw@h.example", "HTTPS://H.example"]) {
     assert.equal(baseUrlProblem(value), undefined, value);
+  }
+  for (const value of ["https://u:pw@a.example\\@b.example", "https://h.example\\ckan", "https:\\\\h.example"]) {
+    assert.equal(baseUrlProblem(value), 'A base URL cannot contain a backslash (\\); write "/" instead.', value);
+  }
+  for (const value of ["http:h.example", "https:/h.example", "http:///h.example", "http:u:pw@h.example"]) {
+    assert.equal(baseUrlProblem(value), 'Expected an absolute http(s) URL ("https://" and the host).', value);
   }
 });

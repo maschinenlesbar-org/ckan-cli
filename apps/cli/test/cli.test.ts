@@ -834,3 +834,25 @@ test("the redaction of stdout is linear in the answer when the run carries crede
   );
   assert.equal(out, "see ftp://***@h.example/x and http://***@c.example/x?y=u@v, mail@example.org");
 });
+
+test("a --base-url or CKAN_BASE_URL the URL parser could read as another host is a usage error, never echoing the password", async () => {
+  const pw = "s3cret-Pw";
+  for (const base of [
+    `http://alice:${pw}@trusted.example\\@127.0.0.1:9`,
+    `http:alice:${pw}@127.0.0.1:9`,
+    `http:///alice:${pw}@127.0.0.1:9`,
+    `https:\\\\alice:${pw}@127.0.0.1:9`,
+  ]) {
+    for (const [argv, env] of [
+      [["--base-url", base, "status"], {}],
+      [["status"], { CKAN_BASE_URL: base }],
+    ] as const) {
+      const cli = makeCli(() => jsonResponse(ckan({})), env);
+      assert.equal(await run([...argv], cli.deps), 1, `${base}: ${cli.err.join("\n")}`);
+      assert.equal(cli.mt.calls.length, 0);
+      const text = [...cli.out, ...cli.err].join("\n");
+      assert.match(text, /backslash|Expected an absolute http\(s\) URL/);
+      assert.ok(!text.includes(pw), text);
+    }
+  }
+});

@@ -27,14 +27,17 @@ export function redactUrl(url: string): string {
 /**
  * The userinfo a URL carries, exactly as written — `["alice:pa#ss"]` for
  * `https://alice:pa#ss@host` — or `[]` when it carries none. Only a value that starts
- * with a scheme (`^[A-Za-z][A-Za-z0-9+.-]*://`) counts: a bare `a:b@c` is a dataset id, a
+ * with a scheme (`^[A-Za-z][A-Za-z0-9+.-]*://`, or a special one such as `http:` with any
+ * slashes or backslashes after it, as WHATWG reads it) counts: a bare `a:b@c` is a dataset id, a
  * search text or a User-Agent as often as a credential, and the base URL always has a
  * scheme. It works on URLs that don't parse too: the userinfo is everything between
  * `://` and the last `@` before the host. Used to redact those exact strings from text
  * that echoes the value (usage errors, help), whatever characters the password contains.
  */
 export function credentialsIn(value: string): string[] {
-  const scheme = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.exec(value);
+  // WHATWG skips any number of "/" and "\" after a special scheme (`http:///u:pw@h`,
+  // `https:\\u:pw@h` and `http:u:pw@h` all send `u:pw`), so its userinfo starts after them.
+  const scheme = SPECIAL_SCHEME_START.exec(value) ?? /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.exec(value);
   if (scheme === null) return [];
   const rest = value.slice(scheme[0].length);
   let parses = false;
@@ -45,11 +48,19 @@ export function credentialsIn(value: string): string[] {
     // Doesn't parse: the password may hold "/", "?", "#" or spaces.
   }
   // In a URL that parses, the userinfo ends at the last "@" of the authority (before the
-  // first "/", "?" or "#"); in one that doesn't, at the last "@" of the value.
-  const authority = parses ? rest.slice(0, rest.search(/[/?#]|$/)) : rest;
+  // first "/", "?" or "#", and for a special scheme such as http(s) a "\", where WHATWG ends
+  // it too: `https://u:pw@a.example\@b.example` sends `u:pw` to a.example); in one that doesn't,
+  // at the last "@" of the value.
+  const stop = SPECIAL_SCHEME.test(scheme[0]) ? /[/?#\\]|$/ : /[/?#]|$/;
+  const authority = parses ? rest.slice(0, rest.search(stop)) : rest;
   const end = authority.lastIndexOf("@");
   return end > 0 ? [rest.slice(0, end)] : [];
 }
+
+/** The schemes WHATWG parses as special (`ftp`, `file`, `http(s)`, `ws(s)`): their authority also ends at a backslash. */
+const SPECIAL_SCHEME = /^(?:ftp|file|https?|wss?):[/\\]*$/i;
+/** A special scheme at the start of a value, with the slashes and backslashes WHATWG skips after it. */
+const SPECIAL_SCHEME_START = /^(?:ftp|file|https?|wss?):[/\\]*/i;
 
 /** A scheme character (RFC 3986: letters, digits, `+`, `.`, `-`). */
 function isSchemeChar(code: number): boolean {

@@ -277,13 +277,16 @@ export function headerValueProblem(value: string): string | undefined {
  *
  * - not blank;
  * - no surrounding or embedded whitespace and no control characters: `new URL`
- *   trims and drops tab/newline silently, but the client glues the value into
- *   every request URL as given, so a trailing space would request another path
- *   (`/ckan%20/api/3/...`) or reach a custom transport raw;
+ *   trims and drops tab/newline silently, so the URL requested would not be the one
+ *   typed (a trailing space would request another path, `/ckan%20/api/3/...`);
  * - an absolute URL with an http(s) scheme (`file:`, `ftp:` … never reach a
  *   transport);
  * - no query string or fragment: the API path is appended, so it would land in
  *   front of `/api/3/action`;
+ * - no backslash, and `http://` or `https://` followed by the host (not `http:host`,
+ *   `http:/host` or `http:///host`): WHATWG ends an http(s) host at a backslash and skips
+ *   any slashes after the scheme, so text-based code would read another host or no userinfo
+ *   (`https://u:pw@a.example\@b.example` sent `u:pw` to b.example);
  * - a `%` in the user name or password must start a valid escape (`%25` for a
  *   literal one): the engine decodes the userinfo for the Authorization header.
  *
@@ -308,6 +311,12 @@ export function baseUrlProblem(value: string): string | undefined {
     return `Unsupported scheme "${cutForMessage(url.protocol)}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "Expected a site URL without a query string or fragment.";
+  // WHATWG reads a "\" in an http(s) URL as "/", so it ends the host, and it skips any number of
+  // slashes after "http:": `http://u:pw@a.example\@b.example` is a.example to the parser and
+  // was b.example to text-based code, and `http:u:pw@host` hid the userinfo from the redaction.
+  // Every reader of the base URL has to agree where its host is.
+  if (value.includes("\\")) return 'A base URL cannot contain a backslash (\\); write "/" instead.';
+  if (!/^https?:\/\/[^/]/i.test(value)) return 'Expected an absolute http(s) URL ("https://" and the host).';
   // The engine decodes the userinfo into the Authorization header; a "%" that isn't an
   // escape would fail there ("URI malformed") at request time. Reject it here.
   for (const part of [url.username, url.password]) {

@@ -274,15 +274,25 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   `undefined` selects the default). One rule set, `baseUrlProblem`, applied by the
   exported `validateBaseUrl()` in the `CkanClient` and `RequestEngine` constructors
   and in `siteRoot()`: a blank value, whitespace or a control character anywhere in
-  it (`new URL` trims and drops tab and newline, but the value is glued into every
-  request URL as given), anything but an absolute http(s) URL, and a query string or
-  fragment (the API path is appended, so it would land in front of it), and a `%`
+  it (`new URL` trims and drops tab and newline, so the URL requested would not be the
+  one typed), anything but an absolute http(s) URL, a query string or
+  fragment (the API path is appended, so it would land in front of it), a backslash, a
+  value that isn't `http://` or `https://` followed by the host (`http:host`, `http:/host`,
+  `http:///host`), and a `%`
   in the user name or password that does not start an escape (write `%25`; the
   engine decodes the userinfo for the Authorization header) all throw
   `CkanValidationError` `Invalid base URL: …` — a configuration mistake, never a
   `CkanNetworkError`, which stays for transport failures (the default transport
   still re-checks the scheme on every hop and redirect). Userinfo is allowed and
-  redacted in messages; the reasons never repeat the value. The CLI also redacts on
+  redacted in messages; the reasons never repeat the value. WHATWG ends an http(s) host at a
+  backslash and skips any slashes after the scheme, where text-based code read on:
+  `http://u:pw@a.example\@b.example` was a.example to the parser and the cleartext warning,
+  but the request went to b.example with `u:pw`. So, besides the refusal, the engine builds
+  every request URL from the parsed base URL (`new URL(...).href`, userinfo cleared,
+  trailing slashes stripped): the host is lower-cased, a default port dropped and the path
+  percent-encoded as WHATWG does it, and that is the spelling error messages and a custom
+  transport see. `credentialsIn` ends a special scheme's authority at a backslash too, and
+  skips the slashes and backslashes WHATWG skips after it. The CLI also redacts on
   output: `run.ts` (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of
   every URL argument (the value of a `key=value` pair too, `--param id=<url>`) and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it
   with `***` in everything it prints — commander's usage errors, which echo a rejected
