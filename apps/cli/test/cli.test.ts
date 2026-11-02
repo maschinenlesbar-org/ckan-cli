@@ -811,3 +811,26 @@ test("the search for URLs inside an argument is linear: a 1 MB argument is read 
   const err = redactionFor(["search", many], {}).err(many);
   assert.ok(!err.includes("pw0xyz") && !err.includes("pw63xyz"), err.slice(0, 200));
 });
+
+test("the redaction of stdout is linear in the answer when the run carries credentials", async () => {
+  // With a URL with userinfo in argv or CKAN_BASE_URL, every stdout text is redacted. The
+  // scheme regex this replaces took ~5 s for an 80 KB `a.a.…` answer; the linear pass takes
+  // milliseconds.
+  const value = "a.".repeat(100_000);
+  for (const [argv, env] of [
+    [["--base-url", "https://alice:s3cret-Pw@mirror.example", "status"], {}],
+    [["status"], { CKAN_BASE_URL: "https://alice:s3cret-Pw@mirror.example" }],
+  ] as const) {
+    const cli = makeCli(() => jsonResponse(ckan({ title: value })), env);
+    const started = performance.now();
+    assert.equal(await run([...argv], cli.deps), 0, cli.err.join("\n"));
+    const ms = performance.now() - started;
+    assert.ok(cli.out.join("\n").includes(value));
+    assert.ok(ms < 1500, `${Math.round(ms)} ms`);
+  }
+  // The pattern backstop still hides any URL's userinfo on stdout, and leaves other text alone.
+  const out = redactionFor(["--base-url", "https://alice:s3cret-Pw@mirror.example", "status"], {}).out(
+    "see ftp://user:other@h.example/x and http://a@b@c.example/x?y=u@v, mail@example.org",
+  );
+  assert.equal(out, "see ftp://***@h.example/x and http://***@c.example/x?y=u@v, mail@example.org");
+});

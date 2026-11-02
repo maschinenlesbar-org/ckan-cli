@@ -18,6 +18,7 @@ import {
   echoedCredentialForms,
   redactCredentials,
   redactSecrets,
+  redactUrlUserinfo,
 } from "@maschinenlesbar.org/ckan-client/internal/errors";
 
 /** The exit code of a usage error: commander's own for a rejected option value. */
@@ -118,16 +119,6 @@ function escapeCommanderError(message: string): string {
   const hint = /\n\(Did you mean [^\n]*\?\)$/.exec(message);
   if (hint === null) return escapeTerminalText(message);
   return escapeTerminalText(message.slice(0, hint.index)) + hint[0];
-}
-
-/**
- * Replace the userinfo of every URL in `text` with `***`, the form `redactUrl` gives
- * (`https://user:secret@host` becomes `https://***@host`). Text-based, so it also
- * covers a URL that does not parse; a fallback behind the exact strings of
- * `withRedactedOutput`.
- */
-export function redactUserinfo(text: string): string {
-  return text.replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#']*@/gi, "$1***@");
 }
 
 /**
@@ -239,7 +230,7 @@ export function redactionFor(argv: readonly string[], env: Record<string, string
   const echoedList = [...echoed].sort((a, b) => b.length - a.length);
   const passwordList = [...passwords].sort((a, b) => b.length - a.length);
   const out = (text: string): string => {
-    let result = redactUserinfo(redactCredentials(text, list));
+    let result = redactUrlUserinfo(redactCredentials(text, list));
     for (const form of encoded) result = result.split(form).join("***%40");
     return redactSecrets(result, echoedList);
   };

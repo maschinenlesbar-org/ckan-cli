@@ -747,3 +747,34 @@ test("an answer longer than V8's longest string is a CkanParseError naming the r
   });
   await assert.rejects(moved.getJson("/x"), (err: unknown) => err instanceof CkanApiError && err.status === 301 && err.body === "");
 });
+
+test("redactUrlUserinfo hides every URL's userinfo in one linear pass, however many URLs", async () => {
+  const { redactUrlUserinfo } = await import("../src/errors.js");
+  const elapsed = (f: () => unknown): number => {
+    const started = performance.now();
+    f();
+    return performance.now() - started;
+  };
+  // The URL regex this replaces (a scheme tried at every word start) takes about 3 s on this.
+  assert.ok(elapsed(() => redactUrlUserinfo("a.".repeat(30_000))) < 1000);
+  assert.equal(redactUrlUserinfo("a -https://u:p@h/x and x-ftp://v@w?q, mail@example.org"), "a -https://***@h/x and x-ftp://***@w?q, mail@example.org");
+  assert.equal(redactUrlUserinfo("argument 'ftp://user:s3cret@h.example' is invalid"), "argument 'ftp://***@h.example' is invalid");
+  assert.equal(redactUrlUserinfo("1://u:p@h ://u:p@h"), "1://u:p@h ://u:p@h");
+  assert.equal(redactUrlUserinfo("https://h/p?u=a@b"), "https://h/p?u=a@b");
+  for (const text of ["a".repeat(1_000_000), "a.".repeat(500_000), "://".repeat(100_000), `https://${"u".repeat(1_000_000)}`]) {
+    assert.equal(redactUrlUserinfo(text), text);
+  }
+  assert.equal(redactUrlUserinfo("https://u:p@h ".repeat(100_000)), "https://***@h ".repeat(100_000));
+});
+
+test("a TextBuilder joins its pieces in order across batches", async () => {
+  const { TextBuilder } = await import("../src/errors.js");
+  const b = new TextBuilder();
+  const expected: string[] = [];
+  for (let i = 0; i < 40_000; i++) {
+    b.push(String(i), ",");
+    expected.push(String(i), ",");
+  }
+  assert.equal(b.toString(), expected.join(""));
+  assert.equal(new TextBuilder().toString(), "");
+});
