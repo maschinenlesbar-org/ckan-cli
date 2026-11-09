@@ -114,7 +114,9 @@ one: the engine runs each transport call under the `timeoutMs` deadline (passing
 `AbortSignal` in `HttpRequest.signal`, which the built-in transport honours; the call
 rejects at the deadline either way) and checks the size of the body it gets back
 (`Response exceeded the size limit of N bytes (maxResponseBytes; --max-response-bytes
-on the CLI)`). A custom transport may return its headers as a plain object in any
+on the CLI)`). The built-in transport joins small chunks as they arrive (up to 1024 of them
+or 64 KiB), so the memory a body takes follows its bytes, not the number of chunks a server
+sends it in. A custom transport may return its headers as a plain object in any
 case, a fetch `Headers` object or a `Map` (read into a record without a prototype, so a
 header named `__proto__` is an ordinary header), and its body as a `Buffer`, any
 `ArrayBuffer` view (fetch's `Uint8Array`) or an `ArrayBuffer`. Anything it throws, and
@@ -576,7 +578,8 @@ The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `c
   file under `ulimit -f` exits 1 with an ERROR record of `ckan.output`, never 0. P27 (a big or odd answer is printed
   or refused in one clean record, within memory: 8 M numbers with `--compact` under a
   256 MB heap, 20 MB of DEL escaped under 512 MB, 90 MB of DEL an ERROR of `ckan.output`;
-  runs the built bin; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN).
+  runs the built bin; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN; an
+  answer in two million one-byte chunks read under a 256 MB heap).
 - **`portal-sources.test.ts`** — parsing each upstream list, id derivation, the merge rules, and a byte-exact round trip of the list file.
 
 No test touches the network. To check a portal by hand:
