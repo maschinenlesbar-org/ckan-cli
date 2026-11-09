@@ -1114,3 +1114,56 @@ test("an echo of the base URL as WHATWG spells it is scrubbed, a short password 
     assert.ok(!text.includes("p%22%C3%A4@") && !text.includes('p"ä@'), text);
   }
 });
+
+/** `text` with every run of percent escapes decoded where it is valid UTF-8. */
+const percentDecoded = (text: string): string =>
+  text.replace(/(?:%[0-9a-fA-F]{2})+/g, (run) => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      return run;
+    }
+  });
+
+test("a credential in a redirect's Location is scrubbed from the error, in its path and its query (D2)", async () => {
+  const locations = [
+    `https://elsewhere.example/login?user=alice&pw=${encodeURIComponent(ECHO_PW)}`,
+    `https://elsewhere.example/login?pw=${ECHO_PW}`,
+    `https://elsewhere.example/${encodeURIComponent(`alice:${ECHO_PW}`)}/x`,
+    `https://elsewhere.example/auth?basic=${ECHO_BASIC}`,
+    `/relative/${ECHO_PW}`,
+  ];
+  for (const location of locations) {
+    // Answered with the same 302 forever: the error names the last hop it reached.
+    const loop = new RequestEngine({ baseUrl: ECHO_BASE, maxRetries: 0, transport: async () => ({ status: 302, headers: { location }, body: Buffer.from("") }) });
+    const err = await loop.getJson("/x").catch((caught: unknown) => caught);
+    assert.ok(err instanceof CkanApiError && /^HTTP 302 .*stopped after 5 redirects/.test(err.message), String(err));
+    // One hop, then an error answer, a broken answer and a failed request: each names the URL it reached.
+    const answers: Array<() => HttpResponse> = [
+      () => rawResponse("{}", "application/json", 500),
+      () => rawResponse("<html>", "text/html"),
+      () => {
+        throw new Error("connection reset");
+      },
+    ];
+    const errors: unknown[] = [err];
+    for (const answer of answers) {
+      let calls = 0;
+      const hop = new RequestEngine({
+        baseUrl: ECHO_BASE,
+        maxRetries: 0,
+        transport: async () => (calls++ === 0 ? { status: 302, headers: { location }, body: Buffer.from("") } : answer()),
+      });
+      errors.push(await hop.getJson("/x").catch((caught: unknown) => caught));
+    }
+    for (const e of errors) {
+      assert.ok(e instanceof Error, String(e));
+      const seen = percentDecoded(everythingOf(e));
+      for (const secret of ECHO_SECRETS) assert.ok(!seen.includes(secret), `${location}: ${seen.slice(0, 2000)}`);
+    }
+  }
+  // A Location that does not parse is quoted as it came, scrubbed.
+  const bad = new RequestEngine({ baseUrl: ECHO_BASE, transport: async () => ({ status: 302, headers: { location: `http://[::1/${ECHO_PW}` }, body: Buffer.from("") }) });
+  const err = await bad.getJson("/x").catch((caught: unknown) => caught);
+  assert.ok(err instanceof CkanApiError && /redirect to http:\/\/\[::1\/\*\*\* not followed/.test(err.message), String(err));
+});

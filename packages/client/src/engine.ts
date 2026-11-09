@@ -596,6 +596,24 @@ export class RequestEngine {
     }
   }
 
+  /**
+   * The URL a redirect leads to as messages and errors show it: the Location with the base URL's
+   * credentials scrubbed as sent, before resolving percent-encodes what is left of them in a new
+   * spelling (`'` as `%27` in a query), then resolved against the URL shown so far, its userinfo
+   * left out. A Location the scrub made unparseable (a credential in its host) is shown as scrubbed.
+   */
+  private shownTarget(location: string, shown: string): string {
+    const sent = this.scrub(location);
+    try {
+      const target = new URL(sent, shown);
+      target.username = "";
+      target.password = "";
+      return target.href;
+    } catch {
+      return sent;
+    }
+  }
+
   /** Perform a request with Accept negotiation and transient-error retries. */
   async request(
     method: string,
@@ -607,6 +625,9 @@ export class RequestEngine {
     // absolute) keeps it and one to another origin or scheme drops it. A transport
     // such as fetch also refuses a URL with credentials outright.
     let url = this.composeUrl(path, options.query, false);
+    // The URL as messages, errors and `RawResponse.url` show it: after a redirect, the Location
+    // with the base URL's credentials scrubbed (shownTarget); `url` is what is requested.
+    let shown = url;
     let headers: Record<string, string> = {
       Accept: options.accept,
       "User-Agent": this.userAgent,
@@ -638,7 +659,7 @@ export class RequestEngine {
         // passes through.
         if (cause instanceof CkanError && !(cause instanceof CkanNetworkError)) throw cause;
         const reason = cause instanceof Error ? cause.message : String(cause);
-        throw new CkanNetworkError(`${method} ${cutForMessage(redactUrl(url))} failed: ${sanitizeServerText(this.scrub(reason))}`, {
+        throw new CkanNetworkError(`${method} ${cutForMessage(redactUrl(shown))} failed: ${sanitizeServerText(this.scrub(reason))}`, {
           cause: this.scrubCause(cause),
         });
       }
@@ -648,7 +669,7 @@ export class RequestEngine {
       const invalid = responseProblem(response);
       if (invalid !== undefined) {
         throw new CkanNetworkError(
-          `${method} ${cutForMessage(redactUrl(url))} failed: the transport returned an invalid response (${invalid}).`,
+          `${method} ${cutForMessage(redactUrl(shown))} failed: the transport returned an invalid response (${invalid}).`,
         );
       }
       // A transport must not follow redirects itself (`redirect: "manual"`): one that
@@ -657,7 +678,7 @@ export class RequestEngine {
       const finalUrl = (response as { url?: unknown }).url;
       if (typeof finalUrl === "string" && finalUrl !== "" && originOf(finalUrl) !== originOf(url)) {
         throw new CkanNetworkError(
-          `${method} ${cutForMessage(redactUrl(url))} failed: the transport followed a redirect to another origin ` +
+          `${method} ${cutForMessage(redactUrl(shown))} failed: the transport followed a redirect to another origin ` +
             `(${cutForMessage(sanitizeServerText(redactUrl(this.scrub(finalUrl))))}); a transport must not follow redirects ` +
             `(HttpRequest.redirect is "manual").`,
         );
@@ -670,7 +691,7 @@ export class RequestEngine {
       // The size cap holds whatever the transport did: the default one aborts early, a
       // custom one may have read everything.
       if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
-        throw new CkanNetworkError(`${method} ${cutForMessage(redactUrl(url))} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
+        throw new CkanNetworkError(`${method} ${cutForMessage(redactUrl(shown))} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
       }
       const retryable = status === 429 || status === 503;
       // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: the error below
@@ -683,7 +704,7 @@ export class RequestEngine {
         // for less: `Retry-After: 0` or a date in the past turned the retries into a
         // zero-delay burst against a server that had just asked for less load.
         const backoff = this.retryDelayMs * attempt;
-        await this.backOff(attempt, retryAfter === undefined ? backoff : Math.max(retryAfter, backoff), url, status);
+        await this.backOff(attempt, retryAfter === undefined ? backoff : Math.max(retryAfter, backoff), shown, status);
         continue;
       }
 
@@ -701,7 +722,7 @@ export class RequestEngine {
         if (nextUrl.protocol !== "http:" && nextUrl.protocol !== "https:") {
           throw new CkanNetworkError(
             `Refusing to follow redirect to unsupported protocol "${cutForMessage(sanitizeServerText(nextUrl.protocol))}" ` +
-              `for ${method} ${cutForMessage(redactUrl(url))}`,
+              `for ${method} ${cutForMessage(redactUrl(shown))}`,
           );
         }
         // Credential-strip guard: if the redirect crosses origin (scheme + host +
@@ -723,6 +744,7 @@ export class RequestEngine {
           headers = engineHeadersOnly(headers);
         }
         url = nextUrl.toString();
+        shown = this.shownTarget(location as string, shown);
         redirects += 1;
         continue;
       }
@@ -739,17 +761,17 @@ export class RequestEngine {
             target !== undefined
               ? `stopped after ${this.maxRedirects} redirects (a redirect loop?)`
               : location
-                ? `redirect to ${cutForMessage(sanitizeServerText(location))} not followed`
+                ? `redirect to ${cutForMessage(sanitizeServerText(this.scrub(location)))} not followed`
                 : "redirect not followed (no Location header)";
-          throw new CkanApiError({ status, url, method, body: this.scrubBody(this.scrub(errorBodyText(body))), detail });
+          throw new CkanApiError({ status, url: shown, method, body: this.scrubBody(this.scrub(errorBodyText(body))), detail });
         }
-        throw this.toApiError(method, url, status, body, status === 401 || status === 403 ? dropped : undefined, {
+        throw this.toApiError(method, shown, status, body, status === 401 || status === 403 ? dropped : undefined, {
           retries: attempt,
           ...(tooLong ? { retryAfterMs: retryAfter } : {}),
         });
       }
 
-      return { data: body, contentType, status, url };
+      return { data: body, contentType, status, url: shown };
     }
   }
 

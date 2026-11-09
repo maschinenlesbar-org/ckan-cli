@@ -474,7 +474,10 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   is never used. `HttpRequest.redirect` is always `"manual"`: a transport must not
   follow redirects itself, and a response whose `HttpResponse.url` lies on another
   origin is rejected as a `CkanNetworkError`. Messages show the request URL without
-  the userinfo.
+  the userinfo. After a redirect they show the URL a `Location` led to with the base URL's
+  credentials scrubbed from it (in its path and query too, as sent and percent-encoded),
+  before it is resolved; so do an error's `url` and `getAnswer`'s `url`. A `Location` that
+  doesn't parse is quoted scrubbed.
 - **Plain `http:` gets a warning, not a refusal.** `cleartextProblem(baseUrl, secrets)`
   (engine, exported) returns one sentence naming the host (`url.host`, never the
   userinfo) and what travels unencrypted — the base URL's credentials when it carries
