@@ -111,6 +111,20 @@ test("the number check skips strings and costs one pass over the text", async ()
   assert.equal((await f.getJson<number[]>("/x")).length, 200_000);
 });
 
+test("a number with a long run of zeros is refused in linear time (A)", async () => {
+  // The trailing-zero regex `/0+$/` tried a match at every zero of a run that doesn't end the
+  // literal: 1.<100 000 zeros>1e300 took about 15 s, past --timeout (the scan runs once the answer is in).
+  const literal = `1.${"0".repeat(100_000)}1e300`;
+  const e = new RequestEngine({ transport: makeMockTransport(() => rawResponse(`{"n":${literal}}`, "application/json")).transport });
+  const start = performance.now();
+  await assert.rejects(e.getJson("/x"), (err: unknown) => err instanceof CkanParseError && /cannot be represented exactly/.test(err.message));
+  const ms = performance.now() - start;
+  assert.ok(ms < 1000, `${Math.round(ms)} ms`);
+  // The count of zeros still sets the exponent: trailing zeros in the fraction are no digits.
+  const g = new RequestEngine({ transport: makeMockTransport(() => rawResponse(`{"n":9007199254740992.${"0".repeat(50_000)}}`, "application/json")).transport });
+  assert.equal((await g.getJson<{ n: number }>("/x")).n, 2 ** 53);
+});
+
 test("a 503 is retried up to maxRetries then surfaces as CkanApiError", async () => {
   let calls = 0;
   const mt = makeMockTransport(() => {
