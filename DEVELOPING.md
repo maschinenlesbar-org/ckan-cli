@@ -291,7 +291,9 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   `CkanValidationError` `Invalid base URL: …` — a configuration mistake, never a
   `CkanNetworkError`, which stays for transport failures (the default transport
   still re-checks the scheme on every hop and redirect). Userinfo is allowed and
-  redacted in messages; the reasons never repeat the value. WHATWG ends an http(s) host at a
+  redacted in messages; the reasons never repeat the value, nor name a scheme the value
+  doesn't spell as `<scheme>://` (`alice:pw@host` and `TOKEN:@host` parse with the user name
+  as their scheme: `Expected an absolute http(s) URL.`). WHATWG ends an http(s) host at a
   backslash and skips any slashes after the scheme, where text-based code read on:
   `http://u:pw@a.example\@b.example` was a.example to the parser and the cleartext warning,
   but the request went to b.example with `u:pw`. So, besides the refusal, the engine builds

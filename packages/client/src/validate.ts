@@ -280,7 +280,8 @@ export function headerValueProblem(value: string): string | undefined {
  *   trims and drops tab/newline silently, so the URL requested would not be the one
  *   typed (a trailing space would request another path, `/ckan%20/api/3/...`);
  * - an absolute URL with an http(s) scheme (`file:`, `ftp:` … never reach a
- *   transport);
+ *   transport); another scheme is named only when the value spells `<scheme>://`, since
+ *   `user:password@host` parses with the user name as its scheme;
  * - no query string or fragment: the API path is appended, so it would land in
  *   front of `/api/3/action`;
  * - no backslash, and `http://` or `https://` followed by the host (not `http:host`,
@@ -308,6 +309,10 @@ export function baseUrlProblem(value: string): string | undefined {
     return "Expected an absolute http(s) URL.";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
+    // `user:password@host` without a scheme parses as a URL whose scheme is the user name
+    // ("t0kens3cret:"), lower-cased, which no exact-string redaction can match: name a scheme
+    // only when the value spells one, `<scheme>://`.
+    if (!/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) return "Expected an absolute http(s) URL.";
     return `Unsupported scheme "${cutForMessage(url.protocol)}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "Expected a site URL without a query string or fragment.";
