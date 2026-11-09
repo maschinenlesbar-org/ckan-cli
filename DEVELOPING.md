@@ -319,7 +319,10 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   DEL, C1 or bidi characters is matched in its raw form. The forms a server echoes a
   userinfo back in are replaced too: the `Basic` value and the decoded `user:password`
   on stdout and stderr, the password alone (4 characters or more) on stderr only, since
-  it may well occur in the data. Behind the exact strings, the userinfo of any other URL in
+  it may well occur in the data. A userinfo without a password (`https://TOKEN@host`,
+  `https://TOKEN:@host`) is a token: the user name is the secret, sent as Basic `TOKEN:`, and
+  its forms (`echoedCredentialForms`: the Basic value of `TOKEN:`, `TOKEN:`, the token alone)
+  are scrubbed and redacted the same way. Behind the exact strings, the userinfo of any other URL in
   the text is replaced by pattern (`redactUrlUserinfo`, client `errors.ts`): one linear pass,
   each `://` found with indexOf, since it runs over the whole printed answer (a regex tried at
   every word boundary took ~5 s for an 80 KB answer of `a.a.…`). `redactUrl` falls

@@ -1167,3 +1167,29 @@ test("a credential in a redirect's Location is scrubbed from the error, in its p
   const err = await bad.getJson("/x").catch((caught: unknown) => caught);
   assert.ok(err instanceof CkanApiError && /redirect to http:\/\/\[::1\/\*\*\* not followed/.test(err.message), String(err));
 });
+
+test("echoedCredentialForms treats a userinfo without a password as a token (Basic `TOKEN:`) (E)", async () => {
+  const { echoedCredentialForms } = await import("../src/errors.js");
+  const basic = (pair: string): string => Buffer.from(pair, "utf8").toString("base64");
+  assert.deepEqual(echoedCredentialForms("alice:s3cret"), [basic("alice:s3cret"), "alice:s3cret", "s3cret"]);
+  assert.deepEqual(echoedCredentialForms("T0ken"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T0ken:"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T%C3%B6k"), [basic("Tök:"), "Tök:"]); // short: not alone
+  assert.deepEqual(echoedCredentialForms(":pw12"), [basic(":pw12"), ":pw12", "pw12"]);
+  assert.deepEqual(echoedCredentialForms(""), []);
+  assert.deepEqual(echoedCredentialForms(":"), []);
+});
+
+test("a token as the base URL's userinfo is scrubbed from library errors in every echoed form (E)", async () => {
+  const token = "T0kenS3cret";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  for (const base of [`https://${token}@mirror.example`, `https://${token}:@mirror.example`]) {
+    for (const echo of [`bad token ${token}`, `Authorization: Basic ${basic}`, `user ${token}: unknown`]) {
+      const e = new RequestEngine({ baseUrl: base, maxRetries: 0, transport: async () => rawResponse(JSON.stringify({ message: echo }), "application/json", 401) });
+      const err = await e.getJson("/x").catch((caught: unknown) => caught);
+      assert.ok(err instanceof CkanApiError && /^HTTP 401 /.test(err.message), String(err));
+      const seen = everythingOf(err);
+      assert.ok(!seen.includes(token) && !seen.includes(basic), `${base} ${echo}: ${seen.slice(0, 2000)}`);
+    }
+  }
+});
