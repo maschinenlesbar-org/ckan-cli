@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { TextDecoder } from "node:util";
-import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/engine.js";
+import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter, sanitizeServerText } from "../src/engine.js";
 import {
   CkanApiError,
   CkanNetworkError,
@@ -210,7 +211,8 @@ test("error detail is stripped of terminal control characters (GOV-02)", async (
       assert.ok(!hasControlChars(err.detail ?? ""));
       assert.ok(!hasControlChars(err.message));
       // ...while the printable characters (and the __type prefix) survive.
-      assert.equal(err.detail, "Internal Server Error: boom[31mred2J");
+      // Whole escape sequences go, not only their control bytes: no `[31m` or `2J` is left.
+      assert.equal(err.detail, "Internal Server Error: boomred");
       return true;
     },
   );
@@ -314,7 +316,7 @@ test("control characters in the Content-Type are stripped from the error message
     () => e.getJson("/x"),
     (err: unknown) => {
       assert.ok(err instanceof CkanParseError);
-      assert.equal(err.message, 'GET https://a.example/x: the answer is not valid JSON (expected JSON, got Content-Type "text/31m[2Jhtml").');
+      assert.equal(err.message, 'GET https://a.example/x: the answer is not valid JSON (expected JSON, got Content-Type "text/html").');
       return true;
     },
   );
@@ -427,7 +429,7 @@ test("parseRetryAfter reads delay-seconds and IMF-fixdate HTTP-dates", () => {
 test("a redirect with a malformed or missing Location is an API error naming it, not a crash", async () => {
   const cases: [Record<string, string>, string][] = [
     [{ location: "http://[::1" }, "redirect to http://[::1 not followed"],
-    [{ location: `http://[::1${ESC}[31m` }, "redirect to http://[::1[31m not followed"],
+    [{ location: `http://[::1${ESC}[31m` }, "redirect to http://[::1 not followed"],
     [{}, "redirect not followed (no Location header)"],
   ];
   for (const [headers, detail] of cases) {
@@ -894,4 +896,97 @@ test("requests go to the host of the parsed base URL, spelled as it parses, with
     const pair = parsed.username === "" ? undefined : `${decodeURIComponent(parsed.username)}:${decodeURIComponent(parsed.password)}`;
     assert.equal(sent.headers?.["Authorization"], pair === undefined ? undefined : `Basic ${Buffer.from(pair).toString("base64")}`);
   }
+});
+
+test("sanitizeServerText drops whole escape sequences, not just their control bytes (C)", () => {
+  const OSC8 = String.fromCharCode(0x9d);
+  const ST8 = String.fromCharCode(0x9c);
+  for (const [input, expected] of [
+    [`line1 ${ESC}]0;title${BEL}rest`, "line1 rest"],
+    [`${ESC}]8;;https://evil.example${ESC}\\click${ESC}]8;;${ESC}\\`, "click"],
+    [`${ESC}[31mred${ESC}[0m plain`, "red plain"],
+    [`${ESC}[1;31;4mbold`, "bold"],
+    [`${CSI}2Jcleared`, "cleared"],
+    [`${OSC8}0;t${ST8}ok`, "ok"],
+    [`a${ESC}7b${ESC}(Bc`, "abc"],
+    // Unterminated: only ESC and its introducer go, the text stays.
+    [`keep ${ESC}]0;no terminator here`, "keep 0;no terminator here"],
+  ] as const) {
+    assert.equal(sanitizeServerText(input), expected, JSON.stringify(input));
+  }
+});
+
+test("sanitizeServerText drops invisible format characters (zero-width, soft hyphen, BOM) (C)", () => {
+  const text = "real​ error Error: forged⁦x⁩ ﻿end­‍⁠!";
+  assert.equal(sanitizeServerText(text), "real error Error: forgedx end!");
+  assert.equal(sanitizeServerText("  Cannot GET  /api/3/action/x  Größe  "), "Cannot GET /api/3/action/x Größe");
+});
+
+test("sanitizeServerText reads a bounded prefix and drops what the per-character filter dropped (C)", () => {
+  // The filter it replaces, one character at a time: C0 but TAB to CR, DEL, C1 and Cf go.
+  const perCharacter = (text: string): string =>
+    [...text]
+      .filter((ch) => {
+        const n = ch.codePointAt(0) ?? 0;
+        return (n >= 0x09 && n <= 0x0d) || !(n <= 0x1f || (n >= 0x7f && n <= 0x9f) || /\p{Cf}/u.test(ch));
+      })
+      .join("")
+      .replace(/\s+/g, " ")
+      .trim();
+  const every = Array.from({ length: 0x3000 }, (_, i) => String.fromCharCode(i)).join("") + "\u{1f600}\u{e0001}\ud800x";
+  for (let at = 0; at < every.length; at += 512) {
+    const piece = every.slice(at, at + 512).replace(/[\u001b\u0090\u0098\u009b-\u009f]/g, "");
+    assert.equal(sanitizeServerText(piece), perCharacter(piece), `from U+${at.toString(16)}`);
+  }
+  // At most 16 384 units of the text are read, never half a surrogate pair.
+  assert.equal(sanitizeServerText("x".repeat(100_000)).length, 16_384);
+  assert.equal(sanitizeServerText(`${"x".repeat(16_383)}\u{1f600}`), "x".repeat(16_383));
+  // A control string ends at another introducer: the first is dropped by the filter, the second
+  // string as a whole.
+  const OSC8 = String.fromCharCode(0x9d);
+  const ST8 = String.fromCharCode(0x9c);
+  assert.equal(sanitizeServerText(`a${OSC8}0;x${OSC8}0;t${ST8}b`), "a0;xb");
+  assert.equal(sanitizeServerText(`a${ESC}]0;x${ESC}]0;t${BEL}b`), "a0;xb");
+});
+
+test("an error answer of unterminated control-string introducers is cleaned in linear time (C)", async () => {
+  // 100 000 × U+009D took about 16 s with a control-string body that admitted the introducers.
+  for (const opener of ["\\u009d", "\\u0090", "\\u0098", "\\u009e", "\\u009f", "\\u001b]"]) {
+    const body = `{"success":false,"error":{"__type":"Search Error","message":"${opener.repeat(100_000)} tail"}}`;
+    const e = new RequestEngine({ transport: makeMockTransport(() => rawResponse(body, "application/json", 500)).transport, maxRetries: 0 });
+    const start = performance.now();
+    await assert.rejects(e.getJson("/x"), (err: unknown) => err instanceof CkanApiError && !hasControlChars(err.message));
+    const ms = performance.now() - start;
+    assert.ok(ms < 1000, `${opener}: ${Math.round(ms)} ms`);
+  }
+});
+
+// These tests start a process with a small heap: 30 s instead of the suite's 5 s.
+const STARTS_A_PROCESS = { timeout: 30_000 };
+
+test("scanNumbers quotes millions of declared members within a small heap (C)", STARTS_A_PROCESS, () => {
+  // One `+=` per quoted member made a rope node each: 3 million of them exhausted a 128 MB heap.
+  const engine = new URL("../src/engine.js", import.meta.url).href;
+  const n = 3_000_000;
+  const script =
+    `const { scanNumbers } = await import(${JSON.stringify(engine)});` +
+    `const json = "[" + '{"k":1},'.repeat(${n - 1}) + '{"k":1}]';` +
+    `process.stdout.write(String(scanNumbers(json, new Set(["k"])).json.length));`;
+  const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
+  assert.equal(out, String(n * 10 + 1));
+});
+
+test("an answer of millions of lone surrogate escapes is repaired within a small heap (C)", STARTS_A_PROCESS, () => {
+  // 6 million repairs (36 MB): one `+=` each exhausted a 128 MB heap; batched, it fits.
+  const engine = new URL("../src/engine.js", import.meta.url).href;
+  const n = 6_000_000;
+  const script =
+    `const { RequestEngine } = await import(${JSON.stringify(engine)});` +
+    `const body = Buffer.from('{"x":"' + "\\\\ud800".repeat(${n}) + '"}');` +
+    `let warned = "";` +
+    `const transport = async () => ({ status: 200, headers: { "content-type": "application/json" }, body });` +
+    `const value = await new RequestEngine({ transport, onWarning: (m) => (warned = m) }).getJson("/x");` +
+    `process.stdout.write(value.x.length + " " + /: (\\d+) characters/.exec(warned)[1]);`;
+  const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
+  assert.equal(out, `${n} ${n}`);
 });

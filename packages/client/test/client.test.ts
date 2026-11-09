@@ -46,8 +46,8 @@ test("a success:false envelope on HTTP 200 is stripped of terminal escapes, bidi
     `str ${ESC}[31merr\nError: forged ${RLO}line`,
   ];
   const expected = [
-    'GET https://suche.transparenz.hamburg.de/api/3/action/status_show: CKAN action "status_show" failed: X]0;PWNED[31mRED: evil [2J31m msg',
-    'GET https://suche.transparenz.hamburg.de/api/3/action/status_show: CKAN action "status_show" failed: str [31merr Error: forged line',
+    'GET https://suche.transparenz.hamburg.de/api/3/action/status_show: CKAN action "status_show" failed: XRED: evil msg',
+    'GET https://suche.transparenz.hamburg.de/api/3/action/status_show: CKAN action "status_show" failed: str err Error: forged line',
   ];
   for (const [i, error] of errors.entries()) {
     const mt = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));

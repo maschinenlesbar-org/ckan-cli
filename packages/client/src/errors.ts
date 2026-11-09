@@ -125,9 +125,11 @@ export function redactUrlUserinfo(text: string): string {
 const BUILDER_BATCH = 16_384;
 
 /**
- * A text put together from many pieces (slices of a text and their replacements), joined in
- * batches of BUILDER_BATCH into flat strings, so memory stays proportional to the text, not to
- * the number of pieces.
+ * A text put together from many pieces (slices of a server answer and their replacements),
+ * joined in batches of BUILDER_BATCH into flat strings, so memory stays proportional to the text,
+ * not to the number of pieces. One `+=` per piece made a rope node each, and one array of every
+ * piece a slot each: millions of lone-surrogate repairs in a large answer exhausted a small heap
+ * either way.
  */
 export class TextBuilder {
   readonly #done: string[] = [];

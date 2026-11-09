@@ -14,11 +14,13 @@ import {
   CkanValidationError,
   credentialsIn,
   cutForMessage,
+  cutText,
   describeCkanError,
   echoedCredentialForms,
   redactCredentials,
   redactSecrets,
   redactUrl,
+  TextBuilder,
 } from "./errors.js";
 import { assertValid, baseUrlProblem, headerValueProblem, intRangeProblem } from "./validate.js";
 
@@ -202,33 +204,60 @@ export function isBidiControl(code: number): boolean {
 }
 
 /**
+ * The most server text (in UTF-16 units) `sanitizeServerText` reads; a longer text is cut first.
+ * Every message keeps far less of it (MAX_MESSAGE_VALUE_LENGTH, 500 characters), and cleaning all
+ * of a 16 MB error detail, one string node per character, exhausted a small heap.
+ */
+const MAX_SERVER_TEXT = 16 * 1024;
+
+/**
+ * A whole terminal escape sequence: a CSI (`ESC [` or the 8-bit U+009B, parameters,
+ * intermediates, final byte), a terminated control string (OSC/DCS/SOS/PM/APC, `ESC ]` …
+ * up to BEL or ST, or their 8-bit forms) or a short `ESC` sequence. Dropping only the
+ * control bytes left the printable rest behind (`ESC ] 0 ; title BEL` became `]0;title`).
+ * An unterminated control string is left to the per-character filter, so it cannot
+ * swallow the rest of the message. A control string's body ends at an ESC or at another
+ * introducer: with the introducers allowed inside it, an unterminated run of them was matched
+ * from each one to the end of the text, quadratic (100 000 × U+009D took 16 s). Written with
+ * escapes, so the source holds no control bytes.
+ */
+const ESCAPE_SEQUENCE =
+  /(?:\u001b\[|\u009b)[0-?]*[ -/]*[@-~]|(?:\u001b[\]PX^_]|[\u0090\u0098\u009d-\u009f])[^\u0007\u001b\u0090\u0098\u009c-\u009f]*(?:\u0007|\u001b\\|\u009c)|\u001b[ -/]*[0-~]/g;
+
+/**
+ * What `sanitizeServerText` drops once the escape sequences are gone: the C0 controls but the
+ * whitespace ones (TAB to CR), DEL, the C1 controls, and every format character (General
+ * Category Cf: bidi controls, zero-width characters, U+00AD, U+FEFF, …).
+ */
+const DROPPED_CHAR = /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\p{Cf}]/gu;
+
+/**
  * Make a string that originates in an attacker-controlled response — the error
  * `detail`, a CKAN `success:false` error, the echoed Content-Type — safe to print
  * into an error message on stderr:
  *
- * - C0 and C1 controls and DEL are dropped. A JSON error body can encode an escape
+ * - Whole escape sequences (CSI, OSC and other control strings) are dropped first,
+ *   then any remaining C0 and C1 controls and DEL. A JSON error body can encode an escape
  *   (U+001B) that JSON.parse turns into a real control byte; printed raw, a hostile
  *   or MITM'd endpoint could drive ANSI/OSC sequences into the terminal (display
  *   spoofing, title changes, OSC 52 clipboard writes).
- * - Bidi formatting characters (isBidiControl) are dropped, so server text cannot
- *   reorder the visible message.
+ * - Unicode format characters (General Category Cf) are dropped: the bidi controls
+ *   (isBidiControl), so server text cannot reorder the visible message, and the
+ *   invisible ones — zero-width space/joiners, word joiner, soft hyphen, BOM — so
+ *   two messages that look identical are identical.
  * - Every run of whitespace — newlines, tabs, U+2028/U+2029 included — becomes one
  *   space and the ends are trimmed, so the text stays on one line and a server
  *   cannot forge an `Error:` line of its own.
+ * - Only the first MAX_SERVER_TEXT (16 384) units are read, and every step is a linear
+ *   regex replace: a hostile error body costs neither seconds nor the heap. A caller that
+ *   scrubs credentials does so first, so a cut never splits one.
  *
  * The CLI's JSON output is escaped separately (`escapeControlChars` in
  * cli/shared.ts): `JSON.stringify` alone leaves DEL, C1 and bidi characters raw.
- * Written as a char-code filter so no raw control byte appears in this source.
+ * Written with escapes so no raw control byte appears in this source.
  */
 export function sanitizeServerText(text: string): string {
-  let out = "";
-  for (const ch of text) {
-    const n = ch.codePointAt(0) ?? 0;
-    const whitespaceControl = n >= 0x09 && n <= 0x0d;
-    if (!whitespaceControl && (n <= 0x1f || (n >= 0x7f && n <= 0x9f) || isBidiControl(n))) continue;
-    out += ch;
-  }
-  return out.replace(/\s+/g, " ").trim();
+  return cutText(text, MAX_SERVER_TEXT).replace(ESCAPE_SEQUENCE, "").replace(DROPPED_CHAR, "").replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -920,7 +949,7 @@ function escapeAt(json: string, at: number): number {
  */
 function wellFormedEscapes(json: string): { json: string; replaced: number } {
   if (!SURROGATE_ESCAPE.test(json)) return { json, replaced: 0 };
-  let out = "";
+  const out = new TextBuilder();
   let copied = 0;
   let replaced = 0;
   for (let i = 0; i < json.length; i++) {
@@ -935,12 +964,14 @@ function wellFormedEscapes(json: string): { json: string; replaced: number } {
       i += 11;
       continue;
     }
-    out += json.slice(copied, i) + "\\ufffd";
+    out.push(json.slice(copied, i), "\\ufffd");
     copied = i + 6;
     replaced++;
     i += 5;
   }
-  return replaced === 0 ? { json, replaced } : { json: out + json.slice(copied), replaced };
+  if (replaced === 0) return { json, replaced };
+  out.push(json.slice(copied));
+  return { json: out.toString(), replaced };
 }
 
 function isLowSurrogate(code: number): boolean {
@@ -1039,7 +1070,7 @@ function skipSpace(json: string, i: number): number {
 export function scanNumbers(json: string, bigIntegerKeys: ReadonlySet<string> = NO_KEYS): NumberScan {
   const keys = bigIntegerKeys.size === 0 ? undefined : [...bigIntegerKeys];
   let inexact: string | undefined;
-  let out: string | undefined;
+  let out: TextBuilder | undefined;
   let copied = 0;
   for (let i = 0; i < json.length; i++) {
     const c = json.charCodeAt(i);
@@ -1063,7 +1094,8 @@ export function scanNumbers(json: string, bigIntegerKeys: ReadonlySet<string> = 
       STRICT_JSON_NUMBER.lastIndex = at;
       const literal = STRICT_JSON_NUMBER.exec(json)?.[0];
       if (literal === undefined) continue;
-      out = (out ?? "") + json.slice(copied, at) + '"' + literal + '"';
+      out ??= new TextBuilder();
+      out.push(json.slice(copied, at), '"', literal, '"');
       copied = at + literal.length;
       i = copied - 1;
     } else if (c === 0x2d || (c >= 0x30 && c <= 0x39)) {
@@ -1078,7 +1110,9 @@ export function scanNumbers(json: string, bigIntegerKeys: ReadonlySet<string> = 
       i += literal.length - 1;
     }
   }
-  return { json: out === undefined ? json : out + json.slice(copied), inexact };
+  if (out === undefined) return { json, inexact };
+  out.push(json.slice(copied));
+  return { json: out.toString(), inexact };
 }
 
 /** A member name written with an escape, decoded; a name JSON.parse can't read matches nothing. */

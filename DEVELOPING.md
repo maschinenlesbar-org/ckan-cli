@@ -267,8 +267,15 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   from a server answer or the user's input (a redirect target, a charset or Content-Type,
   an action name, a scheme, a `--param` or `--portal` value, an unknown command) is cut
   there too, so `err.message` stays bounded for a library caller (a typed value after its
-  userinfo is redacted, so a cut never leaves part of a password); the error's `url`, `detail` and
-  `body` keep the full value.
+  userinfo is redacted, so a cut never leaves part of a password); the error's `url` and
+  `body` keep the full value. Server text bound for a message (an error `detail`, a Content-Type,
+  a charset, a redirect target, a transport's reason) is cleaned by `sanitizeServerText`: it reads
+  at most the first 16 384 characters, drops whole terminal escape sequences, every C0 control
+  but whitespace, DEL, C1 and format character (bidi, zero-width, soft hyphen, BOM), and folds
+  whitespace into one space, each step a linear regex replace, so a hostile error body costs
+  neither seconds nor the heap; `detail` holds that cleaned text. Large answers are repaired and
+  rewritten (`wellFormedEscapes`, `scanNumbers`) in a `TextBuilder`, pieces joined in batches,
+  never one string node per piece.
 - **Base URL.** `--base-url` or `--portal` (they conflict) > `CKAN_BASE_URL` > the
   Hamburg default (an empty `CKAN_BASE_URL` counts as unset; in the library only
   `undefined` selects the default). One rule set, `baseUrlProblem`, applied by the
