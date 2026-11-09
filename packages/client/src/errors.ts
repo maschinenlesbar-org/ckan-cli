@@ -286,6 +286,12 @@ export class CkanApiError extends CkanError {
   readonly detail: string | undefined;
   readonly url: string;
   readonly method: string;
+  /**
+   * The answer's body as text, the base URL's credentials scrubbed. As sent, unless it is JSON
+   * whose decoded text still holds an echoed credential behind an escape: then the decoded JSON
+   * written again (other escapes, no insignificant whitespace) with it replaced by `***`, and `""`
+   * for such a body nested too deeply to write again.
+   */
   readonly body: string;
   /** How many times the engine retried the request before giving up (0 when it did not). */
   readonly retries: number;

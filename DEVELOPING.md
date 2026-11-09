@@ -489,8 +489,13 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   `JSON.stringify` never show its password. The engine scrubs the base URL's
   userinfo (raw and percent-decoded) and the forms a server echoes it back in (the
   `Basic` value, the decoded `user:password`, the password alone from 4 characters:
-  `echoedCredentialForms`) from error bodies and details, a CKAN
-  `success:false` message, transport error text and the `cause` chain it attaches.
+  `echoedCredentialForms`, each also percent-encoded) from error bodies and details, a CKAN
+  `success:false` message and its `__type`, transport error text and the `cause` chain it
+  attaches. Server text is scrubbed as sent and again once decoded, before it is cleaned or
+  cut: a JSON escape (`\"`, `\u00e4`) hides an echo from the first scrub. `CkanApiError.body`
+  stays as sent (scrubbed) unless it is JSON whose decoded text still holds an echoed form;
+  then it is the decoded JSON written again (`JSON.stringify`) with the forms replaced by
+  `***`, and `""` for such a body nested too deeply to write again.
   A transport failure of any kind (the default transport's `CkanNetworkError`, or
   anything a custom transport throws) becomes a `CkanNetworkError`
   `GET <url, redacted> failed: <reason>`, with the original as `cause`.

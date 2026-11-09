@@ -264,7 +264,7 @@ export class CkanClient {
       const type = (env.error as { __type?: unknown } | null | undefined)?.__type;
       throw new CkanActionError(
         `${request}: CKAN action "${cutForMessage(name)}" failed: ${cutForMessage(sanitizeServerText(this.#engine.scrub(describeCkanError(env.error))))}`,
-        { action: name, errorType: typeof type === "string" ? cutForMessage(sanitizeServerText(type)) : undefined, url },
+        { action: name, errorType: typeof type === "string" ? cutForMessage(sanitizeServerText(this.#engine.scrub(type))) : undefined, url },
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
