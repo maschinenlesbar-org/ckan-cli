@@ -19,6 +19,7 @@ import {
   redactCredentials,
   redactSecrets,
   redactUrlUserinfo,
+  typedUrlCredentials,
 } from "@maschinenlesbar.org/ckan-client/internal/errors";
 
 /** The exit code of a usage error: commander's own for a rejected option value. */
@@ -198,16 +199,16 @@ export function redactionFor(argv: readonly string[], env: Record<string, string
   });
   // A base URL typed without its scheme is read as if it had one (anywhere else a bare
   // `a:b@c` is no credential: a dataset id, a search text, a User-Agent).
-  const baseUrls = [...flagValues(argv, BASE_URL_FLAGS), env["CKAN_BASE_URL"] ?? ""].map((value) =>
-    value === "" || /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) ? value : `http://${value}`,
-  );
-  const sources = [...values.flatMap(urlsWithin), ...baseUrls];
+  // Read as a URL however its scheme is typed: missing, special without "//", or mistyped
+  // (`http//u:pw@h`, the colon left out): typedUrlCredentials.
+  const baseUrls = [...flagValues(argv, BASE_URL_FLAGS), env["CKAN_BASE_URL"] ?? ""];
+  const sources = [...values.flatMap(urlsWithin).map(credentialsIn), ...baseUrls.map(typedUrlCredentials)];
   const secrets = new Set<string>();
   const encoded = new Set<string>();
   const echoed = new Set<string>();
   const passwords = new Set<string>();
-  for (const source of sources) {
-    for (const secret of credentialsIn(source)) {
+  for (const found of sources) {
+    for (const secret of found) {
       secrets.add(secret);
       secrets.add(JSON.stringify(secret).slice(1, -1));
       // As commander's echo and the library's quoteValue show it: invisible characters escaped.

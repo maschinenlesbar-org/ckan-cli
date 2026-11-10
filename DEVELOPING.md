@@ -306,7 +306,9 @@ so the pure part is unit-tested) but is not in the npm package: the client ships
   transport see. `credentialsIn` ends a special scheme's authority at a backslash too, and
   skips the slashes and backslashes WHATWG skips after it. The CLI also redacts on
   output: `run.ts` (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of
-  every URL argument (the value of a `key=value` pair too, `--param id=<url>`) and of `CKAN_BASE_URL` (`credentialsIn`, exported) and replaces it
+  every URL argument (the value of a `key=value` pair too, `--param id=<url>`) and of `CKAN_BASE_URL` (`credentialsIn`, exported; a base URL is read as a URL however its scheme is typed,
+`typedUrlCredentials`: missing, `alice:pw@host`, or mistyped, `http//alice:pw@host` with the
+colon left out, whose userinfo is everything between the first slashes and the last `@`) and replaces it
   with `***` in everything it prints — commander's usage errors, which echo a rejected
   `--base-url` or `--portal` value or a URL typed where the command goes, the
   client's own messages and the help's defaults — so a password with spaces,
