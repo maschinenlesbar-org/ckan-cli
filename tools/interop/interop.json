@@ -1,0 +1,1004 @@
+{
+  "comment": "What tools/interop/interop.mjs needs that is particular to this repo: the mock upstream's answer per path (under --base-url http://127.0.0.1:<port>), how many tools the server lists, and the calls to make with what each must answer. The answers are live ones of the Transparenzportal Hamburg recorded on 2026-11-20: the 4 newest contracts of public interest with the whole portal's facets (organizations, licences, document types), and the record kbq-verkehrstechnische-untersuchung-radverkehr; the mock answers by path only, so every search sees that one answer. comparePortals, findHamburgDocuments and the portal input reach the list's own hosts, so no call here uses them.",
+  "answers": {
+    "/api/3/action/package_search": {
+      "help": "https://suche.transparenz.hamburg.de/api/3/action/help_show?name=package_search",
+      "success": true,
+      "result": {
+        "count": 3069,
+        "sort": "metadata_created desc",
+        "results": [
+          {
+            "id": "a533dbf0-2273-4b39-9037-525a64db9819",
+            "name": "vergabe-hafun-06-mittelspannungsanlagen",
+            "title": "Vergabe HAFUN_06_Mittelspannungsanlagen",
+            "type": "document",
+            "notes": "Vergabe HAFUN_06_Mittelspannungsanlagen",
+            "url": null,
+            "num_resources": 4,
+            "license_id": "cc-zero",
+            "license_title": "Creative Commons CCZero",
+            "metadata_created": "2026-11-17T17:04:37.637287",
+            "metadata_modified": "2026-11-17T17:04:37.637292",
+            "author": "Sprinkenhof GmbH",
+            "maintainer": "Fachliche Leitstelle Transparenzportal",
+            "organization": {
+              "name": "workflows",
+              "title": "Workflows"
+            },
+            "groups": [
+              {
+                "name": "bildung-und-wissenschaft",
+                "title": "Bildung & Wissenschaft ",
+                "display_name": "Bildung & Wissenschaft "
+              }
+            ],
+            "tags": [
+              {
+                "name": "Vergabe HAFUN_06_Mittelspannungsanlagen"
+              }
+            ],
+            "extras": [
+              {
+                "key": "offline_date",
+                "value": "2036-11-17T00:00:00"
+              },
+              {
+                "key": "publishing_date",
+                "value": "2026-11-17T00:00:00"
+              },
+              {
+                "key": "registerobject_type",
+                "value": "vertraegeoeffinteresse"
+              },
+              {
+                "key": "temporal_coverage_from",
+                "value": "2026-08-13T00:00:00"
+              },
+              {
+                "key": "terms_of_use",
+                "value": "{\"license_id\": \"cc-zero\", \"license_url\": \"http://creativecommons.org/publicdomain/zero/1.0/deed.de\", \"attribution_text\": \"Namensnennung: Freie und Hansestadt Hamburg\", \"is_free_to_use\": true}"
+              }
+            ],
+            "resources": [
+              {
+                "id": "1e970803-2090-4022-9214-c86032859050",
+                "name": "Upload: 6-040_Angebot_07 2024_geschwärzt",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/48bcfa8c-7bba-4d25-924a-e086f8f6aaa3/Upload__6-040_Angebot_07_2024_geschwaerzt.PDF",
+                "size": 844976
+              },
+              {
+                "id": "89efe95b-9496-4151-bd1e-3614209567ee",
+                "name": "Upload: 261102_Zuschlag_WISAG Elektrotechnik Nord_geschwärzt",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/81451cf8-d5a5-4421-9a29-35d10b2d6d4a/Upload__261102_Zuschlag_WISAG_Elektrotechnik_Nord_geschwaerzt.PDF",
+                "size": 21698
+              },
+              {
+                "id": "bf124d1f-bc54-4ccb-9626-65c2b80897c0",
+                "name": "Upload: B4410_Leistungsverzeichnis_oP_neu",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/912db36b-1f95-4038-945c-d30dda9d9508/Upload__B4410_Leistungsverzeichnis_oP_neu.PDF",
+                "size": 4040900
+              }
+            ]
+          },
+          {
+            "id": "0741bc14-7f76-471e-9527-44fd075fa521",
+            "name": "haus-der-jugend-hammer-park-3-zusatzvertrag-vom-11-09-2026-zum-architektenvertrag-objek-08-2023",
+            "title": "Haus der Jugend Hammer Park - 3. Zusatzvertrag vom 11.09.2026 zum Architektenvertrag Objektplanung Freianlagen vom 14.08.2023",
+            "type": "document",
+            "notes": "3. Zusatzvertrag vom 11.09.2026 zum Architektenvertrag - Freianlagen - vom 14.08.2023 zum Projekt \"Modellvorhaben \"Mitte machen\": Neubau im Hammer Park\" (Otto-Linne-Haus – Haus der Generationen).",
+            "url": null,
+            "num_resources": 1,
+            "license_id": "cc-zero",
+            "license_title": "Creative Commons CCZero",
+            "metadata_created": "2026-11-13T17:04:15.585146",
+            "metadata_modified": "2026-11-13T17:04:15.585150",
+            "author": "Bezirksamt Mitte",
+            "maintainer": "Fachliche Leitstelle Transparenzportal",
+            "organization": {
+              "name": "workflows",
+              "title": "Workflows"
+            },
+            "groups": [
+              {
+                "name": "bevolkerung",
+                "title": "Bevölkerung",
+                "display_name": "Bevölkerung"
+              },
+              {
+                "name": "kultur-sport-und-tourismus",
+                "title": "Kultur, Sport & Tourismus",
+                "display_name": "Kultur, Sport & Tourismus"
+              },
+              {
+                "name": "politik-und-wahlen",
+                "title": "Politik & Wahlen",
+                "display_name": "Politik & Wahlen"
+              },
+              {
+                "name": "soziales",
+                "title": "Soziales",
+                "display_name": "Soziales"
+              },
+              {
+                "name": "verbraucherschutz",
+                "title": "Verbraucherschutz",
+                "display_name": "Verbraucherschutz"
+              },
+              {
+                "name": "wirtschaft-und-arbeit",
+                "title": "Wirtschaft & Arbeit",
+                "display_name": "Wirtschaft & Arbeit"
+              }
+            ],
+            "tags": [
+              {
+                "name": "Haus der Jugend Hammer Park 3. Zusatzvertrag Architektenvertrag Objektplanung Freianlagen"
+              }
+            ],
+            "extras": [
+              {
+                "key": "file_reference_digital",
+                "value": "000.00-04"
+              },
+              {
+                "key": "offline_date",
+                "value": "2036-12-10T00:00:00"
+              },
+              {
+                "key": "publishing_date",
+                "value": "2026-11-13T00:00:00"
+              },
+              {
+                "key": "registerobject_type",
+                "value": "vertraegeoeffinteresse"
+              },
+              {
+                "key": "temporal_coverage_from",
+                "value": "2026-09-22T00:00:00"
+              },
+              {
+                "key": "terms_of_use",
+                "value": "{\"license_id\": \"cc-zero\", \"license_url\": \"http://creativecommons.org/publicdomain/zero/1.0/deed.de\", \"attribution_text\": \"Namensnennung: Freie und Hansestadt Hamburg\", \"is_free_to_use\": true}"
+              }
+            ],
+            "resources": [
+              {
+                "id": "4d4d1021-f608-446d-9edc-62fe521f42d9",
+                "name": "Akte: 000.00-04",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/31c61bfb-64af-4295-8fdd-4aaf0fa87a5a/Akte__000.00-04.pdf",
+                "size": 1495560
+              }
+            ]
+          },
+          {
+            "id": "e0387eb6-5ace-49fc-92a5-3361e2b818d9",
+            "name": "u-bahn-farmsen-baulos-1-strassenbau-los-1",
+            "title": "U-Bahn Farmsen Baulos 1, Straßenbau (Los 1)",
+            "type": "document",
+            "notes": "Busoptimierung Metrobuslinie 26, Baulos 1, Straßenbauarbeiten (Los 1)",
+            "url": null,
+            "num_resources": 2,
+            "license_id": "cc-zero",
+            "license_title": "Creative Commons CCZero",
+            "metadata_created": "2026-11-10T17:04:15.111693",
+            "metadata_modified": "2026-11-10T17:04:15.111697",
+            "author": "Landesbetrieb Straßen, Brücken und Gewässer",
+            "maintainer": "Fachliche Leitstelle Transparenzportal",
+            "organization": {
+              "name": "workflows",
+              "title": "Workflows"
+            },
+            "groups": [
+              {
+                "name": "bevolkerung",
+                "title": "Bevölkerung",
+                "display_name": "Bevölkerung"
+              },
+              {
+                "name": "geografie-geologie-und-geodaten",
+                "title": "Geographie, Geologie &Geodaten",
+                "display_name": "Geographie, Geologie &Geodaten"
+              },
+              {
+                "name": "infrastruktur-bauen-und-wohnen",
+                "title": "Infrastruktur, Bauen & Wohnen",
+                "display_name": "Infrastruktur, Bauen & Wohnen"
+              },
+              {
+                "name": "verwaltung-haushalt-und-steuern",
+                "title": "Öffentliche Verwaltung, Haushalt & Steuern",
+                "display_name": "Öffentliche Verwaltung, Haushalt & Steuern"
+              },
+              {
+                "name": "soziales",
+                "title": "Soziales",
+                "display_name": "Soziales"
+              },
+              {
+                "name": "transport-und-verkehr",
+                "title": "Transport & Verkehr",
+                "display_name": "Transport & Verkehr"
+              },
+              {
+                "name": "umwelt-und-klima",
+                "title": "Umwelt & Klima",
+                "display_name": "Umwelt & Klima"
+              },
+              {
+                "name": "verbraucherschutz",
+                "title": "Verbraucherschutz",
+                "display_name": "Verbraucherschutz"
+              },
+              {
+                "name": "wirtschaft-und-arbeit",
+                "title": "Wirtschaft & Arbeit",
+                "display_name": "Wirtschaft & Arbeit"
+              }
+            ],
+            "tags": [
+              {
+                "name": "Bushaltestellen"
+              },
+              {
+                "name": "Metrobusline 26"
+              },
+              {
+                "name": "Straßenbauarbeiten"
+              },
+              {
+                "name": "U-Bahn Farmsen"
+              }
+            ],
+            "extras": [
+              {
+                "key": "offline_date",
+                "value": "2036-12-10T00:00:00"
+              },
+              {
+                "key": "publishing_date",
+                "value": "2026-11-10T00:00:00"
+              },
+              {
+                "key": "registerobject_type",
+                "value": "vertraegeoeffinteresse"
+              },
+              {
+                "key": "temporal_coverage_from",
+                "value": "2026-11-10T00:00:00"
+              },
+              {
+                "key": "terms_of_use",
+                "value": "{\"license_id\": \"cc-zero\", \"license_url\": \"http://creativecommons.org/publicdomain/zero/1.0/deed.de\", \"attribution_text\": \"Namensnennung: Freie und Hansestadt Hamburg\", \"is_free_to_use\": true}"
+              }
+            ],
+            "resources": [
+              {
+                "id": "ea55e17a-1a6d-4873-baea-aad195406480",
+                "name": "Upload: Leistungsverzeichnis_MB 26_U Farmsen_geschwärzt",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/35006026-94a1-47e5-bd35-af9f498f9d8c/Upload__Leistungsverzeichnis_MB_26_U_Farmsen_geschwaerzt.PDF",
+                "size": 1734350
+              },
+              {
+                "id": "c26999ba-f824-40fd-a6bd-6ce08e2d8f96",
+                "name": "Upload: EUROVIA_Zuschlagsschreiben_MB 26_U Farmsen_geschwärzt",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/3e29fcfb-7931-4986-8cd2-13669462270e/Upload__EUROVIA_Zuschlagsschreiben_MB_26_U_Farmsen_geschwaerzt.PDF",
+                "size": 625338
+              }
+            ]
+          },
+          {
+            "id": "dce23294-689d-4c71-a2c9-33ea5d295aa3",
+            "name": "steinstrasse-strassenbegleitgruen",
+            "title": "Steinstraße Straßenbegleitgrün",
+            "type": "document",
+            "notes": "Im Rahmen der Baumaßnahme in und an der Steinstraße werden Garten- und Landschaftsbau sowie Pflanzarbeiten realisiert.",
+            "url": null,
+            "num_resources": 2,
+            "license_id": "cc-zero",
+            "license_title": "Creative Commons CCZero",
+            "metadata_created": "2026-11-09T17:05:41.701420",
+            "metadata_modified": "2026-11-09T17:05:41.701425",
+            "author": "Landesbetrieb Straßen, Brücken und Gewässer",
+            "maintainer": "Fachliche Leitstelle Transparenzportal",
+            "organization": {
+              "name": "workflows",
+              "title": "Workflows"
+            },
+            "groups": [
+              {
+                "name": "bevolkerung",
+                "title": "Bevölkerung",
+                "display_name": "Bevölkerung"
+              },
+              {
+                "name": "geografie-geologie-und-geodaten",
+                "title": "Geographie, Geologie &Geodaten",
+                "display_name": "Geographie, Geologie &Geodaten"
+              },
+              {
+                "name": "infrastruktur-bauen-und-wohnen",
+                "title": "Infrastruktur, Bauen & Wohnen",
+                "display_name": "Infrastruktur, Bauen & Wohnen"
+              },
+              {
+                "name": "verwaltung-haushalt-und-steuern",
+                "title": "Öffentliche Verwaltung, Haushalt & Steuern",
+                "display_name": "Öffentliche Verwaltung, Haushalt & Steuern"
+              },
+              {
+                "name": "soziales",
+                "title": "Soziales",
+                "display_name": "Soziales"
+              },
+              {
+                "name": "transport-und-verkehr",
+                "title": "Transport & Verkehr",
+                "display_name": "Transport & Verkehr"
+              },
+              {
+                "name": "umwelt-und-klima",
+                "title": "Umwelt & Klima",
+                "display_name": "Umwelt & Klima"
+              },
+              {
+                "name": "verbraucherschutz",
+                "title": "Verbraucherschutz",
+                "display_name": "Verbraucherschutz"
+              },
+              {
+                "name": "wirtschaft-und-arbeit",
+                "title": "Wirtschaft & Arbeit",
+                "display_name": "Wirtschaft & Arbeit"
+              }
+            ],
+            "tags": [
+              {
+                "name": "Domplatz"
+              },
+              {
+                "name": "Speesort"
+              },
+              {
+                "name": "Steinstraße"
+              },
+              {
+                "name": "Straßenbegleitgrün"
+              },
+              {
+                "name": "Straßenumbau"
+              }
+            ],
+            "extras": [
+              {
+                "key": "offline_date",
+                "value": "2036-12-09T00:00:00"
+              },
+              {
+                "key": "publishing_date",
+                "value": "2026-11-09T00:00:00"
+              },
+              {
+                "key": "registerobject_type",
+                "value": "vertraegeoeffinteresse"
+              },
+              {
+                "key": "temporal_coverage_from",
+                "value": "2026-11-09T00:00:00"
+              },
+              {
+                "key": "terms_of_use",
+                "value": "{\"license_id\": \"cc-zero\", \"license_url\": \"http://creativecommons.org/publicdomain/zero/1.0/deed.de\", \"attribution_text\": \"Namensnennung: Freie und Hansestadt Hamburg\", \"is_free_to_use\": true}"
+              }
+            ],
+            "resources": [
+              {
+                "id": "e34d7f86-0599-40ba-9bc7-70f76fc1ed1a",
+                "name": "Upload: Zuschlagsschreiben_Steinstraße Straßenbegleitgrün-_geschwärzt",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/d64a5d0b-c702-43e9-9d36-6de9c524b14a/Upload__Zuschlagsschreiben_Steinstrasse_Strassenbegleitgruen-_geschwaerzt.PDF",
+                "size": 2284973
+              },
+              {
+                "id": "353b3769-d76b-47d4-8598-da052e6ce02f",
+                "name": "Upload: Leistungsverzeichnis_Steinstraße Straßenbegleitgrün",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/e3a20197-aa05-4769-81bb-8b32c92f95a3/Upload__Leistungsverzeichnis_Steinstrasse_Strassenbegleitgruen.PDF",
+                "size": 549744
+              }
+            ]
+          }
+        ],
+        "search_facets": {
+          "extras_registerobject_type": {
+            "title": "extras_registerobject_type",
+            "items": [
+              {
+                "name": "verwaltungsvorschrift",
+                "display_name": "verwaltungsvorschrift",
+                "count": 1378
+              },
+              {
+                "name": "verwaltungsbelang",
+                "display_name": "verwaltungsbelang",
+                "count": 901
+              },
+              {
+                "name": "vertrageoffinteress",
+                "display_name": "vertrageoffinteress",
+                "count": 3069
+              },
+              {
+                "name": "vergleichbar",
+                "display_name": "vergleichbar",
+                "count": 1841
+              },
+              {
+                "name": "subvention",
+                "display_name": "subvention",
+                "count": 69
+              },
+              {
+                "name": "statist",
+                "display_name": "statist",
+                "count": 13403
+              },
+              {
+                "name": "stadtischebeteil",
+                "display_name": "stadtischebeteil",
+                "count": 189
+              },
+              {
+                "name": "senatpetitum",
+                "display_name": "senatpetitum",
+                "count": 6507
+              },
+              {
+                "name": "senatmitteil",
+                "display_name": "senatmitteil",
+                "count": 4772
+              },
+              {
+                "name": "ohneveroffentlichungspflicht",
+                "display_name": "ohneveroffentlichungspflicht",
+                "count": 3513
+              },
+              {
+                "name": "messung",
+                "display_name": "messung",
+                "count": 5043
+              },
+              {
+                "name": "gutacht",
+                "display_name": "gutacht",
+                "count": 2089
+              },
+              {
+                "name": "geodat",
+                "display_name": "geodat",
+                "count": 10056
+              },
+              {
+                "name": "dienstanweis",
+                "display_name": "dienstanweis",
+                "count": 1371
+              },
+              {
+                "name": "daseinsvorsorg",
+                "display_name": "daseinsvorsorg",
+                "count": 923
+              },
+              {
+                "name": "beschluss",
+                "display_name": "beschluss",
+                "count": 101951
+              },
+              {
+                "name": "baumkatast",
+                "display_name": "baumkatast",
+                "count": 83
+              },
+              {
+                "name": "bauleitplan",
+                "display_name": "bauleitplan",
+                "count": 51389
+              },
+              {
+                "name": "baugenehm",
+                "display_name": "baugenehm",
+                "count": 39734
+              },
+              {
+                "name": "andereveroffentlichungspflicht",
+                "display_name": "andereveroffentlichungspflicht",
+                "count": 3993
+              }
+            ]
+          },
+          "organization": {
+            "title": "organization",
+            "items": [
+              {
+                "name": "workflows",
+                "display_name": "Workflows",
+                "count": 8499
+              },
+              {
+                "name": "statistikamt",
+                "display_name": "Statistikamt",
+                "count": 12139
+              },
+              {
+                "name": "stadthamburg",
+                "display_name": "StadtHamburg",
+                "count": 9183
+              },
+              {
+                "name": "hmdklgv",
+                "display_name": "HMDKLGV",
+                "count": 27116
+              },
+              {
+                "name": "dokrates",
+                "display_name": "DOKRATES",
+                "count": 4107
+              },
+              {
+                "name": "allris",
+                "display_name": "ALLRIS",
+                "count": 34668
+              }
+            ]
+          },
+          "res_format": {
+            "title": "res_format",
+            "items": [
+              {
+                "name": "zip",
+                "display_name": "zip",
+                "count": 11084
+              },
+              {
+                "name": "xsd",
+                "display_name": "xsd",
+                "count": 5984
+              },
+              {
+                "name": "xml",
+                "display_name": "xml",
+                "count": 11390
+              },
+              {
+                "name": "xlsx",
+                "display_name": "xlsx",
+                "count": 6150
+              },
+              {
+                "name": "xls",
+                "display_name": "xls",
+                "count": 1772
+              },
+              {
+                "name": "wms",
+                "display_name": "wms",
+                "count": 423
+              },
+              {
+                "name": "wfs",
+                "display_name": "wfs",
+                "count": 417
+              },
+              {
+                "name": "web",
+                "display_name": "web",
+                "count": 3
+              },
+              {
+                "name": "txt",
+                "display_name": "txt",
+                "count": 133
+              },
+              {
+                "name": "tiff",
+                "display_name": "tiff",
+                "count": 10
+              },
+              {
+                "name": "sta",
+                "display_name": "sta",
+                "count": 91
+              },
+              {
+                "name": "shapefiles",
+                "display_name": "shapefiles",
+                "count": 22
+              },
+              {
+                "name": "rar",
+                "display_name": "rar",
+                "count": 73
+              },
+              {
+                "name": "pptx",
+                "display_name": "pptx",
+                "count": 1
+              },
+              {
+                "name": "png",
+                "display_name": "png",
+                "count": 305
+              },
+              {
+                "name": "pdf",
+                "display_name": "pdf",
+                "count": 138665
+              },
+              {
+                "name": "ov2",
+                "display_name": "ov2",
+                "count": 12
+              },
+              {
+                "name": "oaf",
+                "display_name": "oaf",
+                "count": 7617
+              },
+              {
+                "name": "mqtt",
+                "display_name": "mqtt",
+                "count": 94
+              },
+              {
+                "name": "json",
+                "display_name": "json",
+                "count": 610
+              },
+              {
+                "name": "jpg",
+                "display_name": "jpg",
+                "count": 7
+              },
+              {
+                "name": "jpeg",
+                "display_name": "jpeg",
+                "count": 89
+              },
+              {
+                "name": "html",
+                "display_name": "html",
+                "count": 168379
+              },
+              {
+                "name": "gml",
+                "display_name": "gml",
+                "count": 56015
+              },
+              {
+                "name": "geotiff",
+                "display_name": "geotiff",
+                "count": 51
+              },
+              {
+                "name": "ert",
+                "display_name": "ert",
+                "count": 30
+              },
+              {
+                "name": "dxf",
+                "display_name": "dxf",
+                "count": 31
+              },
+              {
+                "name": "docx",
+                "display_name": "docx",
+                "count": 20
+              },
+              {
+                "name": "doc",
+                "display_name": "doc",
+                "count": 3
+              },
+              {
+                "name": "data",
+                "display_name": "data",
+                "count": 4
+              },
+              {
+                "name": "csv",
+                "display_name": "csv",
+                "count": 4476
+              },
+              {
+                "name": "citygml",
+                "display_name": "citygml",
+                "count": 42
+              },
+              {
+                "name": "ascii",
+                "display_name": "ascii",
+                "count": 74
+              }
+            ]
+          },
+          "license_id": {
+            "title": "license_id",
+            "items": [
+              {
+                "name": "odbl",
+                "display_name": "odbl",
+                "count": 59
+              },
+              {
+                "name": "geoNutz-20130319",
+                "display_name": "geoNutz-20130319",
+                "count": 48
+              },
+              {
+                "name": "dl-zero-de-2.0",
+                "display_name": "dl-zero-de-2.0",
+                "count": 265
+              },
+              {
+                "name": "dl-de-zero-2.0",
+                "display_name": "Datenlizenz Deutschland - Zero - Version 2.0",
+                "count": 3
+              },
+              {
+                "name": "dl-de-by-2.0",
+                "display_name": "Datenlizenz Deutschland - Namensnennung - 2.0",
+                "count": 248581
+              },
+              {
+                "name": "cc-zero",
+                "display_name": "Creative Commons CCZero",
+                "count": 2424
+              }
+            ]
+          },
+          "groups": {
+            "title": "groups",
+            "items": [
+              {
+                "name": "verwaltung-haushalt-und-steuern",
+                "display_name": "Öffentliche Verwaltung, Haushalt & Steuern",
+                "count": 59855
+              },
+              {
+                "name": "wirtschaft-und-arbeit",
+                "display_name": "Wirtschaft & Arbeit",
+                "count": 8697
+              },
+              {
+                "name": "verbraucherschutz",
+                "display_name": "Verbraucherschutz",
+                "count": 4113
+              },
+              {
+                "name": "umwelt-und-klima",
+                "display_name": "Umwelt & Klima",
+                "count": 24839
+              },
+              {
+                "name": "transport-und-verkehr",
+                "display_name": "Transport & Verkehr",
+                "count": 24228
+              },
+              {
+                "name": "soziales",
+                "display_name": "Soziales",
+                "count": 18877
+              },
+              {
+                "name": "politik-und-wahlen",
+                "display_name": "Politik & Wahlen",
+                "count": 103354
+              },
+              {
+                "name": "kultur-sport-und-tourismus",
+                "display_name": "Kultur, Sport & Tourismus",
+                "count": 19499
+              },
+              {
+                "name": "infrastruktur-bauen-und-wohnen",
+                "display_name": "Infrastruktur, Bauen & Wohnen",
+                "count": 122371
+              },
+              {
+                "name": "gesundheit",
+                "display_name": "Gesundheit",
+                "count": 4787
+              },
+              {
+                "name": "gesetze-und-justiz",
+                "display_name": "Gesetze & Justiz",
+                "count": 4733
+              },
+              {
+                "name": "geografie-geologie-und-geodaten",
+                "display_name": "Geographie, Geologie &Geodaten",
+                "count": 8852
+              },
+              {
+                "name": "bildung-und-wissenschaft",
+                "display_name": "Bildung & Wissenschaft ",
+                "count": 4740
+              },
+              {
+                "name": "bevolkerung",
+                "display_name": "Bevölkerung",
+                "count": 30344
+              }
+            ]
+          },
+          "type": {
+            "title": "type",
+            "items": [
+              {
+                "name": "document",
+                "display_name": "document",
+                "count": 172940
+              },
+              {
+                "name": "dataset",
+                "display_name": "dataset",
+                "count": 81202
+              },
+              {
+                "name": "app",
+                "display_name": "app",
+                "count": 107
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/3/action/package_show": {
+      "help": "https://suche.transparenz.hamburg.de/api/3/action/help_show?name=package_show",
+      "success": true,
+      "result": {
+        "id": "8e4352bf-d4d9-44a1-b458-8d34b858cac7",
+        "name": "kbq-verkehrstechnische-untersuchung-radverkehr",
+        "title": "KBQ_Verkehrstechnische Untersuchung Radverkehr",
+        "type": "document",
+        "notes": "KBQ_Verkehrstechnische Untersuchung Radverkehr der Firma Masuch&Olbrisch",
+        "url": null,
+        "num_resources": 1,
+        "license_id": "cc-zero",
+        "license_title": "Creative Commons CCZero",
+        "metadata_created": "2026-08-03T16:04:41.050732",
+        "metadata_modified": "2026-08-03T16:04:41.050736",
+        "author": "Hamburg Port Authority",
+        "maintainer": "Fachliche Leitstelle Transparenzportal",
+        "organization": {
+          "name": "workflows",
+          "title": "Workflows"
+        },
+        "groups": [
+          {
+            "name": "transport-und-verkehr",
+            "title": "Transport & Verkehr",
+            "display_name": "Transport & Verkehr"
+          }
+        ],
+        "tags": [
+          {
+            "name": "KBQ Radverkehr"
+          }
+        ],
+        "extras": [
+          {
+            "key": "offline_date",
+            "value": "2036-09-03T00:00:00"
+          },
+          {
+            "key": "publishing_date",
+            "value": "2026-08-03T00:00:00"
+          },
+          {
+            "key": "registerobject_type",
+            "value": "gutachten"
+          },
+          {
+            "key": "temporal_coverage_from",
+            "value": "2026-08-03T00:00:00"
+          },
+          {
+            "key": "temporal_coverage_to",
+            "value": "2036-08-03T00:00:00"
+          },
+          {
+            "key": "terms_of_use",
+            "value": "{\"license_id\": \"cc-zero\", \"license_url\": \"http://creativecommons.org/publicdomain/zero/1.0/deed.de\", \"attribution_text\": \"Namensnennung: Freie und Hansestadt Hamburg\", \"is_free_to_use\": true}"
+          }
+        ],
+        "resources": [
+          {
+            "id": "77d89487-3b4e-4300-a792-397c1d726e40",
+            "name": "Upload: VerkehrstechnUntersuchung_Radverkehr_KBQ_geschwärzt",
+            "format": "PDF",
+            "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/2ee58073-be63-4840-8420-6c7715297dac/Upload__VerkehrstechnUntersuchung_Radverkehr_KBQ_geschwaerzt.PDF",
+            "size": 7555605
+          }
+        ]
+      }
+    }
+  },
+  "tools": 6,
+  "calls": [
+    {
+      "name": "findDatasets",
+      "arguments": {
+        "query": "Vertrag",
+        "type": "document",
+        "sort": "created",
+        "limit": 4
+      },
+      "expect": {
+        "status": "ok",
+        "total": 3069,
+        "datasets.0.licences.0.label": "CC0 1.0",
+        "datasets.0.type": "document"
+      }
+    },
+    {
+      "name": "findDatasets",
+      "arguments": {
+        "query": "Vergabe",
+        "limit": 2
+      },
+      "expect": {
+        "status": "ok",
+        "datasets.0.name": "vergabe-hafun-06-mittelspannungsanlagen",
+        "datasets.0.attribution": "Namensnennung: Freie und Hansestadt Hamburg"
+      }
+    },
+    {
+      "name": "countDatasets",
+      "arguments": {
+        "facets": [
+          "licence"
+        ],
+        "limit": 3
+      },
+      "expect": {
+        "status": "ok",
+        "facets.0.values.0.value": "DL-DE BY 2.0"
+      }
+    },
+    {
+      "name": "getDataset",
+      "arguments": {
+        "id": "kbq-verkehrstechnische-untersuchung-radverkehr"
+      },
+      "expect": {
+        "status": "ok",
+        "dataset.licences.0.label": "CC0 1.0"
+      }
+    },
+    {
+      "name": "listOrganizations",
+      "arguments": {
+        "name": "allris"
+      },
+      "expect": {
+        "status": "ok",
+        "organizations.0.name": "allris"
+      }
+    },
+    {
+      "name": "findDatasets",
+      "arguments": {
+        "query": "x",
+        "limit": 500
+      },
+      "error": true
+    }
+  ]
+}
