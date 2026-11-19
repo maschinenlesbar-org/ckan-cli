@@ -1,0 +1,157 @@
+{
+  "comment": "What tools/image/smoke.mjs needs that is particular to this repo: the bin (its log topic), a command that makes one request, the exit code of a network error, the mock's answer to that request (by path, under --base-url http://mock:8080), and a string the printed answer contains. The answer is the live one of the Transparenzportal Hamburg for a search for Radverkehr (two records, the fields the operations read), recorded on 2026-11-20.",
+  "bin": "ckan",
+  "command": [
+    "search",
+    "Radverkehr",
+    "--rows",
+    "2"
+  ],
+  "networkErrorExit": 1,
+  "answers": {
+    "/api/3/action/package_search": {
+      "help": "https://suche.transparenz.hamburg.de/api/3/action/help_show?name=package_search",
+      "success": true,
+      "result": {
+        "count": 3753,
+        "sort": "score desc, metadata_modified desc",
+        "results": [
+          {
+            "id": "f2724f9c-d5d2-429b-a905-aa8a2c9714bf",
+            "name": "potentialermittlung-radverkehr",
+            "title": "Potentialermittlung Radverkehr",
+            "type": "document",
+            "notes": "Potentialermittlung Radverkehr im Zusammenhang mit der Köhlbrandquerung",
+            "url": null,
+            "num_resources": 1,
+            "license_id": "dl-de-by-2.0",
+            "license_title": "Datenlizenz Deutschland - Namensnennung - 2.0",
+            "metadata_created": "2023-12-22T17:06:32.464524",
+            "metadata_modified": "2023-12-22T17:06:32.464529",
+            "author": "Hamburg Port Authority",
+            "maintainer": "Fachliche Leitstelle Transparenzportal",
+            "organization": {
+              "name": "workflows",
+              "title": "Workflows"
+            },
+            "groups": [
+              {
+                "name": "transport-und-verkehr",
+                "title": "Transport & Verkehr",
+                "display_name": "Transport & Verkehr"
+              }
+            ],
+            "tags": [
+              {
+                "name": "Köhlbrandquerung"
+              },
+              {
+                "name": "Ost-West-Achse"
+              },
+              {
+                "name": "Potentialanalyse"
+              },
+              {
+                "name": "Radverkehr"
+              }
+            ],
+            "extras": [
+              {
+                "key": "offline_date",
+                "value": "2034-01-22T00:00:00"
+              },
+              {
+                "key": "publishing_date",
+                "value": "2023-12-22T00:00:00"
+              },
+              {
+                "key": "temporal_coverage_from",
+                "value": "2023-12-22T00:00:00"
+              },
+              {
+                "key": "temporal_coverage_to",
+                "value": "2028-12-31T00:00:00"
+              },
+              {
+                "key": "terms_of_use",
+                "value": "{\"license_id\": \"dl-de-by-2.0\", \"license_url\": \"http://www.govdata.de/dl-de/by-2-0\", \"attribution_text\": \"Namensnennung: Freie und Hansestadt Hamburg\", \"is_free_to_use\": true}"
+              }
+            ],
+            "resources": [
+              {
+                "id": "724742d9-1643-41e3-a49b-6dd0ce8a4b17",
+                "name": "Upload: 220405_PTV-PGV Alruzt_Radverkehr Potenzialermittlung_mit Anl_Nr55",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/76d19194-264a-48f9-91b7-a1f1c52215a9/Upload__220405_PTV-PGV_Alruzt_Radverkehr_Potenzialermittlung_mit_Anl_Nr55.PDF",
+                "size": 18405186
+              }
+            ]
+          },
+          {
+            "id": "d16fea7f-53ef-47c9-bacf-b72e5f367527",
+            "name": "gutachten-koehlbrandquerung-radverkehr",
+            "title": "Gutachten Köhlbrandquerung Radverkehr",
+            "type": "document",
+            "notes": "Köhlbrandquerung  Gutachten Tunnellüftung Radverkehr",
+            "url": null,
+            "num_resources": 1,
+            "license_id": "dl-de-by-2.0",
+            "license_title": "Datenlizenz Deutschland - Namensnennung - 2.0",
+            "metadata_created": "2023-12-21T17:06:21.930986",
+            "metadata_modified": "2023-12-21T17:06:21.930993",
+            "author": "Hamburg Port Authority",
+            "maintainer": "Fachliche Leitstelle Transparenzportal",
+            "organization": {
+              "name": "workflows",
+              "title": "Workflows"
+            },
+            "groups": [
+              {
+                "name": "transport-und-verkehr",
+                "title": "Transport & Verkehr",
+                "display_name": "Transport & Verkehr"
+              }
+            ],
+            "tags": [
+              {
+                "name": "Köhlbrandquerung Radverkehr"
+              }
+            ],
+            "extras": [
+              {
+                "key": "offline_date",
+                "value": "2034-01-21T00:00:00"
+              },
+              {
+                "key": "publishing_date",
+                "value": "2023-12-21T00:00:00"
+              },
+              {
+                "key": "temporal_coverage_from",
+                "value": "2023-12-21T00:00:00"
+              },
+              {
+                "key": "temporal_coverage_to",
+                "value": "2028-12-31T00:00:00"
+              },
+              {
+                "key": "terms_of_use",
+                "value": "{\"license_id\": \"dl-de-by-2.0\", \"license_url\": \"http://www.govdata.de/dl-de/by-2-0\", \"attribution_text\": \"Namensnennung: Freie und Hansestadt Hamburg\", \"is_free_to_use\": true}"
+              }
+            ],
+            "resources": [
+              {
+                "id": "92bdb8c2-0bd6-4ca5-9170-bdd43f8661e7",
+                "name": "Upload: 2021-09_HBI Haerter_Tunnellueftung Radroehre_Nr43_geschwaerzt",
+                "format": "PDF",
+                "url": "https://daten.transparenz.hamburg.de/Dataport.HmbTG.ZS.Webservice.GetRessource100/GetRessource100.svc/48f2fca4-2712-439a-905f-2bae3d729730/Upload__2021-09_HBI_Haerter_Tunnellueftung_Radroehre_Nr43_geschwaerzt.PDF",
+                "size": 908554
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "expectStdout": "potentialermittlung-radverkehr"
+}
