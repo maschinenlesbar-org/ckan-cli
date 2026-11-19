@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Command, InvalidArgumentError, Option } from "commander";
 import type { CliDeps } from "./io.js";
 import { defaultIO } from "./io.js";
+import { readContainerLimits } from "./limits.js";
 import { CkanClient } from "@maschinenlesbar.org/ckan-client/internal/client";
 import { DEFAULT_BASE_URL, MAX_RETRIES, MAX_RETRY_AFTER_MS } from "@maschinenlesbar.org/ckan-client/internal/engine";
 import { MAX_TIMEOUT_MS } from "@maschinenlesbar.org/ckan-client/internal/http";
@@ -39,6 +40,8 @@ export const defaultDeps: CliDeps = {
   io: defaultIO,
   env: process.env,
   createClient: (options) => new CkanClient(options),
+  // In a container: the memory and pids limits (cgroup), for action()'s checks.
+  limits: () => readContainerLimits(),
 };
 
 /** commander value-parser for `--log-format`. */
