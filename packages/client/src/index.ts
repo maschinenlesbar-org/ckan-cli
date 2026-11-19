@@ -1,6 +1,6 @@
 // Public entry point for the API client library.
 
-export { ALL_FIELDS_PAGE_DELAY_MS, CkanClient, MAX_ALL_FIELDS_PAGES, siteRoot } from "./client.js";
+export { actionRequest, ALL_FIELDS_PAGE_DELAY_MS, CkanClient, MAX_ALL_FIELDS_PAGES, packageSearchQuery, siteRoot } from "./client.js";
 export {
   RequestEngine,
   DEFAULT_BASE_URL,
@@ -60,3 +60,5 @@ export {
 export type { CheckPortalsOptions, PortalCheck } from "./portals.js";
 
 export * from "./types.js";
+
+export * from "./operations.js";

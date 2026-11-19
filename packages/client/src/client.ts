@@ -3,7 +3,7 @@
 
 import { bigIntegerKeysOption, DEFAULT_BASE_URL, RequestEngine, sanitizeServerText, validateBaseUrl, type EngineOptions } from "./engine.js";
 import { CkanActionError, CkanParseError, CkanValidationError, cutForMessage, describeCkanError, quoteValue, redactUrl } from "./errors.js";
-import type { QueryParams } from "./query.js";
+import { buildQueryString, type QueryParams } from "./query.js";
 import {
   assertValid,
   countProblem,
@@ -202,6 +202,49 @@ function assertCount(name: string, value: number | undefined): void {
 }
 
 /**
+ * The `package_search` parameters `packageSearch(params)` sends, checked first (CkanValidationError
+ * before any request: an unknown key, a refused text value, a string where a list belongs, a NaN or
+ * negative number would otherwise go out, or be dropped). See `packageSearch` for how each one is
+ * sent.
+ */
+export function packageSearchQuery(params: PackageSearchParams = {}): QueryParams {
+  assertParams(params);
+  assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
+  assertOptional("q", params.q, textProblem);
+  assertList("fq", params.fq, textProblem);
+  assertOptional("sort", params.sort, sortProblem);
+  assertList("facet_field", params.facet_field, fieldProblem);
+  assertCount("rows", params.rows);
+  assertCount("start", params.start);
+  if (params.facet_limit !== undefined) assertValid("facet_limit", params.facet_limit, facetLimitProblem);
+  const fq = (params.fq ?? []).map(normalizeText);
+  const facetFields = (params.facet_field ?? []).map(normalizeToken);
+  return {
+    q: params.q === undefined ? undefined : normalizeText(params.q),
+    fq: fq.length === 1 ? fq[0] : undefined,
+    fq_list: fq.length > 1 ? fq : undefined,
+    rows: params.rows,
+    start: params.start,
+    sort: params.sort === undefined ? undefined : normalizeToken(params.sort),
+    "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
+    "facet.limit": params.facet_limit,
+  };
+}
+
+/**
+ * A request as `action(name, params)` sends it, under the Action API's base
+ * (`<site>/api/3/action/`): the action's name and its query string (`package_show?id=x`), the
+ * parameters checked and normalised as they go out. What an answer's source names.
+ */
+export function actionRequest(name: string, params: QueryParams = {}): string {
+  if (typeof name !== "string" || !ACTION_NAME.test(name)) {
+    throw new CkanValidationError(`Invalid CKAN action name: ${quoteValue(typeof name === "string" ? name : String(name))}`);
+  }
+  const qs = buildQueryString(prune(params));
+  return qs === "" ? name : `${name}?${qs}`;
+}
+
+/**
  * The site root of a CKAN instance, from what a user is likely to paste: portals
  * document their API as `<site>/api/3/action`, so that suffix (or `/api/3`) is
  * dropped. A CKAN mounted under a sub-path (`https://host/ckan`) keeps it.
@@ -222,8 +265,11 @@ export class CkanClient {
   readonly #site: string;
   /** The pause between `all_fields` pages (EngineOptions.sleep, for tests). */
   readonly #sleep: (ms: number) => Promise<void>;
+  /** The options it was made with, for `withBaseUrl`. */
+  readonly #options: EngineOptions;
 
   constructor(options: EngineOptions = {}) {
+    this.#options = options;
     this.#site = siteRoot(options.baseUrl ?? DEFAULT_BASE_URL);
     // The engine checks every option, `sleep` included, before the client uses it. Solr's
     // `_version_` (≈1.88e18, past 2^53) is always declared a big integer: a portal that sends it
@@ -234,6 +280,24 @@ export class CkanClient {
       bigIntegerKeys: new Set([...bigIntegerKeysOption(options.bigIntegerKeys), ...BIG_INTEGER_KEYS]),
     });
     this.#sleep = options.sleep ?? realSleep;
+  }
+
+  /**
+   * The portal this client talks to as one identity (`portalKey`: host without `www.` and path,
+   * lower case; never a user name or password): to tell whether a portal of the list is this one.
+   */
+  get siteKey(): string {
+    const url = new URL(this.#site);
+    return `${url.host.toLowerCase().replace(/^www\./, "")}${url.pathname.replace(/\/+$/, "").toLowerCase()}`;
+  }
+
+  /**
+   * A client for another CKAN portal with this one's options (transport, timeouts, retries, user
+   * agent, hooks): another portal of a known list, through the same transport (and so the same
+   * request limits). The base URL is checked as the constructor checks it.
+   */
+  withBaseUrl(baseUrl: string): CkanClient {
+    return new CkanClient({ ...this.#options, baseUrl });
   }
 
   /** Call any CKAN action by name and return its unwrapped `result`. */
@@ -319,27 +383,7 @@ export class CkanClient {
    * a Solr field name) as tokens (`normalizeToken`).
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
-    assertParams(params);
-    assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
-    assertOptional("q", params.q, textProblem);
-    assertList("fq", params.fq, textProblem);
-    assertOptional("sort", params.sort, sortProblem);
-    assertList("facet_field", params.facet_field, fieldProblem);
-    assertCount("rows", params.rows);
-    assertCount("start", params.start);
-    if (params.facet_limit !== undefined) assertValid("facet_limit", params.facet_limit, facetLimitProblem);
-    const fq = (params.fq ?? []).map(normalizeText);
-    const facetFields = (params.facet_field ?? []).map(normalizeToken);
-    return this.typed<PackageSearchResult>("package_search", {
-      q: params.q === undefined ? undefined : normalizeText(params.q),
-      fq: fq.length === 1 ? fq[0] : undefined,
-      fq_list: fq.length > 1 ? fq : undefined,
-      rows: params.rows,
-      start: params.start,
-      sort: params.sort === undefined ? undefined : normalizeToken(params.sort),
-      "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
-      "facet.limit": params.facet_limit,
-    }, isSearchResult, "an object with a numeric count and a results array");
+    return this.typed<PackageSearchResult>("package_search", packageSearchQuery(params), isSearchResult, "an object with a numeric count and a results array");
   }
 
   /** A single dataset by id or name. */

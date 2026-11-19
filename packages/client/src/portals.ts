@@ -101,8 +101,8 @@ function errorCode(cause: unknown, depth = 0): unknown {
   return code !== undefined ? code : errorCode((cause as { cause?: unknown }).cause, depth + 1);
 }
 
-/** A short, stable reason for a failed check. */
-function problemOf(err: unknown): string {
+/** A short, stable reason for a failed check (or a failed request to a portal). */
+export function problemOf(err: unknown): string {
   if (err instanceof CkanApiError) {
     return err.detail?.startsWith("stopped after") ? "redirect loop" : `HTTP ${err.status}`;
   }

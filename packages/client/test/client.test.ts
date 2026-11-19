@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CkanClient } from "../src/client.js";
+import { actionRequest, CkanClient, packageSearchQuery } from "../src/client.js";
 import { CkanActionError, CkanError, CkanParseError, CkanValidationError } from "../src/errors.js";
 import { makeMockTransport, jsonResponse } from "./helpers.js";
 
@@ -578,4 +578,26 @@ test("action() refuses a list with no value or a missing entry, never sends it u
   assert.equal(new URL(mt.last().url).search, "");
   await client.action("package_search", { fq: ["a", 1] } as never);
   assert.equal(new URL(mt.last().url).searchParams.getAll("fq").join(","), "a,1");
+});
+
+test("actionRequest names a request as the client sends it: packageSearchQuery's parameters, checked and normalised", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ success: true, result: { count: 0, results: [] } }));
+  const params = { q: " Radverkehr ", fq: ["type:dataset", "groups:verkehr"], rows: 0, facet_field: ["res_format"], facet_limit: -1 };
+  await new CkanClient({ transport: mt.transport }).packageSearch(params);
+  const sent = new URL(mt.last().url);
+  assert.equal(`${sent.pathname.replace("/api/3/action/", "")}${sent.search}`, actionRequest("package_search", packageSearchQuery(params)));
+  assert.equal(actionRequest("package_show", { id: "x" }), "package_show?id=x");
+  assert.throws(() => actionRequest("../status_show"), CkanValidationError);
+  assert.throws(() => packageSearchQuery({ q: "" }), CkanValidationError);
+});
+
+test("withBaseUrl gives a client for another portal with the same transport; siteKey names a portal without its credentials", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ success: true, result: { count: 3, results: [] } }));
+  const hamburg = new CkanClient({ transport: mt.transport, maxRetries: 0 });
+  assert.equal(hamburg.siteKey, "suche.transparenz.hamburg.de");
+  const bw = hamburg.withBaseUrl("https://user:secret@www.daten-bw.de/ckan/api/3/action");
+  assert.equal(bw.siteKey, "daten-bw.de/ckan");
+  await bw.packageSearch({ rows: 0 });
+  assert.equal(new URL(mt.last().url).host, "www.daten-bw.de");
+  assert.throws(() => hamburg.withBaseUrl("ftp://example.org"), CkanValidationError);
 });
