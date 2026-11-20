@@ -47,6 +47,8 @@ test("a format value becomes one short name whatever the portal's spelling: csv 
   assert.equal(formatOf("shapefiles"), "SHP", "Hamburg's facet value");
   assert.equal(formatOf("Shape"), "SHP");
   assert.equal(formatOf("text/csv"), "CSV");
+  assert.equal(formatOf("GML+XML"), "GML", "Open.NRW (seen live, 2026-11-20)");
+  assert.equal(formatOf("gezippte Shapedatei"), "SHP", "Open.NRW (seen live, 2026-11-20)");
   assert.equal(formatOf("web"), undefined, "Hamburg's 'web' names no format");
   assert.equal(formatOf("Shape, CSV"), undefined);
   assert.equal(formatOf(null), undefined);
@@ -56,6 +58,7 @@ test("a format filter ORs every spelling: Berlin's filter is case-sensitive and 
   const filter = formatFilter("CSV");
   for (const spelling of ['"CSV"', '"csv"', `"${EU}CSV"`, '"text/csv"']) assert.ok(filter.includes(spelling), spelling);
   assert.ok(formatFilter("SHP").includes('"shapefiles"'), "Hamburg's lower-case shapefiles");
+  assert.ok(formatFilter("SHP").includes('"GEZIPPTE SHAPEDATEI"'), "Open.NRW's capitals");
   assert.ok(formatFilter("WMS").includes(`"${EU}WMS_SRVC"`));
 });
 
@@ -251,6 +254,7 @@ test("countDatasets per year: one count per year on metadata_created, the range 
   const mock = ckanApi();
   const answer = await countDatasets(clientOf(mock), { portal: "berlin", query: "Radverkehr", yearFrom: 2024, yearTo: 2026 });
   assert.deepEqual(answer.byYear?.map((y) => y.year), [2024, 2025, 2026]);
+  assert.ok(answer.notes.some((n) => n.includes("when the record entered the portal")));
   assert.ok(fqOf(mock.calls[0]).includes("metadata_created:[2024-01-01T00:00:00Z TO 2025-01-01T00:00:00Z}"));
   await assert.rejects(countDatasets(clientOf(mock), { yearFrom: 2000, yearTo: 2030 }), /at most 20 years/);
   await assert.rejects(countDatasets(clientOf(mock), { yearFrom: 2020 }), /both/);

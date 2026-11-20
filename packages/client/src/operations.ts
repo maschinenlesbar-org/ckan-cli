@@ -165,6 +165,9 @@ const FORMAT_ALIASES: Readonly<Record<string, string>> = {
   SHAPEFILES: "SHP",
   "GEZIPPTE SHAPE": "SHP",
   "ESRI SHAPEFILE": "SHP",
+  "GEZIPPTE SHAPEDATEI": "SHP",
+  "GEZIPPTE SHAPEDATEIEN": "SHP",
+  "GML+XML": "GML",
   GEOPACKAGE: "GPKG",
   "APPLICATION/GEOPACKAGE+SQLITE3": "GPKG",
   JPG: "JPEG",
@@ -237,7 +240,11 @@ export function formatSpellings(format: string): string[] {
   for (const [alias, meaning] of Object.entries(FORMAT_ALIASES)) {
     if (meaning !== format) continue;
     spellings.add(alias.includes("/") ? alias.toLowerCase() : alias.charAt(0) + alias.slice(1).toLowerCase());
-    if (!alias.includes("/") && !alias.includes(" ")) spellings.add(alias.toLowerCase());
+    if (!alias.includes("/")) {
+      // Open.NRW writes them in capitals (GEZIPPTE SHAPEDATEI), Hamburg in lower case (shapefiles).
+      spellings.add(alias);
+      spellings.add(alias.toLowerCase());
+    }
   }
   if (format === "GEOJSON") spellings.add("GeoJSON");
   if (format === "GPKG") spellings.add("GeoPackage");
@@ -1161,7 +1168,10 @@ export async function countDatasets(client: CkanClient, params: CountDatasetsPar
     answer.notes.push(site.portal?.id === "hamburg" ? "A record can carry several document types, so their counts overlap." : "documentType is the Transparenzportal Hamburg's field; other portals have none.");
   }
   if (facets.includes("licence")) licenceNotes(site, answer.notes);
-  if (byYear !== undefined) answer.notes.push(`byYear counts by ${params.dateField ?? "created"} (when the record entered or last changed on the portal), not by the date of the data.`);
+  if (byYear !== undefined) {
+    const when = params.dateField === "modified" ? "when the record last changed on the portal" : "when the record entered the portal";
+    answer.notes.push(`byYear counts by ${params.dateField ?? "created"} (${when}), not by the date of the data.`);
+  }
   return trace.done(answer);
 }
 
