@@ -34,6 +34,59 @@ npm i -g @maschinenlesbar.org/ckan-cli
 
 This installs the **`ckan`** command. Requires **Node.js 22.12+**.
 
+### Docker
+
+From 0.9.0 every release is also a container image for linux/amd64 and linux/arm64 on the
+GitHub Container Registry, made from the same tarball as the npm package. It needs no Node.js and no
+install:
+
+```bash
+docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+  ghcr.io/maschinenlesbar-org/ckan-cli:latest --portal berlin search Radverkehr --rows 5
+```
+
+The image's entrypoint is the program, so the command follows the image name directly;
+`… ckan-cli:latest ckan search Radverkehr` works too. Pass `CKAN_BASE_URL` with `-e` if you use it.
+
+In a container with a memory limit (`--memory`) the default `--max-response-bytes` is an eighth
+of that limit (at most the usual 100 MiB), so an oversized answer is refused with a clear
+error instead of the container being killed for memory. A search with many rows of large
+records can be several megabytes; most answers are small.
+The CLI needs at least 12 processes and threads (`--pids-limit 12`): below that it refuses with
+an error, and with 4 or fewer Node.js itself hangs before the CLI can check.
+
+`latest` is the newest release. For scripts, name a release and pin its digest, which the
+[release notes](https://github.com/maschinenlesbar-org/ckan-cli/releases) give:
+`…/ckan-cli:0.9.0@sha256:<digest>`. Each image carries signed build provenance;
+check it with
+
+```bash
+gh attestation verify oci://ghcr.io/maschinenlesbar-org/ckan-cli:latest \
+  --repo maschinenlesbar-org/ckan-cli
+```
+
+### MCP server
+
+From 0.9.0 the CKAN portals are also an [MCP](https://modelcontextprotocol.io/) server for AI
+agents, `@maschinenlesbar.org/ckan-mcp` (command `ckan-mcp`, image
+`ghcr.io/maschinenlesbar-org/ckan-mcp`): six read-only tools, to see which portals of the
+built-in list have data on a topic (GovData apart, since it harvests the others), find datasets on
+one portal with friendly filters (an organization or group by name, a file format in all its
+spellings, a date range) and their licences, count a portal by organization, group, format,
+licence, tag or type and per year (the spellings folded), search the Transparenzportal Hamburg's
+documents by type, topic and date, read one record in full, and list a portal's organizations or
+groups, on stdio or Streamable HTTP. The server's portal is Hamburg, or the one `--base-url`
+names; per call a tool takes another portal of the list by its id, never a URL. Setup for Claude
+Code, Claude Desktop and VS Code:
+[MCP.md](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/MCP.md).
+
+```bash
+npm i -g @maschinenlesbar.org/ckan-mcp
+claude mcp add ckan -- ckan-mcp
+```
+
+Every result gives each record's licence and the portal it came from, whose terms apply too.
+
 ## Quickstart
 
 The two examples from Hamburg's API page, as commands. A full-text search:
@@ -334,6 +387,9 @@ Transparenzportal's contracts, Gutachten and Senate papers
 ```
 
 Real runs of each skill are in [EXAMPLE.md](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/EXAMPLE.md).
+
+The same use cases are the tools of the MCP server, for any MCP client: see
+[MCP.md](https://github.com/maschinenlesbar-org/ckan-cli/blob/main/MCP.md).
 
 ## Data license
 

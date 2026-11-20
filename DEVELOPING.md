@@ -29,7 +29,7 @@ node apps/cli/dist/src/cli/index.js --help    # or: npm start -- --help
 ## Library usage
 
 ```ts
-import { CkanClient, CkanError } from "@maschinenlesbar.org/ckan-cli";
+import { CkanClient, CkanError, comparePortals, countDatasets } from "@maschinenlesbar.org/ckan-cli";
 
 const hamburg = new CkanClient(); // defaults to https://suche.transparenz.hamburg.de
 const govdata = new CkanClient({ baseUrl: "https://ckan.govdata.de" });
@@ -50,6 +50,12 @@ try {
 } catch (err) {
   if (err instanceof CkanError) console.error(err.message);
 }
+
+// The skills' use cases, with their traps built in (see "MCP server" below): one count per
+// portal of the built-in list, GovData marked national; a portal's formats folded over their
+// spellings and sorted (an empty search is status "empty", not an exception).
+const where = await comparePortals(hamburg, { query: "Radverkehr" });
+const formats = await countDatasets(hamburg, { portal: "berlin", query: "Radverkehr", facets: ["format"] });
 ```
 
 ### Client options
@@ -184,14 +190,18 @@ apps/cli/            # @maschinenlesbar.org/ckan-cli — the published package
 packages/client/     # @maschinenlesbar.org/ckan-client — private, shipped inside the CLI's tarball
   src/               # the API client (below)
   scripts/           # update-portals, which rewrites src/portals-list.ts (below; not shipped)
-  test/              # tests that only touch the client, + the transport helpers
+  test/              # tests that only touch the client, + the transport helpers and fixtures (ckan.ts: a mock of the portals)
+apps/mcp/            # @maschinenlesbar.org/ckan-mcp — the MCP server, released with the CLI
+packages/log/        # the log records (text/jsonl), shared by both apps
+tools/image/         # the container images of both apps (build, push, smoke, SBOM)
+tools/interop/       # the built MCP server against the official MCP client (own lockfile)
 tools/pack/          # prepack/postpack: ship the client (dist/node_modules) and commander in the tarball
-tools/bump.mjs       # version bump + commit + tag (npm run bump)
+tools/bump.mjs       # version bump + commit + tag of every published app (npm run bump)
 tools/sbom/          # the CycloneDX SBOM tool, own lockfile (release.yml's sbom job only)
 tsconfig.docs.json   # TypeDoc only: the package entry, with the client read from its sources
 ```
 
-- **The client is its own package** so a later MCP app can share it with the CLI. It is
+- **The client is its own package** so the MCP app shares it with the CLI. It is
   never published on its own: `apps/cli`'s `prepack` copies it into
   `apps/cli/dist/node_modules/`, where the CLI's imports find it, and the tarball ships it
   as plain files — so npm lists only commander (bundled) as a dependency, never the
@@ -205,9 +215,10 @@ tsconfig.docs.json   # TypeDoc only: the package entry, with the client read fro
   tests (not bundled). Only `"."` is part of the library.
 - **Dependencies point one way:** the app depends on the client, the client on nothing
   in the workspace.
-- **The version lives in `apps/cli/package.json`.** The root has none; a plain
-  `npm version` at the root is refused. Release with `npm run bump -- <patch|minor|major>`,
-  which bumps the app, commits (the bare version as the message) and tags `vX.Y.Z`.
+- **The version lives in `apps/cli/package.json`** (and, the same, in `apps/mcp/package.json`).
+  The root has none; a plain `npm version` at the root is refused. Release with
+  `npm run bump -- <patch|minor|major>`, which bumps every published app together, commits (the
+  bare version as the message) and tags `vX.Y.Z`.
 - **TypeScript:** `tsconfig.base.json` holds the compiler options; every workspace has a
   `tsconfig.json` (`src/`, and the client's `scripts/`) and a `tsconfig.test.json`
   (`test/`), and the root `tsconfig.json`/`tsconfig.test.json` reference them, built with
@@ -224,7 +235,9 @@ packages/client/src/
     engine.ts    # URL building, retry/backoff, redirects, JSON decoding, error mapping
     errors.ts    # CkanError / CkanApiError / CkanActionError / CkanNetworkError / CkanParseError / CkanValidationError
     validate.ts  # the input rules (`…Problem` functions) and assertValid
-    client.ts    # CkanClient — CKAN actions over the engine (with result-unwrapping)
+    client.ts    # CkanClient — CKAN actions over the engine (with result-unwrapping); actionRequest, withBaseUrl
+    operations.ts # the skills' use cases: comparePortals / findDatasets / countDatasets /
+                 #   findHamburgDocuments / getDataset / listOrganizations
     portals.ts   # portalKey, findPortal, checkPortal (live check), withCheck, checkPortals
     portals-list.ts  # PORTALS: the built-in list, rewritten by scripts/update-portals.ts
     index.ts     # the client's public surface (the library entry re-exports it)
@@ -642,9 +655,12 @@ shows what changed.
 GitHub Actions workflows under `.github/workflows/`, identical to the other
 maschinenlesbar.org CLIs:
 
-- **ci.yml** — type-check, build and test on Node 22/24/26 for every push and PR; then pack the
-  real tarball, check the pack left nothing behind, install it globally with the registry out
-  of reach and run the bin.
+- **ci.yml** — type-check, build and test on Node 22/24/26 for every push and PR; then pack each
+  published app (the CLI and the MCP server), check the pack left nothing behind, install it
+  globally with the registry out of reach and run its bins; its `interop` job runs the MCP
+  server against the official client.
+- **images.yml** — build, smoke-test and scan both container images on every push and weekly
+  (see [Container image](#container-image)).
 - **release.yml** — on a `v*` tag (made by `npm run bump`), three jobs. **pack** (read-only):
   verify the tag matches `apps/cli/package.json`, test, `npm pack --workspace apps/cli`, record
   the tarball's and the notes' sha256 as job outputs. **sbom** (read-only): `npm ci
@@ -656,10 +672,112 @@ maschinenlesbar.org CLIs:
   where the tarball is built or where the write token is. Update the tool by changing its
   version in `tools/sbom/package.json` and running `npm install --package-lock-only
   --ignore-scripts` there; don't chain its install into an npm script (as with `tools/docs/`).
-- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): `npm publish --workspace apps/cli` via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
+  The release also carries both image archives, their SBOMs, `SHA256SUMS` and signed
+  provenance (see [Container image](#container-image)).
+- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): publishes the release's own files, both tarballs to npm via OIDC **Trusted
+  Publishing** (no stored `NPM_TOKEN`) with provenance and both images to ghcr.io, each checked
+  first against the immutable release and the provenance `release.yml` signed.
 - **docs.yml** — the project website and TypeDoc API docs to GitHub Pages on each `v*` tag.
   TypeDoc runs from the lockfile-pinned `tools/docs/` toolchain; locally, run
   `npm ci --prefix tools/docs` once before `npm run docs`.
+
+## MCP server (apps/mcp)
+
+`apps/mcp` is the second published app, `@maschinenlesbar.org/ckan-mcp` (bin `ckan-mcp`),
+released in lockstep with the CLI: `npm run bump` bumps every published app under `apps/`
+together, one version, one tag. Its npm README is the root `MCP.md` (prepack packs `<APP>.md` for
+an app that has one).
+
+**Which portal.** The server's own portal is the one `--base-url` names (the kit's option; the
+Transparenzportal Hamburg without it). Per call, every tool but `findHamburgDocuments` takes
+`portal`, an id of the built-in list (an enum in the input schema; `portalById` refuses anything
+else, a URL included), and asks that portal through `client.withBaseUrl(<its url>)`: the same
+options and the same limited transport, so the limiter covers all portals together. A tool never
+takes a URL, so a caller can't make the server fetch an address of its choosing.
+`findHamburgDocuments` always asks Hamburg's portal of the list. `CKAN_BASE_URL` stays the CLI's
+(as `AUTOBAHN_BASE_URL` in autobahn-cli): the kit's config reads no environment variable, and an
+MCP client sets `--base-url` in the server's arguments as easily.
+
+| Module | Role |
+|---|---|
+| `packages/client/src/operations.ts` | The skills' use cases as library functions, with their traps built in. A portal is the client's own or one of the list (`portalById`, `siteKey` tells whether it is the client's own: then its requests are named relative to its API, else as absolute URLs). The shared filters (`DatasetFilters`): an organization or a group by slug or name, resolved against the portal's facet (one request; several fitting are `ambiguous` with the candidates, none is `empty` saying where to look), a tag as a phrase, a file format in every spelling the portals use (`formatFilter`: upper and lower case, as Berlin's case-sensitive filter needs, the EU file-type URI, `_SRVC` for services, free-text and MIME aliases), the record type, a date range on `metadata_created` or `metadata_modified` (to the end of the `to` day), only records with files, raw `fq`. `comparePortals`: one `rows=0` count per portal of the list (or of those named), 3 at a time, sorted; GovData marked `national`; a portal that fails is listed with its problem (`problemOf`). `findDatasets`: a page of hits, each with its formats folded (`formatOf`), its licences (`licenceOf`: one label for dl-de-by-2.0, dl-by-de/2.0, the DCAT-AP.de URI and `2_0`; cc-by-4.0, geoNutz-20130319, …; `open` where known; the portal's `license_title` for an unknown one; the record's own and any other its files name) and the attribution text (Hamburg's `terms_of_use` extra). `countDatasets`: rows 0; format and licence facets read whole (`facet.limit` -1) and folded (`upperBound` when several spellings were summed), the others at limit + 1 so `complete` is known; sorted; Hamburg's document types labelled (`DOCUMENT_TYPES`); per year one count each (`yearFrom`, `yearTo`, at most 20). `findHamburgDocuments`: a document type by any of its names (`documentType`: the stemmed index value, the German name, the stored and the published value; a word that fits two is refused) sent stemmed, newest first, each document with publication date, types, office, file number, licence, attribution and its first 10 files. `getDataset`: by name, id or page link (`datasetIdFrom`); CKAN's 404 is `empty`. `listOrganizations`: the organization (or groups) facet in full. Every answer keeps the requests it made, as the client sends them (`requestsOf`; the client's `actionRequest` and `packageSearchQuery`, which `packageSearch` uses too). Public API of both packages. |
+| `packages/log` | The log records (text/jsonl), shared by both apps; `createLogger({ program })`. |
+| `src/mcp/tools.ts` | This repo's: the six tools (flat input schemas with limits, no root combinators; one object output schema each; descriptions under 2000 characters), the instructions, the licence (per record, the portal's terms, Hamburg's HmbTG terms, the link to DATA_LICENSE.md), the hints the server's messages give. A result's `source` is the requests it came from: relative ones under the server's API base, several in braces (`…/api/3/action/{package_search?rows=0&facet.field=…,package_search?q=…}`); another portal's absolute; comparePortals' as `https://{host,host,…}/api/3/action/package_search?…`. The CLI's other reads (package, group and tag lists, single resources, organizations and groups, licences, status, any action) answer no question the six don't. |
+| `src/mcp/api.ts` | This repo's: how the kit reaches the client (`CkanClient` as `Client`, `CkanError` as `ClientError`, `CkanNetworkError` as `NetworkError`, `apiBase`). `apiBase` is the base URL as the client reads it (`siteRoot`) and the Action API's path. No portal publishes a request limit, so the kit's limiter (2 at a time, 120 a minute, over all portals) is the only pace. |
+| `src/mcp/server.ts` | The McpServer factory, the tool types, `callTool`: deadline (`--call-timeout`) plus the client's cancellation, cleaned and fitted answers, failures as `isError` results. |
+| `src/mcp/result.ts` | `cleanStrings` (control, bidi, zero-width characters dropped in the value), `fitResult` (whole list entries dropped under `--max-result-chars`, `nextOffset`). |
+| `src/mcp/limiter.ts` | One per process around the upstream transport: 2 in flight, 120 a minute, pause on 429, a bounded queue. |
+| `src/mcp/http.ts` | node:http adapter for the SDK's `createMcpHandler`: POST /mcp, /healthz, Host and Origin checks (the SDK does neither), 1 MiB body, 8 requests at once, timeouts. |
+| `src/mcp/config.ts`, `run.ts`, `index.ts` | Options (`node:util` parseArgs), argv -> exit code, the bin (console into log records, SIGINT/SIGTERM, stdin's end). |
+
+The protocol is the SDK's: `@modelcontextprotocol/server` 2.4.0, bundled with its core and zod
+(prepack). It serves the 2026-07-28 revision and the 2025 handshake (2025-11-25, 2025-06-18)
+statelessly, on stdio (`serveStdio`) and HTTP. The SDK bundles AJV 8.18 into its own code to
+validate tool arguments against the input schemas; an SBOM doesn't list that copy.
+
+**The kit.** Everything in `apps/mcp` but `tools.ts`, `api.ts`, `test/helpers.ts`,
+`test/tools.test.ts` and the conformance tests' adapter blocks, plus `packages/log`,
+`apps/cli/src/cli/limits.ts`, `tools/image/` (but `smoke.json`), `tools/interop/` (but
+`interop.json`), `tools/bump.mjs`, `tools/pack/` and the workflows `ci.yml`, `images.yml`,
+`release.yml` and `publish.yml`, is the kit of `create-cli-template` (in the api-cli workspace),
+the same in every repository with an MCP server: a fix lands there first and comes here with
+`npm run sync-kit -- ../ckan-cli` (run in create-cli-template; `--check` lists the drift).
+
+Tests (`apps/mcp/test`) run in-process over the SDK's InMemoryTransport with raw JSON-RPC (the
+kit's `harness.ts`). The rules every server follows are the shared conformance tests
+`conformance-m1-…` to `conformance-m10-…` (protocol and tool rules, HTTP, Host and Origin,
+stdio with the built bin, config, limiter, result shaping, drain, call errors, MCP.md), each with
+an adapter block naming this repo's calls and mock answers; `tools.test.ts` holds this server's
+own (the six tools and the traps). The mock API is the client's `test/ckan.ts` (`ckanApi`,
+`ckanAnswer`): it answers package_search and package_show by host from live answers recorded on
+2026-11-20, cut to the fields read (Hamburg: a search for Radverkehr, the whole portal's facets,
+Gutachten about Radverkehr, the newest contracts, one record, CKAN's 404 and one HTTP 500 of its
+search server; Berlin's Radverkehr facets and CSV datasets; Open.NRW's Radverkehr search;
+GovData's count), applying the filters the operations send; a portal without a recording answers
+count 0. The stdio tests start the built bin (30 s each). `tools/interop/` checks the built server
+against the official client 2.4.0 (stdio and HTTP; legacy, auto and pinned 2026-07-28) in
+ci.yml's `interop` job; it has its own lockfile and is never installed by the workspace, release
+or publish runs; the calls it makes and the mock's answers (one per path) are in
+`tools/interop/interop.json` (no call there takes `portal`: that would reach the real portals).
+
+## Container image
+
+`tools/image/` builds both apps' images (Dockerfile targets `cli` and `mcp`) from their release
+tarballs (`npm pack` output), never from source: `ADD` unpacks it onto distroless Node 24 (Debian
+13, `nonroot`, uid 65532), so the image holds exactly the files npm users get. The base,
+BuildKit, the test registry, skopeo (local runs only), syft and grype are pinned in `pins.json`;
+bump them in the deps round. A Node or Debian security fix reaches the image only through a new
+base digest, so it means a patch release.
+
+| Script | What it does |
+|---|---|
+| `build.mjs` | Multi-arch OCI archive (amd64, arm64), reproducible: no provenance or SBOM attestation, timestamps from `SOURCE_DATE_EPOCH` (default: the HEAD commit's time). Two builds give the same index digest; compare index digests, not files. |
+| `push.mjs` | Copies the archive to a registry with skopeo (`--all --preserve-digests`) and checks the digest the registry serves. Used for the local test registry and for ghcr.io. |
+| `smoke.mjs` | Runs the image read-only, without capabilities, as an arbitrary uid: `--version`, `--help`, a network error (exit 1, the CLI's network exit code), one request to a mock upstream (`smoke.json`: `search Radverkehr --rows 2` against Hamburg's recorded answer), and `docker stop`, which must end a waiting call with 143 in under 5 s. |
+| `sbom.mjs` | One CycloneDX SBOM per platform with syft, and with `--gate true` grype over them: a fixable high or critical finding fails. Accepted findings go into `.grype.yaml` with a reason. CI only. |
+
+Locally (colima; the scripts never read your docker config, so no credential helper is asked;
+on macOS port 5000 is often taken by the AirPlay receiver, hence 5055):
+
+```bash
+export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+npm pack --workspace apps/cli --pack-destination dist-artifacts
+node tools/image/build.mjs --app cli --tarball dist-artifacts/<tarball>.tgz --out dist-artifacts/cli.oci.tar
+docker run -d -p 127.0.0.1:5055:5000 <registry pin from pins.json>
+node tools/image/push.mjs --archive dist-artifacts/cli.oci.tar --to 127.0.0.1:5055/ckan-cli:dev
+node tools/image/smoke.mjs --app cli --image 127.0.0.1:5055/ckan-cli@<index digest>
+```
+
+Without a registry (and without any pull), copy one platform out of the archive with the pinned
+skopeo image into a docker archive (`skopeo copy --override-os linux --override-arch arm64
+oci-archive:… docker-archive:…:ckan-cli:arm64`), `docker load` it and smoke-test
+`ckan-cli:arm64`, as images.yml's arm64 job does.
+
+In CI: `images.yml` does all of it on every push and weekly, with the arm64 image smoke-tested on
+an arm64 runner and the vulnerability gate. In `release.yml` the job `image` builds from the
+checked tarball and records the archive's digest, `image-sbom` makes the SBOMs (no gate: the
+scanner's database changes daily), `attest` signs build provenance for the tarball, the archive
+and the image index, and the release attaches the archive, the image SBOMs and `SHA256SUMS`.
 
 ## Website
 
