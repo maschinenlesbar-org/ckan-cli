@@ -88,9 +88,9 @@ For scripts and shared configs, pin a release and its digest from the
 | `listOrganizations` | A portal's organizations (or groups) with their slugs and dataset counts; by name, those that contain it. |
 
 Every tool only reads. An answer is JSON (`structuredContent` and the same as text), with the
-`source` it came from (the portal's URLs; an answer a redirect fetched from another host says so
-there: "… (answered by https://other.example after a redirect)", and a WARN record names both)
-and the data licence. Counts come from the portal's total, never from paging. Every portal spells formats and licences its own way (CSV, csv, an EU
+`source` it came from (the portal's URLs, whole, never cut like the data; an answer a redirect
+fetched from another host says so there: "… (answered by https://other.example after a
+redirect)", and a WARN record names both) and the data licence. Counts come from the portal's total, never from paging. Every portal spells formats and licences its own way (CSV, csv, an EU
 vocabulary URI; dl-de-by-2.0 and its DCAT-AP.de URI): a format filter matches every spelling, a
 count folds them (and says when the sum is an upper bound), each licence gets one label and says
 whether it is open. Hamburg's document types work only in the stemmed form its search index holds;
