@@ -140,7 +140,8 @@ words, with what to try. A failure is a tool error that says what to change.
   could.
 - **Stops cleanly.** On `docker stop` (SIGTERM) or Ctrl-C the HTTP server takes no new
   connection and lets calls in flight answer for up to 5 s, then exits 143 (130); a second signal
-  ends it at once. On stdio it ends at once, and when stdin ends.
+  ends it at once. On stdio a signal ends it at once; when stdin ends, it first answers the
+  requests it has read (each within its call deadline), then exits.
 - **In a container** it needs at least 12 processes and threads (`--pids-limit`) and about
   256 MB of memory. The answers it reads are small (a search reads at most 50 records; a count
   reads no records).
