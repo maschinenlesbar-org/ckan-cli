@@ -138,3 +138,40 @@ test("the deadline's and the size cap's advice fit every tool: each option they 
     }
   }
 });
+
+test("countDatasets: a small facet next to one of long values survives the size cap whole; the facets are never emptied without a word", async () => {
+  // Hamburg's tags are often whole keyword lists in one string: 100 values of about 1400 characters.
+  const tags = Array.from({ length: 101 }, (_, i) => ({ name: `tag${i} ${"Stichwort, ".repeat(127)}`, count: 200 - i }));
+  const formats = [{ name: "CSV", count: 5 }, { name: "pdf", count: 4 }, { name: "json", count: 3 }];
+  const transport = makeMockTransport((request) => {
+    const fields = new URL(request.url).searchParams.get("facet.field") ?? "";
+    const facets: Record<string, unknown> = {};
+    if (fields.includes("tags")) facets["tags"] = { items: tags };
+    if (fields.includes("res_format")) facets["res_format"] = { items: formats };
+    return jsonResponse({ help: "", success: true, result: { count: 300, results: [], search_facets: facets } });
+  });
+  for (const facets of [["tag", "format"], ["format", "tag"]]) {
+    const connection = await connect({ transport });
+    const content = (await connection.call("countDatasets", { facets, limit: 100 })).structuredContent ?? {};
+    await connection.close();
+    const got = content["facets"] as { facet: string; values: { value: string; count: number }[]; complete: boolean }[];
+    assert.equal(content["truncated"], true);
+    assert.deepEqual(got.find((f) => f.facet === "format")?.values.map((v) => [v.value, v.count]), [["CSV", 5], ["PDF", 4], ["JSON", 3]], facets.join());
+    const tag = got.find((f) => f.facet === "tag");
+    assert.equal(tag?.values.length, 100, "every tag value kept, its text cut");
+    assert.match(tag?.values[0]?.value ?? "", /…\[cut, \d+ characters in all\]$/);
+    assert.equal(tag?.complete, false);
+  }
+  for (const facets of [["tag", "format"], ["format", "tag"]]) {
+    const connection = await connect({ transport, config: { maxResultChars: 3000 } });
+    const result = await connection.call("countDatasets", { facets, limit: 100 });
+    await connection.close();
+    if (result.isError === true) {
+      assert.match(result.content[0]?.text ?? "", /size cap/);
+      continue;
+    }
+    const got = (result.structuredContent?.["facets"] ?? []) as unknown[];
+    assert.ok(got.length > 0, "never facets: []");
+    assert.match(String(result.structuredContent?.["reason"]), /facets lost entries/, "a facet dropped is named");
+  }
+});
