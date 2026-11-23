@@ -179,7 +179,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "Which portals have data on a topic",
     description: [
       'How many datasets match a topic (and a file format) on every German CKAN portal of the built-in list at once, most first: Hamburg, Berlin, NRW, Schleswig-Holstein, München, daten.bw, Hessen, GovData and more. Use it for "welche Portale haben offene Daten zu Radverkehr?", "gibt es Daten zu Schulen in Rostock?", "wie groß sind die deutschen Open-Data-Portale?", "which German portals have open data on cycling?", "compare the open-data portals by size", "where is there data about trees?".',
-      "One count per portal, nothing else (without query: each portal's size now). govdata is marked national: it harvests most Länder portals and many cities, so its count overlaps the others: report it apart and never add it to a sum. A portal that fails is listed with its problem: say it could not be asked, never that it has no data. hamburg is the Transparenzportal: most of its matches are documents, not datasets. Then findDatasets with the portal's id. A place without a portal of its own: look at govdata.",
+      "One count per portal, nothing else (without query: each portal's size now). govdata is marked national: it harvests most Länder portals and many cities, so its count overlaps the others: report it apart and never add it to a sum. A portal that fails is listed with its problem: say it could not be asked, never that it has no data (when none answers, the call fails). hamburg is the Transparenzportal: most of its matches are documents, not datasets. Then findDatasets with the portal's id. A place without a portal of its own: look at govdata.",
       RULES,
     ].join("\n\n"),
     inputSchema: input({

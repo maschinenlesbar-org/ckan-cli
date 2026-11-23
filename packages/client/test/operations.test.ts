@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CkanClient } from "../src/client.js";
-import { CkanApiError, CkanValidationError } from "../src/errors.js";
+import { CkanApiError, CkanNetworkError, CkanValidationError } from "../src/errors.js";
 import {
   comparePortals,
   countDatasets,
@@ -424,4 +424,23 @@ test("comparePortals: a portal's success:false answer is described by its reason
   assert.equal(answer.portals.find((p) => p.id === "nrw")?.problem, "Search Error: Solr down");
   assert.equal(answer.portals.find((p) => p.id === "leipzig")?.problem, "Validation Error: q: too long");
   assert.ok(answer.notes.some((n) => n.includes("nrw: Search Error: Solr down")), answer.notes.join(" | "));
+});
+
+test("comparePortals: when every portal asked fails, it fails, never 'no portal has a matching dataset'; with some failed and the rest 0, the reason says so", async () => {
+  const reset = Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+  const offline = new CkanClient({ transport: () => Promise.reject(reset), maxRetries: 0 });
+  for (const portals of [["berlin"], ["berlin", "nrw", "hessen"], undefined]) {
+    await assert.rejects(comparePortals(offline, { query: "Radverkehr", ...(portals === undefined ? {} : { portals }) }), (err: Error) => {
+      assert.ok(err instanceof CkanNetworkError, String(err));
+      assert.match(err.message, /^None of the (1 portal asked could be counted now \(berlin|\d+ portals asked could be counted now \(every one): connection reset\)/);
+      assert.match(err.message, /not "no data"/);
+      return true;
+    });
+  }
+  const someDown = makeMockTransport((request) =>
+    new URL(request.url).host === "open.nrw" ? jsonResponse(SEARCH_SERVER_DOWN, 500) : jsonResponse({ help: "", success: true, result: { count: 0, results: [], search_facets: {} } }),
+  );
+  const answer = await comparePortals(new CkanClient({ transport: someDown.transport, maxRetries: 0 }), { query: "x", portals: ["nrw", "berlin"] });
+  assert.equal(answer.status, "empty");
+  assert.match(answer.reason ?? "", /No portal that answered has a matching dataset; 1 could not be counted \(nrw: HTTP 500\)/);
 });

@@ -80,7 +80,7 @@ For scripts and shared configs, pin a release and its digest from the
 
 | Tool | What it answers |
 |---|---|
-| `comparePortals` | How many datasets match a topic (and a format) on every portal of the list at once, most first; GovData marked national, a portal that fails listed with its problem. |
+| `comparePortals` | How many datasets match a topic (and a format) on every portal of the list at once, most first; GovData marked national, a portal that fails listed with its problem; when none answers, a tool error. |
 | `findDatasets` | Datasets on one portal for a topic and filters (organization or group by name, tag, file format, record type, a date range, only with files), a page at a time: name, title, organization, author, dates, number of files, formats, licences and attribution text. |
 | `countDatasets` | How many datasets match on one portal, and their distribution by organization, group, file format, licence, tag, record type or Hamburg's document type, sorted, spellings folded; and per year. |
 | `findHamburgDocuments` | Documents of the Transparenzportal Hamburg by document type (Gutachten, Verträge von öffentlichem Interesse, Senatsmitteilungen, …), topic and date, newest first: publication date, office, licence, attribution text, files. |

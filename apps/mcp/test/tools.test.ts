@@ -110,3 +110,11 @@ test("findHamburgDocuments: a type with more words is a tool error naming the ty
   assert.equal(mock.calls.length, 0);
   await connection.close();
 });
+
+test("comparePortals: when every portal fails, a tool error that says so, never status empty", async () => {
+  const connection = await connect({ transport: makeMockTransport(() => jsonResponse(SEARCH_SERVER_DOWN, 500)) });
+  const result = await connection.call("comparePortals", { query: "Radverkehr", portals: ["berlin", "nrw"] });
+  assert.equal(result.isError, true, result.content[0]?.text);
+  assert.match(result.content[0]?.text ?? "", /None of the 2 portals asked could be counted now \(every one: HTTP 500\)\. That is not "no data"/);
+  await connection.close();
+});

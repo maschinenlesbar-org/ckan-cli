@@ -24,7 +24,7 @@
 // as the client sends it, for its source.
 
 import { actionRequest, packageSearchQuery, type CkanClient } from "./client.js";
-import { CkanActionError, CkanApiError, CkanError, CkanValidationError, cutText } from "./errors.js";
+import { CkanActionError, CkanApiError, CkanError, CkanNetworkError, CkanValidationError, cutText } from "./errors.js";
 import { mapLimit, portalKey, problemOf } from "./portals.js";
 import { PORTALS } from "./portals-list.js";
 import type { JsonObject, JsonValue, PackageSearchParams, PackageSearchResult, Portal } from "./types.js";
@@ -1015,6 +1015,7 @@ export async function comparePortals(
   const search: PackageSearchParams = { q: params.query?.trim(), fq: format === undefined ? undefined : [formatFilter(format)], rows: 0 };
   const sites = portals.map((portal) => siteOf(client, portal.id));
   for (const site of sites) trace.requests.push(`${site.prefix}${actionRequest("package_search", packageSearchQuery(search))}`);
+  const failures: CkanError[] = [];
   const counts = await mapLimit(sites, COMPARE_CONCURRENCY, async (site): Promise<PortalCount> => {
     const portal = site.portal as Portal;
     const entry: PortalCount = { id: portal.id, title: portal.title, url: portal.url };
@@ -1024,17 +1025,30 @@ export async function comparePortals(
     } catch (err) {
       if (!(err instanceof CkanError)) throw err;
       entry.problem = problemOf(err);
+      failures.push(err);
     }
     return entry;
   });
   counts.sort((a, b) => (b.count ?? -1) - (a.count ?? -1) || a.id.localeCompare(b.id));
+  const failed = counts.filter((c) => c.problem !== undefined);
+  const problems = failed.map((c) => `${c.id}: ${c.problem}`).join("; ");
+  // No portal answered: that is no answer at all, never "no portal has a matching dataset".
+  if (failed.length === counts.length) {
+    const alike = counts.length > 1 && failed.every((c) => c.problem === failed[0]?.problem);
+    const message = `None of the ${counts.length} ${counts.length === 1 ? "portal" : "portals"} asked could be counted now (${alike ? `every one: ${failed[0]?.problem}` : problems}). That is not "no data": try again later.`;
+    throw failures.every((err) => err instanceof CkanNetworkError) ? new CkanNetworkError(message) : new CkanError(message);
+  }
   const withMatches = counts.filter((c) => (c.count ?? 0) > 0).length;
   const answer: ComparePortalsAnswer = { status: withMatches === 0 ? "empty" : "ok", withMatches, portals: counts, searched, notes: [] };
-  if (withMatches === 0) answer.reason = "No portal has a matching dataset. Try fewer or broader words (whole words: Radverkehr, not Rad).";
+  if (withMatches === 0) {
+    answer.reason =
+      failed.length === 0
+        ? "No portal has a matching dataset. Try fewer or broader words (whole words: Radverkehr, not Rad)."
+        : `No portal that answered has a matching dataset; ${failed.length} could not be counted (${problems}): never read that as no data. Try fewer or broader words (whole words: Radverkehr, not Rad), and those portals again later.`;
+  }
   if (counts.some((c) => c.national === true)) answer.notes.push("govdata is the national catalogue: it harvests most Länder portals and many cities, so its count overlaps the others. Report it apart and never add it to a sum.");
   if (counts.some((c) => c.id === "hamburg" && (c.count ?? 0) > 0)) answer.notes.push("hamburg is the Transparenzportal: most of its records are documents (contracts, decisions, reports), not datasets; type dataset narrows it.");
-  const failed = counts.filter((c) => c.problem !== undefined);
-  if (failed.length > 0) answer.notes.push(`${failed.length} portal(s) could not be counted now (${failed.map((c) => `${c.id}: ${c.problem}`).join("; ")}): say so; never read a failure as no data.`);
+  if (failed.length > 0) answer.notes.push(`${failed.length} portal(s) could not be counted now (${problems}): say so; never read a failure as no data.`);
   return trace.done(answer);
 }
 
