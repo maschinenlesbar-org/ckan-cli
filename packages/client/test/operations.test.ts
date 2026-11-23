@@ -381,3 +381,34 @@ test("a document type with more words is refused, naming the type and where the 
   }
   assert.equal(mock.calls.length, 0);
 });
+
+test("non-commercial and no-derivatives licences in every DCAT-AP.de spelling are named and not open; the facet holds them apart", async () => {
+  for (const [id, label] of [
+    ["cc-by-nc-de/3.0", "CC BY-NC 3.0 DE"],
+    ["http://dcat-ap.de/def/licenses/cc-by-nc-de/3.0", "CC BY-NC 3.0 DE"],
+    ["cc-by-nd-de/3.0", "CC BY-ND 3.0 DE"],
+    ["cc-by-nc-sa/4.0", "CC BY-NC-SA 4.0"],
+    ["cc-by-nc-nd/4.0", "CC BY-NC-ND 4.0"],
+    ["cc-by-nc-nd-4.0", "CC BY-NC-ND 4.0"],
+    ["cc-by-nc-sa-de/3.0", "CC BY-NC-SA 3.0 DE"],
+  ]) {
+    assert.deepEqual(licenceOf(id), { id, label, open: false }, id);
+  }
+  assert.deepEqual(licenceOf("http://dcat-ap.de/def/licenses/cc-by-nc-de/3.0", "Creative Commons Namensnennung - Nicht kommerziell 3.0 Deutschland (CC BY-NC 3.0 DE)")?.open, false, "GovData's title doesn't hide it");
+  assert.deepEqual(licenceOf("cc-by-sa-de/3.0"), { id: "cc-by-sa-de/3.0", label: "CC BY-SA 3.0 DE", open: true });
+  assert.equal(licenceOf("http://example.org/licences/x/3.0")?.label, "x/3.0", "an unknown licence is never named by its version alone");
+  const search = {
+    count: 20,
+    results: [],
+    search_facets: { license_id: { items: [{ name: "cc-by-nc-de/3.0", count: 10 }, { name: "cc-by-nd-de/3.0", count: 7 }, { name: "cc-by-nc-sa/4.0", count: 2 }, { name: "cc-by-nc-nd/4.0", count: 1 }] } },
+  };
+  const counts = await countDatasets(answering({}, search), { facets: ["licence"] });
+  assert.deepEqual(counts.facets[0]?.values.map((v) => [v.value, v.count, v.upperBound ?? false]), [
+    ["CC BY-NC 3.0 DE", 10, false],
+    ["CC BY-ND 3.0 DE", 7, false],
+    ["CC BY-NC-SA 4.0", 2, false],
+    ["CC BY-NC-ND 4.0", 1, false],
+  ]);
+  const page = await findDatasets(answering({}, { count: 1, results: [{ name: "a", license_id: "cc-by-nc-de/3.0", resources: [] }], search_facets: {} }));
+  assert.ok(page.notes.some((n) => n.includes("not open")), page.notes.join(" | "));
+});

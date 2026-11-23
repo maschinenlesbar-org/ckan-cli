@@ -316,7 +316,7 @@ function licenceKey(raw: string): string {
   let key = raw.toLowerCase().replace(/\/+$/, "").replace(/^https?:\/\/dcat-ap\.de\/def\/licenses\//, "").replace(/_/g, ".");
   key = key.replace(/^dl-de-(by|zero|by-nc)-(\d\.\d)$/, "dl-$1-de/$2");
   key = key.replace(/^dl-(by|zero|by-nc)-de-(\d\.\d)$/, "dl-$1-de/$2");
-  key = key.replace(/^(cc-by(?:-sa|-nd|-nc)?)-(\d\.\d)$/, "$1/$2");
+  key = key.replace(/^(cc-by(?:-nc)?(?:-sa|-nd)?(?:-de)?)-(\d\.\d)$/, "$1/$2");
   key = key.replace(/^geonutz-(\d{8})$/, "geonutz/$1");
   key = key.replace(/^cc-zero\/1\.0$/, "cc-zero");
   return key;
@@ -330,8 +330,16 @@ function licenceKey(raw: string): string {
 export function licenceOf(raw: unknown, title?: unknown): Licence | undefined {
   const id = textOf(raw);
   if (id === undefined) return undefined;
-  const known = LICENCES[licenceKey(id)];
+  const key = licenceKey(id);
+  const known = LICENCES[key];
   if (known !== undefined) return { id, label: known[0], open: known[1] };
+  // The other Creative Commons licences of DCAT-AP.de (cc-by-nc-de/3.0, cc-by-nc-sa/4.0): named
+  // from their parts; non-commercial (NC) and no-derivatives (ND) are not open.
+  const ccKey = /^cc-by((?:-nc)?(?:-sa|-nd)?)(-de)?(?:\/(\d\.\d))?$/.exec(key);
+  if (ccKey !== null) {
+    const [, terms = "", de, version] = ccKey;
+    return { id, label: `CC BY${terms.toUpperCase()}${version === undefined ? "" : ` ${version}`}${de === undefined ? "" : " DE"}`, open: !/nc|nd/.test(terms) };
+  }
   const lower = id.toLowerCase().replace(/\/+$/, "");
   const govdata = /govdata\.de\/dl-de\/(by|zero|by-nc)-(\d)-(\d)$/.exec(lower);
   if (govdata !== null) {
@@ -346,7 +354,10 @@ export function licenceOf(raw: unknown, title?: unknown): Licence | undefined {
   if (/creativecommons\.org\/publicdomain\/zero\//.test(lower)) return { id, label: "CC0 1.0", open: true };
   const named = textOf(title);
   if (named !== undefined && named !== id) return { id, label: excerpt(named, 120) as string };
-  const tail = id.replace(/\/+$/, "").split(/[/#]/).pop() ?? id;
+  // The last part of the id, with the one before it when the last is only a version (x/3.0):
+  // licences that differ only before their version never share a label.
+  const parts = id.replace(/\/+$/, "").split(/[/#]/);
+  const tail = (/^\d+(\.\d+)*$/.test(parts.at(-1) ?? "") && parts.length > 1 ? parts.slice(-2).join("/") : parts.at(-1)) ?? id;
   return { id, label: tail === "" ? id : tail };
 }
 
