@@ -139,8 +139,8 @@ its end, where the reason is).
   Exposed beyond localhost (it logs a warning then), it belongs behind a proxy that authenticates or
   at least terminates TLS.
 - **Gentle with the portals.** One server process sends at most 2 requests at a time and 120 a
-  minute, over all portals together, pauses on HTTP 429 (as long as its Retry-After asks, at
-  most 30 s), and stops a tool call after its deadline (a tool that has read part of its answer by
+  minute, over all portals together, pauses the requests to a portal that answers HTTP 429 (as long
+  as its Retry-After asks, at most 30 s; those to the other portals go on), and stops a tool call after its deadline (a tool that has read part of its answer by
   then may answer with that part, and says so). A request those limits would hold longer than it
   or its call may wait is not sent: the call fails at once, naming the limit and when to ask again
   (and the log says so). `comparePortals` makes one count request per portal (18 for the whole

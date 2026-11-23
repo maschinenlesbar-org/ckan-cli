@@ -8,6 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { limitTransport } from "../src/mcp/limiter.js";
 import { listTools } from "../src/mcp/server.js";
 import { SIZE_HINT, TOOLS } from "../src/mcp/tools.js";
 import { connect } from "./harness.js";
@@ -174,4 +175,27 @@ test("countDatasets: a small facet next to one of long values survives the size 
     assert.ok(got.length > 0, "never facets: []");
     assert.match(String(result.structuredContent?.["reason"]), /facets lost entries/, "a facet dropped is named");
   }
+});
+
+test("comparePortals: one portal's 429 pauses that portal only; the others are counted, and a call to another portal is not held", async () => {
+  const seen: string[] = [];
+  const upstream = makeMockTransport((request) => {
+    const host = new URL(request.url).host;
+    seen.push(host);
+    return host === "datenregister.berlin.de"
+      ? { status: 429, headers: { "retry-after": "60" }, body: Buffer.from("") }
+      : jsonResponse({ help: "", success: true, result: { count: 3, results: [], search_facets: {} } });
+  });
+  const transport = limitTransport(upstream.transport);
+  const connection = await connect({ transport: { transport }, config: { callTimeoutMs: 4000 } });
+  const compared = await connection.call("comparePortals", { query: "x" });
+  assert.notEqual(compared.isError, true, compared.content[0]?.text);
+  const portals = compared.structuredContent?.["portals"] as { id: string; count?: number; problem?: string }[];
+  assert.equal(portals.filter((p) => p.count === 3).length, 17, JSON.stringify(portals));
+  assert.match(portals.find((p) => p.id === "berlin")?.problem ?? "", /429/);
+  const started = Date.now();
+  const nrw = await connection.call("findDatasets", { portal: "nrw", query: "x" });
+  assert.equal(nrw.structuredContent?.["total"], 3, nrw.content[0]?.text);
+  assert.ok(Date.now() - started < 1000, "Open.NRW is not held by Berlin's pause");
+  await connection.close();
 });
