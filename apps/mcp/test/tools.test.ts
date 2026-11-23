@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
+import { SIZE_HINT, TOOLS } from "../src/mcp/tools.js";
 import { connect } from "./harness.js";
 import { ckanAnswer, ckanApi, jsonResponse, makeMockTransport, SEARCH_SERVER_DOWN } from "./helpers.js";
 
@@ -117,4 +118,23 @@ test("comparePortals: when every portal fails, a tool error that says so, never 
   assert.equal(result.isError, true, result.content[0]?.text);
   assert.match(result.content[0]?.text ?? "", /None of the 2 portals asked could be counted now \(every one: HTTP 500\)\. That is not "no data"/);
   await connection.close();
+});
+
+test("the deadline's and the size cap's advice fit every tool: each option they name is named with the tools that take it", async () => {
+  const hanging = { transport: (): Promise<never> => new Promise<never>(() => {}) };
+  const connection = await connect({ transport: hanging, config: { callTimeoutMs: 30 } });
+  const deadline = (await connection.call("getDataset", { id: "x" })).content[0]?.text ?? "";
+  await connection.close();
+  assert.match(deadline, /took longer than .* and was stopped/);
+  assert.match(deadline, /try again shortly/, "getDataset takes none of the options: the advice that fits it comes first");
+  const schemas = new Map(TOOLS.map((tool) => [tool.name, Object.keys((tool.inputSchema as { properties: Record<string, unknown> }).properties)]));
+  for (const text of [deadline, SIZE_HINT]) {
+    const pairs = [...text.matchAll(/(\w+(?: or \w+)*) \((\w+(?:, \w+)*)\)/g)];
+    assert.ok(pairs.length >= 2, text);
+    for (const [, options, tools] of pairs) {
+      for (const tool of (tools as string).split(", ")) {
+        for (const option of (options as string).split(" or ")) assert.ok(schemas.get(tool)?.includes(option), `${tool} takes no ${option}: ${text}`);
+      }
+    }
+  }
 });
