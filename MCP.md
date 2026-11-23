@@ -90,18 +90,21 @@ For scripts and shared configs, pin a release and its digest from the
 Every tool only reads. An answer is JSON (`structuredContent` and the same as text), with the
 `source` it came from (the portal's URLs, whole, never cut like the data; an answer a redirect
 fetched from another host says so there: "… (answered by https://other.example after a
-redirect)", and a WARN record names both) and the data licence. Counts come from the portal's total, never from paging. Every portal spells formats and licences its own way (CSV, csv, an EU
+redirect)", and a WARN record names both) and the data licence. Counts come from the portal's
+total, never from paging. Every portal spells formats and licences its own way (CSV, csv, an EU
 vocabulary URI; dl-de-by-2.0 and its DCAT-AP.de URI): a format filter matches every spelling, a
 count folds them (and says when the sum is an upper bound), each licence gets one label and says
 whether it is open. Hamburg's document types work only in the stemmed form its search index holds;
 the tool sends that form for a German name. An organization or group that fits several names is
 reported with the candidates, never guessed; an unknown record or an empty search is said in
 words, with what to try. A text over 2000 characters is cut and ends in
-`…[cut, N characters in all]`, and the answer says `truncated`. An answer over `--max-result-chars` loses entries from the end of its lists, each
-down to its first entry (so a page's `nextOffset` always moves on), then has its longest texts cut further
-(each with that mark), and says `truncated`; one that can't be cut down so far is a tool error that says to ask for less. A failure is a tool error that
-says what to change (one over 5000 characters loses its middle, never its end, where the reason
-is).
+`…[cut, N characters in all]`, and the answer says `truncated`. An answer over
+`--max-result-chars` first loses entries from the end of its page (`nextOffset` says where to go
+on), then has its longest texts cut further (each with that mark) or, when that isn't enough, its
+other lists shortened; a list keeps its first entry, `notes` stay whole, and the answer says
+`truncated`. One that can't be cut down so far is a tool error that says to ask for less. A
+failure is a tool error that says what to change (one over 5000 characters loses its middle, never
+its end, where the reason is).
 
 ## Options
 
