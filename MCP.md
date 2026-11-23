@@ -97,8 +97,8 @@ whether it is open. Hamburg's document types work only in the stemmed form its s
 the tool sends that form for a German name. An organization or group that fits several names is
 reported with the candidates, never guessed; an unknown record or an empty search is said in
 words, with what to try. A text over 2000 characters is cut and ends in
-`…[cut, N characters in all]`, and the answer says `truncated`. An answer over `--max-result-chars` loses entries from the end of its lists (a page
-keeps its first entry, so `nextOffset` always moves on), then has its longest texts cut further
+`…[cut, N characters in all]`, and the answer says `truncated`. An answer over `--max-result-chars` loses entries from the end of its lists, each
+down to its first entry (so a page's `nextOffset` always moves on), then has its longest texts cut further
 (each with that mark), and says `truncated`; one that can't be cut down so far is a tool error that says to ask for less. A failure is a tool error that
 says what to change (one over 5000 characters loses its middle, never its end, where the reason
 is).
