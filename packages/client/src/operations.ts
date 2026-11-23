@@ -131,11 +131,28 @@ function excerpt(text: string | undefined, max: number): string | undefined {
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
 
+/**
+ * `html` with each tag replaced by a space: a tag runs from "<" to the next ">"; a "<" with no ">"
+ * after it is text. One pass with indexOf, so linear: a regular expression tried at every "<"
+ * rescans the rest of a text without a ">" (quadratic).
+ */
+function withoutTags(html: string): string {
+  const out: string[] = [];
+  let at = 0;
+  for (let open = html.indexOf("<"); open !== -1; open = html.indexOf("<", at)) {
+    const close = html.indexOf(">", open + 1);
+    if (close === -1) break;
+    out.push(html.slice(at, open), " ");
+    at = close + 1;
+  }
+  out.push(html.slice(at));
+  return out.join("");
+}
+
 /** HTML or Markdown-ish text (a description can arrive as `<p>…</p>`) as plain text, cut at `max`. */
 function plainText(html: string | undefined, max = 1000): string | undefined {
   if (html === undefined) return undefined;
-  const text = html
-    .replace(/<[^>]*>/g, " ")
+  const text = withoutTags(html)
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

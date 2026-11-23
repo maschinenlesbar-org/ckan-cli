@@ -328,3 +328,25 @@ test("listOrganizations: the portal's organizations, most datasets first; groups
   const none = await listOrganizations(clientOf(ckanApi()), { name: "Bezirksamt" });
   assert.equal(none.status, "empty");
 });
+
+// ---- found in the MCP sweep of 2026-11-22 --------------------------------------------------------
+
+/** A portal whose package_show answers `dataset` and whose package_search answers `search`. */
+const answering = (dataset: Record<string, unknown>, search: Record<string, unknown> = { count: 0, results: [], search_facets: {} }) =>
+  new CkanClient({
+    transport: makeMockTransport((request) => jsonResponse({ help: "", success: true, result: request.url.includes("package_show") ? dataset : search })).transport,
+    maxRetries: 0,
+  });
+
+test("a description's HTML is stripped in linear time: an opening bracket with no closing one never rescans the rest", async () => {
+  // `/<[^>]*>/` tried every "<" against the rest of a text without ">": quadratic, so a description
+  // of 120 000 characters of "<p" held the event loop for seconds, and one of a few MiB for hours.
+  const notes = "<p".repeat(60_000);
+  const start = performance.now();
+  const answer = await getDataset(answering({ name: "x", notes, resources: [] }), { id: "x" });
+  const ms = performance.now() - start;
+  assert.ok(ms < 500, `${Math.round(ms)} ms`);
+  assert.ok(answer.dataset?.description?.startsWith("<p<p"), "a bracket that closes no tag is text, as before");
+  const tagged = await getDataset(answering({ name: "x", notes: "a < b <p>c</p> d > e &amp; <br/>f", resources: [] }), { id: "x" });
+  assert.equal(tagged.dataset?.description, "a c d > e & f", "a tag runs from < to the next >, as before");
+});
