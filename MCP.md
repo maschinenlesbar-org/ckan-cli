@@ -128,10 +128,11 @@ words, with what to try. A failure is a tool error that says what to change.
   at least terminates TLS.
 - **Gentle with the portals.** One server process sends at most 2 requests at a time and 120 a
   minute, over all portals together, pauses on HTTP 429 (as long as its Retry-After asks, at
-  most 30 s), and stops a tool call after its deadline. A request those limits would hold longer
-  than it or its call may wait is not sent: the call fails at once, naming the limit and when to
-  ask again (and the log says so). `comparePortals` makes one count request per portal (18 for
-  the whole list).
+  most 30 s), and stops a tool call after its deadline (a tool that has read part of its answer by
+  then may answer with that part, and says so). A request those limits would hold longer than it
+  or its call may wait is not sent: the call fails at once, naming the limit and when to ask again
+  (and the log says so). `comparePortals` makes one count request per portal (18 for the whole
+  list).
 - **Results are data.** Text from the portals is cleaned (control, bidi and zero-width
   characters removed), but it is still other people's text: a model can be told things in it.
   The server can't act on that (it has no tool that writes), but other tools in the same session
