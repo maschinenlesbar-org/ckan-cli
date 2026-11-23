@@ -478,3 +478,22 @@ test("getDataset with a page link asks the portal the link is on; a link to anot
   const other = new CkanClient({ transport: mock.transport, maxRetries: 0, baseUrl: "https://data.example.org" });
   assert.equal((await getDataset(other, { id: "https://data.example.org/dataset/abc" })).status, "ok", "a link to the client's own portal, outside the list");
 });
+
+test("a search whose URL would be longer than portals accept is refused before any request, saying what to shorten", async () => {
+  const mock = ckanApi();
+  const long = { query: "ä".repeat(400), filters: Array.from({ length: 5 }, () => `title:${"ö".repeat(240)}`) };
+  for (const run of [
+    () => findDatasets(clientOf(mock), long),
+    () => countDatasets(clientOf(mock), { ...long, portal: "berlin" }),
+    () => comparePortals(clientOf(mock), { query: "ä".repeat(1400) }),
+  ]) {
+    await assert.rejects(run(), (err: Error) => {
+      assert.ok(err instanceof CkanValidationError, String(err));
+      assert.match(err.message, /^Invalid query or filters: the request would be \d+ characters long, more than portals accept \(8000\)\. Shorten the query or the filters/);
+      return true;
+    });
+  }
+  assert.equal(mock.calls.length, 0);
+  await findDatasets(clientOf(mock), { query: "Radverkehr ".repeat(45).trim() });
+  assert.equal(mock.calls.length, 1, "a long query within the limits is sent");
+});

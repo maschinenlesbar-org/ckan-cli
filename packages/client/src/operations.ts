@@ -91,12 +91,31 @@ export function requestsOf(answer: object): readonly string[] {
   return REQUESTS.get(answer) ?? [];
 }
 
+/**
+ * The longest request URL a search sends: servers refuse longer ones (nginx's 8 KB request line,
+ * 414; Node's 16 KB of headers, 431), with no reason a caller could act on. A query and filters
+ * within the inputs' limits can pass it: an umlaut takes six characters once encoded.
+ */
+export const MAX_REQUEST_LENGTH = 8000;
+
+/** Throw unless the search `request` (relative to `site`'s Action API) fits MAX_REQUEST_LENGTH. */
+function checkLength(site: Site, request: string): void {
+  const length = (site.prefix === "" ? `https://${site.client.siteKey}${ACTION_PATH}` : site.prefix).length + request.length;
+  if (length > MAX_REQUEST_LENGTH) {
+    throw new CkanValidationError(
+      `Invalid query or filters: the request would be ${length} characters long, more than portals accept (${MAX_REQUEST_LENGTH}). Shorten the query or the filters (in the URL an umlaut takes six characters, a space three).`,
+    );
+  }
+}
+
 /** The requests of one operation call. */
 class Trace {
   readonly requests: string[] = [];
 
   async search(site: Site, params: PackageSearchParams): Promise<PackageSearchResult> {
-    this.requests.push(`${site.prefix}${actionRequest("package_search", packageSearchQuery(params))}`);
+    const request = actionRequest("package_search", packageSearchQuery(params));
+    checkLength(site, request);
+    this.requests.push(`${site.prefix}${request}`);
     return site.client.packageSearch(params);
   }
 
@@ -1018,7 +1037,9 @@ export async function comparePortals(
   const trace = new Trace();
   const search: PackageSearchParams = { q: params.query?.trim(), fq: format === undefined ? undefined : [formatFilter(format)], rows: 0 };
   const sites = portals.map((portal) => siteOf(client, portal.id));
-  for (const site of sites) trace.requests.push(`${site.prefix}${actionRequest("package_search", packageSearchQuery(search))}`);
+  const request = actionRequest("package_search", packageSearchQuery(search));
+  for (const site of sites) checkLength(site, request);
+  for (const site of sites) trace.requests.push(`${site.prefix}${request}`);
   const failures: CkanError[] = [];
   const counts = await mapLimit(sites, COMPARE_CONCURRENCY, async (site): Promise<PortalCount> => {
     const portal = site.portal as Portal;
