@@ -444,3 +444,14 @@ test("comparePortals: when every portal asked fails, it fails, never 'no portal 
   assert.equal(answer.status, "empty");
   assert.match(answer.reason ?? "", /No portal that answered has a matching dataset; 1 could not be counted \(nrw: HTTP 500\)/);
 });
+
+test("a link that is not a web link (javascript:, data:, file:) is kind broken, never a page", async () => {
+  for (const url of ["javascript:alert(1)", "JavaScript:fetch('//evil')", "data:text/html,<b>x</b>", "file:///etc/passwd", "vbscript:x"]) {
+    assert.equal(linkKind(url, "PDF"), "broken", url);
+  }
+  assert.equal(linkKind("ftp://ftp.example.org/data.csv", "CSV"), "file", "ftp is a web link");
+  assert.equal(linkKind("HTTPS://example.org/a.csv", "CSV"), "file");
+  const answer = await getDataset(answering({ name: "x", resources: [{ url: "javascript:alert(1)", format: "PDF" }] }), { id: "x" });
+  assert.equal(answer.dataset?.files[0]?.kind, "broken");
+  assert.ok(answer.notes.some((n) => n.includes("broken")), answer.notes.join(" | "));
+});

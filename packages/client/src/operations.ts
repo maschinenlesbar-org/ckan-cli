@@ -399,7 +399,8 @@ function attributionOf(dataset: JsonObject, extras: Map<string, string>): string
  * What a resource's link is: `file` (a file name at the end), `generated` (a file built on request:
  * an export or download endpoint, a WFS GetFeature), `service` (a map or feature service, an OGC
  * API, a feed: not a file), `page` (a landing page), `api` (another API call), `template` (a
- * placeholder such as {yyyymm} or _yyyy. to fill in), `broken` (cut off by a harvester).
+ * placeholder such as {yyyymm} or _yyyy. to fill in), `broken` (cut off by a harvester, or no web
+ * link at all: javascript:, data:, file:, which a client must never offer as a link).
  */
 export type LinkKind = "file" | "generated" | "service" | "page" | "api" | "template" | "broken";
 
@@ -428,6 +429,9 @@ export function hasKeyInLink(url: string): boolean {
 
 /** The kind of a resource's link (see LinkKind), from the link and its format. */
 export function linkKind(url: string, format: string | undefined): LinkKind {
+  // A scheme other than http(s) or ftp(s): no web link (javascript:, data:, file:).
+  const scheme = /^\s*([a-z][a-z0-9+.-]*):/i.exec(url)?.[1]?.toLowerCase();
+  if (scheme !== undefined && !/^(https?|ftps?)$/.test(scheme)) return "broken";
   const link = decodedLink(url);
   const [path = "", query = ""] = link.split(/\?/, 2);
   if (/\{[^}]*\}|%7b/i.test(url) || /(^|[_\-/.])(yyyy|yyyymm|yyyymmdd|jjjj|jjjjmm)([_\-/.]|$)/i.test(path)) return "template";
