@@ -1400,16 +1400,45 @@ export async function findHamburgDocuments(client: CkanClient, params: FindHambu
 
 // ---- getDataset ------------------------------------------------------------------------------
 
+/** A link to a dataset's page (…/dataset/NAME): its host and the name. */
+const PAGE_LINK = /^https?:\/\/([^/?#]+)\/(?:[^?#]*\/)?(?:dataset|daten)\/([^/?#]+)\/?(?:[?#].*)?$/i;
+
 /** A dataset's slug or id from itself or a link to its page (…/dataset/NAME). */
 export function datasetIdFrom(value: string): string {
   const text = value.trim();
-  const link = /^https?:\/\/[^/]+\/(?:[^?#]*\/)?(?:dataset|daten)\/([^/?#]+)\/?(?:[?#].*)?$/i.exec(text);
-  if (link === null) return text;
+  const name = PAGE_LINK.exec(text)?.[2];
+  if (name === undefined) return text;
   try {
-    return decodeURIComponent(link[1] as string);
+    return decodeURIComponent(name);
   } catch {
-    return link[1] as string;
+    return name;
   }
+}
+
+/** A host's site: its last two labels (datenregister.berlin.de is berlin.de); each portal of the list has its own. */
+const siteDomain = (host: string): string => host.toLowerCase().replace(/:\d+$/, "").split(".").slice(-2).join(".");
+
+/**
+ * The portal to ask for `id`: a page link is asked on the portal it is on (its site's domain: a
+ * portal's pages and its API can be on different hosts, www.govdata.de and ckan.govdata.de). With no
+ * portal named, a link to another portal of the list goes there; a link to another portal than the
+ * one named, or to a site that is neither the client's nor one of the list, is refused: the same
+ * name there is another record, or none.
+ */
+function portalForLink(client: CkanClient, id: string, portalId: string | undefined): string | undefined {
+  const host = PAGE_LINK.exec(id.trim())?.[1]?.replace(/^[^@]*@/, "");
+  if (host === undefined) return portalId;
+  const asked = siteOf(client, portalId);
+  const askedHost = asked.portal === undefined ? (client.siteKey.split("/")[0] as string) : new URL(asked.portal.url).host;
+  if (siteDomain(host) === siteDomain(askedHost)) return portalId;
+  const owner = PORTALS.find((p) => siteDomain(new URL(p.url).host) === siteDomain(host));
+  if (owner !== undefined && portalId === undefined) return owner.id;
+  const shown = cutText(host, 80);
+  throw new CkanValidationError(
+    owner === undefined
+      ? `Invalid id: the link is to ${shown}, which is neither the portal asked (${askedHost}) nor one of the list: give the record's name and the portal it is on.`
+      : `Invalid id: the link is to a record of ${owner.id} (${shown}), not of the portal asked (${portalId}): ask ${owner.id}, or give the record's name on this portal.`,
+  );
 }
 
 export interface DatasetRecord {
@@ -1470,7 +1499,7 @@ const DETAIL_KEYS: readonly [string, string][] = [
 export async function getDataset(client: CkanClient, params: { id: string; portal?: string | undefined }): Promise<GetDatasetAnswer> {
   if (typeof params.id !== "string" || params.id.trim() === "") throw new CkanValidationError("Invalid id: expected a dataset's name, id or the link to its page.");
   const id = datasetIdFrom(params.id);
-  const site = siteOf(client, params.portal);
+  const site = siteOf(client, portalForLink(client, params.id, params.portal));
   const trace = new Trace();
   const searched: Searched = { id };
   trace.requests.push(`${site.prefix}${actionRequest("package_show", { id })}`);

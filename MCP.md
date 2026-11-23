@@ -84,7 +84,7 @@ For scripts and shared configs, pin a release and its digest from the
 | `findDatasets` | Datasets on one portal for a topic and filters (organization or group by name, tag, file format, record type, a date range, only with files), a page at a time: name, title, organization, author, dates, number of files, formats, licences and attribution text. |
 | `countDatasets` | How many datasets match on one portal, and their distribution by organization, group, file format, licence, tag, record type or Hamburg's document type, sorted, spellings folded; and per year. |
 | `findHamburgDocuments` | Documents of the Transparenzportal Hamburg by document type (Gutachten, Verträge von öffentlichem Interesse, Senatsmitteilungen, …), topic and date, newest first: publication date, office, licence, attribution text, files. |
-| `getDataset` | One record by its name, id or page link on one portal: description, organization, author, groups, tags, dates, licences and attribution, details, every file with its kind, format, size and licence. |
+| `getDataset` | One record by its name, id or page link on one portal (a link on the portal it is on): description, organization, author, groups, tags, dates, licences and attribution, details, every file with its kind, format, size and licence. |
 | `listOrganizations` | A portal's organizations (or groups) with their slugs and dataset counts; by name, those that contain it. |
 
 Every tool only reads. An answer is JSON (`structuredContent` and the same as text), with the

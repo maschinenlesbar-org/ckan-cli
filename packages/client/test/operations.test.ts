@@ -455,3 +455,26 @@ test("a link that is not a web link (javascript:, data:, file:) is kind broken, 
   assert.equal(answer.dataset?.files[0]?.kind, "broken");
   assert.ok(answer.notes.some((n) => n.includes("broken")), answer.notes.join(" | "));
 });
+
+test("getDataset with a page link asks the portal the link is on; a link to another portal than the one named is refused", async () => {
+  const mock = makeMockTransport(() => jsonResponse({ help: "", success: true, result: { name: "gdk-nutzungsdaten", resources: [] } }));
+  const hamburg = new CkanClient({ transport: mock.transport, maxRetries: 0 });
+  const answer = await getDataset(hamburg, { id: "https://datenregister.berlin.de/dataset/gdk-nutzungsdaten" });
+  assert.equal(new URL(mock.last().url).host, "datenregister.berlin.de");
+  assert.equal(answer.portal.id, "berlin");
+  assert.deepEqual(requestsOf(answer), ["https://datenregister.berlin.de/api/3/action/package_show?id=gdk-nutzungsdaten"]);
+  const govdata = await getDataset(hamburg, { id: "https://www.govdata.de/suche/daten/abc" });
+  assert.equal(govdata.portal.id, "govdata", "the portal's page site and its API host share a domain");
+  const own = await getDataset(hamburg, { id: "https://suche.transparenz.hamburg.de/dataset/kbq", portal: "hamburg" });
+  assert.equal(own.portal.id, "hamburg");
+  const calls = mock.calls.length;
+  await assert.rejects(getDataset(hamburg, { id: "https://datenregister.berlin.de/dataset/gdk-nutzungsdaten", portal: "nrw" }), (err: Error) => {
+    assert.ok(err instanceof CkanValidationError);
+    assert.match(err.message, /the link is to a record of berlin \(datenregister\.berlin\.de\), not of the portal asked \(nrw\)/);
+    return true;
+  });
+  await assert.rejects(getDataset(hamburg, { id: "https://data.example.org/dataset/abc" }), /the link is to data\.example\.org, which is neither the portal asked \(suche\.transparenz\.hamburg\.de\) nor one of the list/);
+  assert.equal(mock.calls.length, calls, "no request for a refused link");
+  const other = new CkanClient({ transport: mock.transport, maxRetries: 0, baseUrl: "https://data.example.org" });
+  assert.equal((await getDataset(other, { id: "https://data.example.org/dataset/abc" })).status, "ok", "a link to the client's own portal, outside the list");
+});
