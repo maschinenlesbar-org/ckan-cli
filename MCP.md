@@ -98,7 +98,8 @@ the tool sends that form for a German name. An organization or group that fits s
 reported with the candidates, never guessed; an unknown record or an empty search is said in
 words, with what to try. A text over 2000 characters is cut and ends in
 `…[cut, N characters in all]`, and the answer says `truncated`. A failure is a tool error that
-says what to change.
+says what to change (one over 5000 characters loses its middle, never its end, where the reason
+is).
 
 ## Options
 
