@@ -83,7 +83,7 @@ const output = (properties: Record<string, JsonSchema>): JsonSchema => ({
     status: { type: "string", enum: ["ok", "ambiguous", "empty"], description: "ok: the answer; empty: nothing there (reason says why and what to try); ambiguous: several organizations or groups fit (ambiguous.candidates)." },
     source: { type: "string" },
     licence: { type: "string" },
-    truncated: { type: "boolean", description: "True when the answer holds only part of a list (size cap)." },
+    truncated: { type: "boolean", description: "True when the answer holds only part of a list (size cap), or a text cut at its end (it ends in \"…[cut, N characters in all]\")." },
     reason: { type: "string" },
     portal: { type: "object", description: "The portal asked: id, title, url (empty for a portal outside the list)." },
     searched: obj,

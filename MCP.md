@@ -96,7 +96,9 @@ count folds them (and says when the sum is an upper bound), each licence gets on
 whether it is open. Hamburg's document types work only in the stemmed form its search index holds;
 the tool sends that form for a German name. An organization or group that fits several names is
 reported with the candidates, never guessed; an unknown record or an empty search is said in
-words, with what to try. A failure is a tool error that says what to change.
+words, with what to try. A text over 2000 characters is cut and ends in
+`…[cut, N characters in all]`, and the answer says `truncated`. A failure is a tool error that
+says what to change.
 
 ## Options
 
