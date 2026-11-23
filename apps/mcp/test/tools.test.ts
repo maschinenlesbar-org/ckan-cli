@@ -100,3 +100,13 @@ test("listOrganizations: the groups of Hamburg by name", async () => {
   assert.deepEqual((result.structuredContent?.["organizations"] as { name: string }[]).map((g) => g.name), ["transport-und-verkehr"]);
   await connection.close();
 });
+
+test("findHamburgDocuments: a type with more words is a tool error naming the type and where the words go, not every document of the type", async () => {
+  const mock = ckanApi();
+  const connection = await connect({ transport: mock });
+  const result = await connection.call("findHamburgDocuments", { documentType: "Gutachten zum Radverkehr" });
+  assert.equal(result.isError, true);
+  assert.match(result.content[0]?.text ?? "", /give "Gutachten" there and "zum Radverkehr" as query/);
+  assert.equal(mock.calls.length, 0);
+  await connection.close();
+});

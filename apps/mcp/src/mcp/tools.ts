@@ -247,7 +247,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       RULES,
     ].join("\n\n"),
     inputSchema: input({
-      documentType: { type: "string", minLength: 3, maxLength: 80, description: "A document type by its German name (Gutachten, Verträge von öffentlichem Interesse, Senatsmitteilungen, …)." },
+      documentType: { type: "string", minLength: 3, maxLength: 80, description: "A document type by its German name alone (Gutachten, Verträge von öffentlichem Interesse, Senatsmitteilungen, …); topic words go in query." },
       query: filters["query"] as JsonSchema,
       organization: { type: "string", minLength: 2, maxLength: 100, pattern: "^[a-z0-9_-]+$", description: "An organization slug: allris, workflows, hmdklgv, dokrates, statistikamt, stadthamburg." },
       from: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Entered the portal from this day (YYYY-MM-DD)." },

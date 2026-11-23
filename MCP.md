@@ -95,7 +95,8 @@ total, never from paging. Every portal spells formats and licences its own way (
 vocabulary URI; dl-de-by-2.0 and its DCAT-AP.de URI): a format filter matches every spelling, a
 count folds them (and says when the sum is an upper bound), each licence gets one label and says
 whether it is open. Hamburg's document types work only in the stemmed form its search index holds;
-the tool sends that form for a German name. An organization or group that fits several names is
+the tool sends that form for a German name, and refuses a type with more words ("Gutachten zum
+Radverkehr"), naming the type and the words that belong in `query`. An organization or group that fits several names is
 reported with the candidates, never guessed; an unknown record or an empty search is said in
 words, with what to try. A text over 2000 characters is cut and ends in
 `…[cut, N characters in all]`, and the answer says `truncated`. An answer over

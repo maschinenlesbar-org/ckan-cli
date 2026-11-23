@@ -24,7 +24,7 @@
 // as the client sends it, for its source.
 
 import { actionRequest, packageSearchQuery, type CkanClient } from "./client.js";
-import { CkanActionError, CkanApiError, CkanError, CkanValidationError } from "./errors.js";
+import { CkanActionError, CkanApiError, CkanError, CkanValidationError, cutText } from "./errors.js";
 import { mapLimit, portalKey, problemOf } from "./portals.js";
 import { PORTALS } from "./portals-list.js";
 import type { JsonObject, JsonValue, PackageSearchParams, PackageSearchResult, Portal } from "./types.js";
@@ -517,22 +517,32 @@ export type DocumentType = keyof typeof DOCUMENT_TYPES;
 /** A word with the umlauts as Hamburg's values write them out (ae, oe, ue) taken back to a, o, u. */
 const unUmlaut = (text: string): string => foldName(text).replace(/ae/g, "a").replace(/oe/g, "o").replace(/ue/g, "u").replace(/[^a-z]/g, "");
 
+/** The words of a value as a person writes them (spaces and commas between). */
+const wordsOf = (text: string): string[] => text.trim().split(/[\s,;]+/).filter((word) => word !== "");
+
+/** The most letters a value may have after a whole stem: a word's ending (Beteilig-ungen), not more words. */
+const MAX_ENDING = 7;
+
 /**
  * A document type's index value from that value, its German name, Hamburg's stored value
  * (vertraegeoeffinteresse) or its published one (vertraege_oeff_interesse); undefined if none fits.
+ * A value with more words than the type's name ("Gutachten zum Radverkehr") is no type: the other
+ * words would be dropped without a word (documentTypeAndWords finds the type in it).
  */
 export function documentType(value: string): DocumentType | undefined {
   const folded = unUmlaut(value);
   if (folded === "") return undefined;
+  const words = wordsOf(value).length;
   let best: DocumentType | undefined;
   let bestLength = 0;
   let tie = false;
   for (const [stem, label] of Object.entries(DOCUMENT_TYPES)) {
     if (folded === stem || folded === unUmlaut(label)) return stem as DocumentType;
+    if (words > wordsOf(label).length) continue;
     // A stored or published value starts with the stem, give or take the last letters (senatpetita).
     let common = 0;
     while (common < stem.length && common < folded.length && stem[common] === folded[common]) common++;
-    if (common < Math.min(stem.length, 6) || (common !== stem.length && folded.length - common > 3)) continue;
+    if (common < Math.min(stem.length, 6) || folded.length - common > (common === stem.length ? MAX_ENDING : 3)) continue;
     if (common > bestLength) {
       best = stem as DocumentType;
       bestLength = common;
@@ -543,6 +553,19 @@ export function documentType(value: string): DocumentType | undefined {
   }
   // Two types fit as well ("verwaltung"): none is guessed.
   return tie ? undefined : best;
+}
+
+/**
+ * A value that starts with a document type and goes on with other words ("Gutachten zum
+ * Radverkehr"): the type and those words; undefined when no leading words are a type.
+ */
+export function documentTypeAndWords(value: string): { type: DocumentType; words: string } | undefined {
+  const words = wordsOf(value);
+  for (let n = words.length - 1; n >= 1; n--) {
+    const type = documentType(words.slice(0, n).join(" "));
+    if (type !== undefined) return { type, words: words.slice(n).join(" ") };
+  }
+  return undefined;
 }
 
 /** The German names of a record's stored type value ("dienstanweisungen, vergleichbar"). */
@@ -1292,6 +1315,13 @@ export async function findHamburgDocuments(client: CkanClient, params: FindHambu
   let type: DocumentType | undefined;
   if (params.documentType !== undefined) {
     type = documentType(params.documentType);
+    const more = type === undefined ? documentTypeAndWords(params.documentType) : undefined;
+    if (more !== undefined) {
+      const query = params.query === undefined ? "" : `, beside ${JSON.stringify(cutText(params.query.trim(), 80))}`;
+      throw new CkanValidationError(
+        `Invalid documentType: ${JSON.stringify(cutText(params.documentType.trim(), 80))} is more than a type: documentType takes a type alone: give ${JSON.stringify(DOCUMENT_TYPES[more.type])} there and ${JSON.stringify(cutText(more.words, 80))} as query${query}.`,
+      );
+    }
     if (type === undefined) {
       throw new CkanValidationError(`Invalid documentType: ${JSON.stringify(params.documentType.slice(0, 80))} is none of Hamburg's document types (${Object.values(DOCUMENT_TYPES).join(", ")}).`);
     }

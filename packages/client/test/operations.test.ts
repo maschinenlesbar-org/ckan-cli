@@ -350,3 +350,34 @@ test("a description's HTML is stripped in linear time: an opening bracket with n
   const tagged = await getDataset(answering({ name: "x", notes: "a < b <p>c</p> d > e &amp; <br/>f", resources: [] }), { id: "x" });
   assert.equal(tagged.dataset?.description, "a c d > e & f", "a tag runs from < to the next >, as before");
 });
+
+test("a document type with more words is refused, naming the type and where the words go; no request is made", async () => {
+  assert.equal(documentType("Gutachten zum Radverkehr"), undefined, "more than a type");
+  assert.equal(documentType("gutachtenzumradverkehr"), undefined, "a stem with a long tail is more than a type");
+  assert.equal(documentType("Baumkataster Altona 2024"), undefined);
+  // What still fits: the labels, the stored and published values, singular and plural.
+  for (const [value, stem] of [
+    ["Gutachten", "gutacht"],
+    ["Dienstanweisung", "dienstanweis"],
+    ["dienstanweisungen", "dienstanweis"],
+    ["Baugenehmigung", "baugenehm"],
+    ["städtische Beteiligungen", "stadtischebeteil"],
+    ["staedtische_beteiligungen", "stadtischebeteil"],
+    ["andereveroeffentlichungspflicht", "andereveroffentlichungspflicht"],
+    ["Verträge", "vertrageoffinteress"],
+  ] as const) {
+    assert.equal(documentType(value), stem, value);
+  }
+  const mock = ckanApi();
+  for (const [value, type, words] of [
+    ["Gutachten zum Radverkehr", "Gutachten", "zum Radverkehr"],
+    ["Baumkataster Altona 2024", "Baumkataster", "Altona 2024"],
+  ]) {
+    await assert.rejects(findHamburgDocuments(clientOf(mock), { documentType: value as string, query: "Eiche" }), (err: Error) => {
+      assert.ok(err instanceof CkanValidationError);
+      assert.match(err.message, new RegExp(`documentType takes a type alone: give "${type}" there and "${words}" as query`), err.message);
+      return true;
+    });
+  }
+  assert.equal(mock.calls.length, 0);
+});
