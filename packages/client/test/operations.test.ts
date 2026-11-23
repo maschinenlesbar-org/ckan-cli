@@ -412,3 +412,16 @@ test("non-commercial and no-derivatives licences in every DCAT-AP.de spelling ar
   const page = await findDatasets(answering({}, { count: 1, results: [{ name: "a", license_id: "cc-by-nc-de/3.0", resources: [] }], search_facets: {} }));
   assert.ok(page.notes.some((n) => n.includes("not open")), page.notes.join(" | "));
 });
+
+test("comparePortals: a portal's success:false answer is described by its reason, not by a cut URL", async () => {
+  const transport = makeMockTransport((request) => {
+    const host = new URL(request.url).host;
+    if (host === "open.nrw") return jsonResponse({ help: "", success: false, error: { __type: "Search Error", message: "Solr down" } });
+    if (host === "opendata.leipzig.de") return jsonResponse({ help: "", success: false, error: { __type: "Validation Error", q: ["too long"] } });
+    return jsonResponse({ help: "", success: true, result: { count: 1, results: [], search_facets: {} } });
+  });
+  const answer = await comparePortals(new CkanClient({ transport: transport.transport, maxRetries: 0 }), { query: "x", portals: ["nrw", "leipzig", "berlin"] });
+  assert.equal(answer.portals.find((p) => p.id === "nrw")?.problem, "Search Error: Solr down");
+  assert.equal(answer.portals.find((p) => p.id === "leipzig")?.problem, "Validation Error: q: too long");
+  assert.ok(answer.notes.some((n) => n.includes("nrw: Search Error: Solr down")), answer.notes.join(" | "));
+});

@@ -3,7 +3,7 @@
 
 import { CkanClient, siteRoot } from "./client.js";
 import { validateBaseUrl, type EngineOptions } from "./engine.js";
-import { CkanApiError, CkanNetworkError, CkanParseError, CkanValidationError, cutText } from "./errors.js";
+import { CkanActionError, CkanApiError, CkanNetworkError, CkanParseError, CkanValidationError, cutText } from "./errors.js";
 import { PORTALS } from "./portals-list.js";
 import type { Portal } from "./types.js";
 import { assertValid, intRangeProblem } from "./validate.js";
@@ -107,6 +107,11 @@ export function problemOf(err: unknown): string {
     return err.detail?.startsWith("stopped after") ? "redirect loop" : `HTTP ${err.status}`;
   }
   const message = err instanceof Error ? err.message : String(err);
+  if (err instanceof CkanActionError) {
+    // The client's "GET <url>: CKAN action "<name>" failed: <type>: <reason>": the reason, not the URL.
+    const at = message.indexOf('" failed: ');
+    if (at >= 0) return cutText(message.slice(at + '" failed: '.length), 80);
+  }
   if (err instanceof CkanParseError) {
     // The engine's "GET <url>: the answer is not valid JSON (expected JSON, got Content-Type "<type>")."
     const got = /\(expected JSON, got Content-Type "(.*)"\)\.$/.exec(message);
