@@ -117,8 +117,11 @@ body.
 
 `timeoutMs` and `maxResponseBytes` hold for every transport, not only the built-in
 one: the engine runs each transport call under the `timeoutMs` deadline (passing an
-`AbortSignal` in `HttpRequest.signal`, which the built-in transport honours; the call
-rejects at the deadline either way) and checks the size of the body it gets back
+`AbortSignal` in `HttpRequest.signal`, aborted with the engine's timeout error as its reason,
+which the built-in transport honours: it stops with that reason, and for a signal some other
+caller aborted, the MCP server's tool call (its deadline, a cancellation), it says "Request
+aborted by its caller before it finished", never a timeout it didn't have; the call rejects at
+the deadline either way) and checks the size of the body it gets back
 (`Response exceeded the size limit of N bytes (maxResponseBytes; --max-response-bytes
 on the CLI)`). The built-in transport joins small chunks as they arrive (up to 1024 of them
 or 64 KiB), so the memory a body takes follows its bytes, not the number of chunks a server
