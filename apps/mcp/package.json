@@ -1,6 +1,6 @@
 {
   "name": "@maschinenlesbar.org/ckan-mcp",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "MCP server for German CKAN open-data portals (Transparenzportal Hamburg by default, Berlin, Open.NRW, GovData and 14 more): find and count datasets, compare the portals, and search Hamburg's transparency register for documents, for AI agents (stdio and Streamable HTTP)",
   "type": "module",
   "bin": {
